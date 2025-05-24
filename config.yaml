@@ -1,3 +1,0 @@
-periods: 4
-database_url: "sqlite:///schedule.db"
-# Add more config as needed
