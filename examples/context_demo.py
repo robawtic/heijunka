@@ -55,20 +55,17 @@ def demo_context_usage():
     model = cp_model.CpModel()
     
     # Create decision variables
-    days = 1
     periods = 3
     assign = {}
-    for d in range(days):
-        for i in range(len(employees)):
-            for j in range(len(workstations)):
-                for p in range(periods):
-                    assign[(d, i, j, p)] = model.NewBoolVar(f"assign_d{d}_e{i}_w{j}_p{p}")
-    
+    for i in range(len(employees)):
+        for j in range(len(workstations)):
+            for p in range(periods):
+                assign[(i, j, p)] = model.NewBoolVar(f"assign_e{i}_w{j}_p{p}")
+
     # Create a context
     ctx = RuleContext(
         model=model,
         assign=assign,
-        days=days,
         employees=employees,
         workstations=workstations,
         periods=periods,
@@ -84,29 +81,27 @@ def demo_context_usage():
         assign = ctx.assign
         employees = ctx.employees
         workstations = ctx.workstations
-        
-        for d in range(ctx.days):
-            for i, emp in enumerate(employees):
-                for j, ws in enumerate(workstations):
-                    if not emp.can_work(ws):
-                        for p in range(ctx.periods):
-                            model.Add(assign[(d, i, j, p)] == 0)
-                            print(f"  Forbidding {emp.name} from working at {ws.name}")
-    
+
+        for i, emp in enumerate(employees):
+            for j, ws in enumerate(workstations):
+                if not emp.can_work(ws):
+                    for p in range(ctx.periods):
+                        model.Add(assign[(i, j, p)] == 0)
+                        print(f"  Forbidding {emp.name} from working at {ws.name}")
+
     # Apply the rule
     example_rule(ctx)
     print()
     
     # Define a prototype rule with explicit parameters
-    def prototype_rule(model, A, days, E, W, P):
+    def prototype_rule(model, A, E, W, P):
         """A prototype rule with explicit parameters."""
         print("Applying prototype_rule...")
-        for d in range(days):
-            for i in range(len(E)):
-                for p in range(P):
-                    # Ensure each employee works at most one station per period
-                    model.Add(sum(A[(d, i, j, p)] for j in range(len(W))) <= 1)
-                    print(f"  Ensuring {E[i].name} works at most one station in period {p+1}")
+        for i in range(len(E)):
+            for p in range(P):
+                # Ensure each employee works at most one station per period
+                model.Add(sum(A[(i, j, p)] for j in range(len(W))) <= 1)
+                print(f"  Ensuring {E[i].name} works at most one station in period {p+1}")
     
     # Adapt the prototype rule to use the context
     adapted_rule = adapt_rule(prototype_rule)
@@ -119,7 +114,6 @@ def demo_context_usage():
     headsub_ctx = HeadsubRuleContext(
         model=model,
         assign=assign,
-        days=days,
         employees=employees,
         workstations=workstations,
         periods=periods,
@@ -152,7 +146,6 @@ def demo_context_usage():
         team_name=team_name,
         model=model,
         assign=assign,
-        days=days,
         employees=employees,
         workstations=workstations,
         periods=periods,

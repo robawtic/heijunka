@@ -4,7 +4,7 @@ from domain.entities.employee import Employee
 from domain.entities.workstation import Workstation
 from .schedule_period import SchedulePeriod
 
-@dataclass
+@dataclass(frozen=True)
 class WorkAssignment:
     employee: Employee
     workstation: Workstation

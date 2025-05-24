@@ -27,25 +27,25 @@ def forbid_adjacent_special_loading(ctx: HeadsubRuleContext):
             for p in range(periods):
                 # For each special station
                 for s in special_indices:
-                    v = assign[(d, i, s, p)]
+                    v = assign[(i, s, p)]
                     # Prevent assignment to loading stations in adjacent periods
                     if p > 0:
                         for l in loading_indices:
-                            model.AddImplication(v, assign[(d, i, l, p-1)].Not())
+                            model.AddImplication(v, assign[(i, l, p-1)].Not())
                     if p < periods - 1:
                         for l in loading_indices:
-                            model.AddImplication(v, assign[(d, i, l, p+1)].Not())
+                            model.AddImplication(v, assign[(i, l, p+1)].Not())
 
                 # For each loading station
                 for l in loading_indices:
-                    v = assign[(d, i, l, p)]
+                    v = assign[(i, l, p)]
                     # Prevent assignment to special stations in adjacent periods
                     if p > 0:
                         for s in special_indices:
-                            model.AddImplication(v, assign[(d, i, s, p-1)].Not())
+                            model.AddImplication(v, assign[(i, s, p-1)].Not())
                     if p < periods - 1:
                         for s in special_indices:
-                            model.AddImplication(v, assign[(d, i, s, p+1)].Not())
+                            model.AddImplication(v, assign[(i, s, p+1)].Not())
 
 
 @rule_metadata(uses=["model", "assign", "days", "employees", "workstations", "periods"])
@@ -72,7 +72,7 @@ def forbid_parts_wash_outside_period1(ctx: RuleContext):
     for d in range(days):
         for i in range(len(employees)):
             for p in range(1, periods):  # Skip period 0 (first period)
-                model.Add(assign[(d, i, pw_idx, p)] == 0)
+                model.Add(assign[(i, pw_idx, p)] == 0)
 
 
 @rule_metadata(uses=["model", "assign", "days", "employees", "workstations", "periods", "start_date", "scheduled"])
@@ -111,10 +111,10 @@ def limit_h010_once_per_day(ctx: RuleContext):
             if already_worked >= 1:
                 # Prevent any additional assignments to H010 today
                 for p in range(periods):
-                    model.Add(assign[(d, i, h010_idx, p)] == 0)
+                    model.Add(assign[(i, h010_idx, p)] == 0)
             else:
                 # Limit to at most one assignment to H010 today
-                model.Add(sum(assign[(d, i, h010_idx, p)] for p in range(periods)) <= 1)
+                model.Add(sum(assign[(i, h010_idx, p)] for p in range(periods)) <= 1)
 
 
 @rule_metadata(uses=["model", "assign", "days", "employees", "workstations", "periods"])
@@ -144,7 +144,7 @@ def require_full_staff_for_parts_wash(ctx: HeadsubRuleContext):
         for d in range(days):
             for i in range(total_employees):
                 for p in range(periods):
-                    model.Add(assign[(d, i, pw_idx, p)] == 0)
+                    model.Add(assign[(i, pw_idx, p)] == 0)
 
 
 @rule_metadata(uses=["model", "assign", "days", "employees", "workstations", "periods", "start_date", "scheduled"])
@@ -177,10 +177,10 @@ def limit_heavy_loading_jobs(ctx: HeadsubRuleContext):
                 # Prevent any additional assignments to heavy loading stations today
                 for j in heavy_indices:
                     for p in range(periods):
-                        model.Add(assign[(d, i, j, p)] == 0)
+                        model.Add(assign[(i, j, p)] == 0)
             else:
                 # Limit to at most one assignment to heavy loading stations today
-                model.Add(sum(assign[(d, i, j, p)] for j in heavy_indices for p in range(periods)) <= 1)
+                model.Add(sum(assign[(i, j, p)] for j in heavy_indices for p in range(periods)) <= 1)
 
 
 @rule_metadata(uses=["model", "assign", "days", "employees", "workstations", "periods", "start_date", "scheduled"])
@@ -213,10 +213,10 @@ def limit_head_loading_jobs(ctx: HeadsubRuleContext):
                 # Prevent any additional assignments to head loading stations today
                 for j in head_indices:
                     for p in range(periods):
-                        model.Add(assign[(d, i, j, p)] == 0)
+                        model.Add(assign[(i, j, p)] == 0)
             else:
                 # Limit to at most one assignment to head loading stations today
-                model.Add(sum(assign[(d, i, j, p)] for j in head_indices for p in range(periods)) <= 1)
+                model.Add(sum(assign[(i, j, p)] for j in head_indices for p in range(periods)) <= 1)
 
 
 # forbid_consecutive_special is a headsub specific rule.
@@ -252,7 +252,7 @@ def forbid_consecutive_special(ctx: RuleContext):
                 for s1 in special_indices:
                     for s2 in special_indices:
                         # Forbid assignment to special stations in consecutive periods
-                        model.Add(assign[(d, i, s1, p)] + assign[(d, i, s2, p + 1)] <= 1)
+                        model.Add(assign[(i, s1, p)] + assign[(i, s2, p + 1)] <= 1)
 # List of all Headsub team rules
 
 HEADSUB_RULES = [

@@ -9,7 +9,6 @@ class ScheduleModel(Base):
     id = Column(Integer, primary_key=True)
     team_id = Column(Integer, ForeignKey('teams.id'), nullable=False, index=True)
     start_date = Column(Date, nullable=False, index=True)
-    days = Column(Integer, nullable=False, default=1)
     periods_per_day = Column(Integer, nullable=False, default=4)
     call_ins = Column(JSON, nullable=True)
     offline = Column(JSON, nullable=True)
@@ -30,4 +29,4 @@ class ScheduleModel(Base):
     work_history_entries = relationship('EmployeeWorkHistoryModel', back_populates='schedule', cascade="all, delete-orphan")
 
     def __repr__(self):
-        return f"<Schedule(id={self.id}, team_id={self.team_id}, start_date={self.start_date}, days={self.days}, status={self.status})>"
+        return f"<Schedule(id={self.id}, team_id={self.team_id}, start_date={self.start_date}, status={self.status})>"

@@ -42,24 +42,21 @@ class TestHeadsubRules(unittest.TestCase):
         
         self.workstations = [self.h170, self.bw010, self.parts_wash, self.h010, self.loading_station]
         
-        # Set up days and periods
-        self.days = 1
+        # Set up periods
         self.periods = 3
         
         # Create assignment variables
         self.assign = {}
-        for d in range(self.days):
-            for i in range(len(self.employees)):
-                for j in range(len(self.workstations)):
-                    for p in range(self.periods):
-                        self.assign[(d, i, j, p)] = self.model.NewBoolVar(f"assign_d{d}_e{i}_w{j}_p{p}")
-        
+        for i in range(len(self.employees)):
+            for j in range(len(self.workstations)):
+                for p in range(self.periods):
+                    self.assign[(i, j, p)] = self.model.NewBoolVar(f"assign_e{i}_w{j}_p{p}")
+
         # Create rule context
         self.start_date = date.today()
         self.ctx = HeadsubRuleContext(
             model=self.model,
             assign=self.assign,
-            days=self.days,
             employees=self.employees,
             workstations=self.workstations,
             periods=self.periods,

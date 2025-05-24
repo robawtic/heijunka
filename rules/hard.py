@@ -35,12 +35,12 @@ def forbid_unavailable(ctx: RuleContext):
                 # Forbid assignment to any workstation during any period
                 for j in range(len(workstations)):
                     for p in range(periods):
-                        model.Add(assign[(d, i, j, p)] == 0)
+                        model.Add(assign[(i, j, p)] == 0)
             else:
                 # Check regular availability
                 for p in range(periods):
                     # Check if employee is unavailable for this period
-                    is_unavailable = not emp.is_available_for_period(day, p + 1)  # Periods are 1-indexed in the domain model
+                    is_unavailable = not emp.is_available_for_period(start_date, p + 1)  # Periods are 1-indexed in the domain model
 
                     # Check if employee is marked as offline for this period
                     is_offline = False
@@ -53,7 +53,7 @@ def forbid_unavailable(ctx: RuleContext):
                     if is_unavailable or is_offline:
                         # Forbid assignment to any workstation during this period
                         for j in range(len(workstations)):
-                            model.Add(assign[(d, i, j, p)] == 0)
+                            model.Add(assign[(i, j, p)] == 0)
 
 
 @rule_metadata(uses=["model", "assign", "days", "employees", "workstations", "periods"])
@@ -78,7 +78,7 @@ def forbid_unknown_stations(ctx: RuleContext):
                 if not emp.can_work(ws):
                     # Forbid assignment to this workstation
                     for p in range(periods):
-                        model.Add(assign[(d, i, j, p)] == 0)
+                        model.Add(assign[(i, j, p)] == 0)
 
 
 @rule_metadata(uses=["model", "assign", "days", "employees", "periods"])
@@ -99,7 +99,7 @@ def add_one_station_per_employee(ctx: RuleContext):
     for d in range(days):
         for i in range(len(employees)):
             for p in range(periods):
-                model.Add(sum(assign[(d, i, j, p)] for j in range(len(workstations))) <= 1)
+                model.Add(sum(assign[(i, j, p)] for j in range(len(workstations))) <= 1)
 
 
 @rule_metadata(uses=["model", "assign", "days", "workstations", "periods"])
@@ -128,4 +128,4 @@ def add_exactly_one_per_station(ctx: RuleContext):
                     continue
 
                 # Require at most one employee per workstation per period
-                model.Add(sum(assign[(d, i, j, p)] for i in range(len(employees))) == 1)
+                model.Add(sum(assign[(i, j, p)] for i in range(len(employees))) == 1)

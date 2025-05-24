@@ -87,13 +87,12 @@ offline_periods: {}                  # Dictionary of periods when workstations a
 #### Generate a Schedule
 
 ```bash
-python main.py generate --team <team_name> --days <num_days> --periods <periods_per_day> [options]
+python main.py generate --team <team_name> --periods <periods_per_day> [options]
 ```
 
 Options:
 - `--team`: Team name (required)
 - `--start-date`: Start date for the schedule (YYYY-MM-DD)
-- `--days`: Number of days to schedule (default: 1)
 - `--periods`: Number of periods per day (default: 4)
 - `--call-ins`: List of employees calling in (unavailable)
 - `--offline`: List of employees offline for specific periods in format "employee:periods" (e.g., "John:1,2")
@@ -101,7 +100,7 @@ Options:
 
 Example:
 ```bash
-python main.py generate --team headsub --days 5 --periods 4 --start-date 2024-08-19
+python main.py generate --team headsub --periods 4 --start-date 2024-08-19
 ```
 
 #### Create a Manual Assignment

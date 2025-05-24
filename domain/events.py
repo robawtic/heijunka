@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 from datetime import datetime, date
-from typing import Optional
+from typing import Optional, List
 import uuid
 from domain.value_objects.schedule_period import SchedulePeriod
 
@@ -25,97 +25,6 @@ class ScheduleEvent(DomainEvent):
             raise TypeError("schedule_id must be a string")
         if not self.schedule_id or self.schedule_id.isspace():
             raise ValueError("schedule_id cannot be empty or whitespace")
-
-@dataclass
-class ScheduleCreated(DomainEvent):
-    """Event raised when a new schedule is created"""
-    schedule_id: int
-    team_id: int
-    start_date: date
-    days: int
-    periods_per_day: int
-
-    def __post_init__(self):
-        super().__post_init__()
-        if not isinstance(self.schedule_id, int) or self.schedule_id <= 0:
-            raise ValueError("schedule_id must be a positive integer")
-        if not isinstance(self.team_id, int) or self.team_id <= 0:
-            raise ValueError("team_id must be a positive integer")
-        if not isinstance(self.start_date, date):
-            raise ValueError("start_date must be a date object")
-        if not isinstance(self.days, int) or self.days <= 0:
-            raise ValueError("days must be a positive integer")
-        if not isinstance(self.periods_per_day, int) or self.periods_per_day <= 0:
-            raise ValueError("periods_per_day must be a positive integer")
-
-
-@dataclass
-class ScheduleUpdated(DomainEvent):
-    """Event raised when a schedule is updated"""
-    schedule_id: int
-
-    def __post_init__(self):
-        super().__post_init__()
-        if not isinstance(self.schedule_id, int) or self.schedule_id <= 0:
-            raise ValueError("schedule_id must be a positive integer")
-
-
-@dataclass
-class ScheduleStatusChanged(DomainEvent):
-    """Event raised when a schedule's status is changed"""
-    schedule_id: int
-    old_status: str
-    new_status: str
-
-    def __post_init__(self):
-        super().__post_init__()
-        if not isinstance(self.schedule_id, int) or self.schedule_id <= 0:
-            raise ValueError("schedule_id must be a positive integer")
-        if not isinstance(self.old_status, str):
-            raise ValueError("old_status must be a string")
-        if not isinstance(self.new_status, str) or not self.new_status:
-            raise ValueError("new_status must be a non-empty string")
-
-
-@dataclass
-class AssignmentAdded(DomainEvent):
-    """Event raised when an assignment is added to a schedule"""
-    schedule_id: int
-    employee_id: int
-    workstation_id: int
-    period: SchedulePeriod
-
-    def __post_init__(self):
-        super().__post_init__()
-        if not isinstance(self.schedule_id, int) or self.schedule_id <= 0:
-            raise ValueError("schedule_id must be a positive integer")
-        if not isinstance(self.employee_id, int) or self.employee_id <= 0:
-            raise ValueError("employee_id must be a positive integer")
-        if not isinstance(self.workstation_id, int) or self.workstation_id <= 0:
-            raise ValueError("workstation_id must be a positive integer")
-        if not isinstance(self.period, SchedulePeriod):
-            raise ValueError("period must be a SchedulePeriod instance")
-
-
-@dataclass
-class AssignmentRemoved(DomainEvent):
-    """Event raised when an assignment is removed from a schedule"""
-    schedule_id: int
-    employee_id: int
-    workstation_id: int
-    period: SchedulePeriod
-
-    def __post_init__(self):
-        super().__post_init__()
-        if not isinstance(self.schedule_id, int) or self.schedule_id <= 0:
-            raise ValueError("schedule_id must be a positive integer")
-        if not isinstance(self.employee_id, int) or self.employee_id <= 0:
-            raise ValueError("employee_id must be a positive integer")
-        if not isinstance(self.workstation_id, int) or self.workstation_id <= 0:
-            raise ValueError("workstation_id must be a positive integer")
-        if not isinstance(self.period, SchedulePeriod):
-            raise ValueError("period must be a SchedulePeriod instance")
-
 
 @dataclass
 class AssignmentCreated(DomainEvent):
@@ -459,3 +368,101 @@ class GroupDepartmentChanged(DomainEvent):
             raise ValueError("old_department_id must be a positive integer or None")
         if self.new_department_id is not None and (not isinstance(self.new_department_id, int) or self.new_department_id <= 0):
             raise ValueError("new_department_id must be a positive integer or None")
+
+@dataclass
+class ScheduleCreated(DomainEvent):
+    """Event raised when a new schedule is created"""
+    schedule_id: int
+    team_id: int
+    start_date: date
+    periods_per_day: int
+
+    def __post_init__(self):
+        super().__post_init__()
+        if not isinstance(self.schedule_id, int) or self.schedule_id <= 0:
+            raise ValueError("schedule_id must be a positive integer")
+        if not isinstance(self.team_id, int) or self.team_id <= 0:
+            raise ValueError("team_id must be a positive integer")
+        if not isinstance(self.start_date, date):
+            raise ValueError("start_date must be a date object")
+        if not isinstance(self.periods_per_day, int) or self.periods_per_day <= 0:
+            raise ValueError("periods_per_day must be a positive integer")
+
+@dataclass
+class ScheduleUpdated(DomainEvent):
+    """Event raised when a schedule is updated"""
+    schedule_id: int
+
+    def __post_init__(self):
+        super().__post_init__()
+        if not isinstance(self.schedule_id, int) or self.schedule_id <= 0:
+            raise ValueError("schedule_id must be a positive integer")
+
+@dataclass
+class ScheduleStatusChanged(DomainEvent):
+    """Event raised when a schedule's status is changed"""
+    schedule_id: int
+    old_status: str
+    new_status: str
+
+    def __post_init__(self):
+        super().__post_init__()
+        if not isinstance(self.schedule_id, int) or self.schedule_id <= 0:
+            raise ValueError("schedule_id must be a positive integer")
+        if not isinstance(self.old_status, str):
+            raise ValueError("old_status must be a string")
+        if not isinstance(self.new_status, str) or not self.new_status:
+            raise ValueError("new_status must be a non-empty string")
+
+@dataclass
+class AssignmentAdded(DomainEvent):
+    """Event raised when an assignment is added to a schedule"""
+    schedule_id: int
+    employee_id: int
+    workstation_id: int
+    period: SchedulePeriod
+
+    def __post_init__(self):
+        super().__post_init__()
+        if not isinstance(self.schedule_id, int) or self.schedule_id <= 0:
+            raise ValueError("schedule_id must be a positive integer")
+        if not isinstance(self.employee_id, int) or self.employee_id <= 0:
+            raise ValueError("employee_id must be a positive integer")
+        if not isinstance(self.workstation_id, int) or self.workstation_id <= 0:
+            raise ValueError("workstation_id must be a positive integer")
+        if not isinstance(self.period, SchedulePeriod):
+            raise ValueError("period must be a SchedulePeriod instance")
+
+@dataclass
+class AssignmentRemoved(DomainEvent):
+    """Event raised when an assignment is removed from a schedule"""
+    schedule_id: int
+    employee_id: int
+    workstation_id: int
+    period: SchedulePeriod
+
+    def __post_init__(self):
+        super().__post_init__()
+        if not isinstance(self.schedule_id, int) or self.schedule_id <= 0:
+            raise ValueError("schedule_id must be a positive integer")
+        if not isinstance(self.employee_id, int) or self.employee_id <= 0:
+            raise ValueError("employee_id must be a positive integer")
+        if not isinstance(self.workstation_id, int) or self.workstation_id <= 0:
+            raise ValueError("workstation_id must be a positive integer")
+        if not isinstance(self.period, SchedulePeriod):
+            raise ValueError("period must be a SchedulePeriod instance")
+
+@dataclass
+class ScheduleValidationFailed(DomainEvent):
+    """Event raised when schedule validation fails"""
+    schedule_id: int
+    validation_errors: List[str]
+
+    def __post_init__(self):
+        super().__post_init__()
+        if not isinstance(self.schedule_id, int) or self.schedule_id <= 0:
+            raise ValueError("schedule_id must be a positive integer")
+        if not isinstance(self.validation_errors, list):
+            raise ValueError("validation_errors must be a list")
+        if not all(isinstance(error, str) for error in self.validation_errors):
+            raise ValueError("All validation errors must be strings")

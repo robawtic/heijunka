@@ -3,12 +3,11 @@
 from rules.registry import get_rules_for_team, create_context_for_team
 from models import load_models
 
-def run_schedule(days, teams, call_ins, overrides, config):
+def run_schedule(teams, call_ins, overrides, config):
     """
     Run the scheduling algorithm for the given teams.
 
     Args:
-        days: Number of days to schedule
         teams: Team name or list of team names
         call_ins: List of employee names who called in (unavailable)
         overrides: Dictionary of scheduling overrides
@@ -34,18 +33,16 @@ def run_schedule(days, teams, call_ins, overrides, config):
     # Create decision variables
     # (day, employee_idx, workstation_idx, period) -> BoolVar
     assign = {}
-    for d in range(days):
-        for i in range(len(employees)):
-            for j in range(len(workstations)):
-                for p in range(config["periods"]):
-                    assign[(d, i, j, p)] = model.NewBoolVar(f"assign_d{d}_e{i}_w{j}_p{p}")
+    for i in range(len(employees)):
+        for j in range(len(workstations)):
+            for p in range(config["periods"]):
+                assign[(i, j, p)] = model.NewBoolVar(f"assign_e{i}_w{j}_p{p}")
 
     # Create the appropriate context for the team
     ctx = create_context_for_team(
         team_name=teams,
         model=model,
         assign=assign,
-        days=days,
         employees=employees,
         workstations=workstations,
         periods=config["periods"],
@@ -100,19 +97,17 @@ def run_schedule(days, teams, call_ins, overrides, config):
     if status in [cp_model.OPTIMAL, cp_model.FEASIBLE]:
         # Extract assignments
         schedule = []
-        for d in range(days):
-            for i, emp in enumerate(employees):
-                for j, ws in enumerate(workstations):
-                    for p in range(config["periods"]):
-                        if solver.Value(assign[(d, i, j, p)]) == 1:
-                            schedule.append({
-                                "day": d,
-                                "employee_id": emp.id,
-                                "employee_name": emp.name,
-                                "workstation_id": ws.id,
-                                "workstation_name": ws.name,
-                                "period": p
-                            })
+        for i, emp in enumerate(employees):
+            for j, ws in enumerate(workstations):
+                for p in range(config["periods"]):
+                    if solver.Value(assign[(i, j, p)]) == 1:
+                        schedule.append({
+                            "employee_id": emp.id,
+                            "employee_name": emp.name,
+                            "workstation_id": ws.id,
+                            "workstation_name": ws.name,
+                            "period": p
+                        })
         print(f"Generated {len(schedule)} assignments")
         return {
             "status": "success",

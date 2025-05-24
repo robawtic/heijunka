@@ -44,7 +44,7 @@ class TestHardRules(unittest.TestCase):
             for i in range(len(self.employees)):
                 for j in range(len(self.workstations)):
                     for p in range(self.periods):
-                        self.assign[(d, i, j, p)] = self.model.NewBoolVar(f"assign_d{d}_e{i}_w{j}_p{p}")
+                        self.assign[(i, j, p)] = self.model.NewBoolVar(f"assign_e{i}_w{j}_p{p}")
 
         # Create rule context
         self.ctx = RuleContext(

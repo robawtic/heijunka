@@ -75,7 +75,6 @@ def parse_arguments():
     generate_parser = subparsers.add_parser('generate', help='Generate a schedule')
     generate_parser.add_argument('--team', type=str, required=True, help='Team name')
     generate_parser.add_argument('--start-date', type=str, default=date.today(), help='Start date for the schedule')
-    generate_parser.add_argument('--days', type=int, default=1, help='Number of days to schedule')
     generate_parser.add_argument('--periods', type=int, default=4, help='Number of periods per day')
     generate_parser.add_argument('--call-ins', type=str, nargs='*', help='Employees calling in')
     generate_parser.add_argument('--offline', type=str, nargs='*', help='Employees offline for specific periods in format "employee:periods" (e.g., "John:1,2")')
@@ -332,7 +331,6 @@ def main():
                 command = GenerateScheduleCommand(
                     team_id=team_id,
                     start_date=start_date,
-                    days=args.days,
                     periods_per_day=args.periods,
                     call_ins=args.call_ins,
                     offline=args.offline,

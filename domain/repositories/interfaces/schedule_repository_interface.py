@@ -46,7 +46,7 @@ class ScheduleRepositoryInterface(BaseRepository[Schedule]):
         pass
     
     @abstractmethod
-    def create_schedule(self, team_id: int, start_date: date, days: int, periods_per_day: int, 
+    def create_schedule(self, team_id: int, start_date: date, periods: int, 
                        call_ins: List[str] = None, offline: List[str] = None, 
                        force_complete: bool = False) -> Schedule:
         """
@@ -55,8 +55,7 @@ class ScheduleRepositoryInterface(BaseRepository[Schedule]):
         Args:
             team_id: The ID of the team.
             start_date: The start date of the schedule.
-            days: Number of days to schedule.
-            periods_per_day: Number of periods per day.
+            periods: Number of periods.
             call_ins: List of employee names who called in (unavailable).
             offline: List of strings in format "employee:periods" specifying which employees are offline for which periods.
             force_complete: Whether to force completion of the schedule.

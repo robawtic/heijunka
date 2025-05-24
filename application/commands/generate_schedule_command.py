@@ -7,7 +7,6 @@ from typing import List, Optional
 class GenerateScheduleCommand:
     team_id: int
     start_date: date
-    days: int
     periods_per_day: int
     call_ins: List[str] = None
     offline: List[str] = None

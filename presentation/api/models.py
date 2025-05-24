@@ -225,7 +225,6 @@ class TeamResponse(BaseResponse, TeamBase):
 class ScheduleBase(BaseModel):
     team_id: int
     start_date: date
-    days: int = 1
     periods_per_day: int = 4
     call_ins: Optional[List[str]] = None
     offline: Optional[List[str]] = None
@@ -236,7 +235,6 @@ class ScheduleBase(BaseModel):
             "example": {
                 "team_id": 1,
                 "start_date": "2023-06-01",
-                "days": 5,
                 "periods_per_day": 4,
                 "call_ins": ["John Doe", "Jane Smith"],
                 "offline": ["Assembly Station 3"],
@@ -250,7 +248,6 @@ class ScheduleCreate(ScheduleBase):
 
     - team_id: ID of the team for which to create the schedule
     - start_date: First date of the schedule
-    - days: Number of days to schedule (default: 1)
     - periods_per_day: Number of work periods per day (default: 4)
     - call_ins: List of employee names who are calling in (optional)
     - offline: List of workstation names that are offline (optional)
@@ -263,7 +260,6 @@ class ScheduleCreate(ScheduleBase):
             "example": {
                 "team_id": 1,
                 "start_date": "2023-06-01",
-                "days": 5,
                 "periods_per_day": 4,
                 "call_ins": ["John Doe", "Jane Smith"],
                 "offline": ["Assembly Station 3"],
@@ -326,7 +322,6 @@ class ScheduleResponse(BaseResponse, ScheduleBase):
     - team_id: ID of the team for which the schedule was created
     - team_name: Name of the team
     - start_date: First date of the schedule
-    - days: Number of days in the schedule
     - periods_per_day: Number of work periods per day
     - call_ins: List of employee names who called in
     - offline: List of workstation names that were offline
@@ -351,7 +346,6 @@ class ScheduleResponse(BaseResponse, ScheduleBase):
                 "team_id": 1,
                 "team_name": "Assembly Team",
                 "start_date": "2023-06-01",
-                "days": 5,
                 "periods_per_day": 4,
                 "call_ins": ["John Doe", "Jane Smith"],
                 "offline": ["Assembly Station 3"],

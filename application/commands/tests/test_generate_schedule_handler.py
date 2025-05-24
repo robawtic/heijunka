@@ -68,7 +68,6 @@ class TestGenerateScheduleHandler(unittest.TestCase):
         command = GenerateScheduleCommand(
             team_id=1,
             start_date=date.today(),
-            days=1,
             periods_per_day=2,
             call_ins=None,
             force_complete=False

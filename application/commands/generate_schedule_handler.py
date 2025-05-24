@@ -40,7 +40,6 @@ class GenerateScheduleHandler:
             employees=employees,
             workstations=workstations,
             start_date=command.start_date,
-            days=command.days,
             periods_per_day=command.periods_per_day,
             team_name=team.name,
             call_ins=command.call_ins,

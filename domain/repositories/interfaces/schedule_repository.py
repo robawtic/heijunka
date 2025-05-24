@@ -8,7 +8,7 @@ class ScheduleRepository(ABC):
     """Repository interface for schedule operations."""
     
     @abstractmethod
-    def create(self, team_id: int, start_date: date, days: int, periods_per_day: int, 
+    def create(self, team_id: int, start_date: date, periods: int,
                call_ins: List[str] = None, offline: List[str] = None, 
                force_complete: bool = False) -> ScheduleModel:
         """Create a new schedule."""

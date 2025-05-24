@@ -17,8 +17,7 @@ class RuleContext:
     interface for all scheduling rules regardless of their specific needs.
     """
     model: CpModel
-    assign: Dict[Tuple[int, int, int, int], Any]  # (day, employee_idx, workstation_idx, period) -> BoolVar
-    days: int
+    assign: Dict[Tuple[ int, int, int], Any]  # (day, employee_idx, workstation_idx, period) -> BoolVar
     employees: List[Employee]
     workstations: List[Workstation]
     periods: int
@@ -66,7 +65,7 @@ def rule_metadata(uses: List[str]):
         uses: List of attribute names from RuleContext that this rule requires
 
     Example:
-        @rule_metadata(uses=["model", "assign", "days", "employees"])
+        @rule_metadata(uses=["model", "assign", "employees"])
         def my_rule(ctx: RuleContext):
             # Rule implementation
     """
@@ -99,7 +98,6 @@ def adapt_rule(rule_func: Callable) -> Callable[[RuleContext], Any]:
         param_map = {
             'model': ctx.model,
             'A': ctx.assign,
-            'days': ctx.days,
             'E': ctx.employees,
             'W': ctx.workstations,
             'P': ctx.periods,

@@ -32,23 +32,20 @@ class TestRegistry(unittest.TestCase):
         self.workstation2 = Workstation(id=2, name="Station 2", line_type="Assembly", team_id=1)
         self.workstations = [self.workstation1, self.workstation2]
         
-        # Set up days and periods
-        self.days = 1
+        # Set up periods
         self.periods = 2
         
         # Create assignment variables
         self.assign = {}
-        for d in range(self.days):
-            for i in range(len(self.employees)):
-                for j in range(len(self.workstations)):
-                    for p in range(self.periods):
-                        self.assign[(d, i, j, p)] = self.model.NewBoolVar(f"assign_d{d}_e{i}_w{j}_p{p}")
-        
+        for i in range(len(self.employees)):
+            for j in range(len(self.workstations)):
+                for p in range(self.periods):
+                    self.assign[(i, j, p)] = self.model.NewBoolVar(f"assign_e{i}_w{j}_p{p}")
+
         # Create context parameters
         self.context_params = {
             'model': self.model,
             'assign': self.assign,
-            'days': self.days,
             'employees': self.employees,
             'workstations': self.workstations,
             'periods': self.periods
@@ -116,7 +113,6 @@ class TestRegistry(unittest.TestCase):
         # Verify that other parameters are set
         self.assertEqual(ctx.model, self.model)
         self.assertEqual(ctx.assign, self.assign)
-        self.assertEqual(ctx.days, self.days)
         self.assertEqual(ctx.employees, self.employees)
         self.assertEqual(ctx.workstations, self.workstations)
         self.assertEqual(ctx.periods, self.periods)
@@ -135,7 +131,6 @@ class TestRegistry(unittest.TestCase):
         # Verify that other parameters are set
         self.assertEqual(ctx.model, self.model)
         self.assertEqual(ctx.assign, self.assign)
-        self.assertEqual(ctx.days, self.days)
         self.assertEqual(ctx.employees, self.employees)
         self.assertEqual(ctx.workstations, self.workstations)
         self.assertEqual(ctx.periods, self.periods)
