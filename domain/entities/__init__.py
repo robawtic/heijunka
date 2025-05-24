@@ -5,7 +5,8 @@ from domain.entities.group import Group
 from domain.entities.team import Team
 from domain.entities.team_member import TeamMember
 from domain.entities.workstation import Workstation
-from domain.entities.line_type import LineType
+# LineType is now a value object
+from domain.value_objects.line_type import LineType
 
 __all__ = [
     'Employee',

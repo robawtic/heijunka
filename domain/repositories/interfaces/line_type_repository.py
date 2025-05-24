@@ -1,7 +1,7 @@
 # heijunka/domain/repositories/interfaces/line_type_repository.py
 from abc import abstractmethod
 from typing import List, Optional
-from domain.entities.line_type import LineType
+from domain.value_objects.line_type import LineType
 from domain.repositories.interfaces.base_repository import BaseRepository
 
 
@@ -63,12 +63,13 @@ class LineTypeRepositoryInterface(BaseRepository[LineType]):
         pass
 
     @abstractmethod
-    def update(self, line_type: LineType) -> LineType:
+    def update(self, line_type_id: int, line_type: LineType) -> LineType:
         """
         Update an existing line type.
 
         Args:
-            line_type: The line type to update
+            line_type_id: The ID of the line type to update
+            line_type: The new line type value object
 
         Returns:
             The updated line type

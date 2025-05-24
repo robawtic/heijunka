@@ -1,5 +1,5 @@
 # heijunka/domain/entities/employee_availability.py
-from dataclasses import dataclass, frozen
+from dataclasses import dataclass
 from datetime import date
 from typing import NewType, Optional
 from enum import Enum
