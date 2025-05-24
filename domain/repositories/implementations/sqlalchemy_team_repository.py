@@ -162,8 +162,8 @@ class SqlAlchemyTeamRepository(BaseSqlAlchemyRepository[Team, TeamModel], TeamRe
             id=model.id,
             name=model.name,
             description=model.description,
-            members=members,
-            workstations=workstations
+            _members=members,
+            _workstations=workstations
         )
 
     def _to_model(self, entity: Team) -> TeamModel:

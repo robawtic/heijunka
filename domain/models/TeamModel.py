@@ -44,8 +44,8 @@ class TeamModel(Base):
             id=self.id,
             name=self.name,
             description=self.description,
-            members=members,
-            workstations=workstations
+            _members=members,
+            _workstations=workstations
         )
 
     def __repr__(self):
