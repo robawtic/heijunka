@@ -209,7 +209,7 @@ def add_compound_fatigue_penalty_daylevel(ctx: RuleContext):
     return penalties
 
 
-@rule_metadata(uses=["model", "assign", "days", "employees", "workstations", "periods", "start_date", "lookback", "session", "scheduled"])
+@rule_metadata(uses=["model", "assign", "employees", "workstations", "periods", "start_date", "lookback", "session", "scheduled"])
 def add_compound_fatigue_repetition_penalty(ctx: RuleContext):
     """
     Penalize employees who are assigned to all three types of demanding stations after
@@ -223,7 +223,6 @@ def add_compound_fatigue_repetition_penalty(ctx: RuleContext):
     """
     model = ctx.model
     assign = ctx.assign
-    days = ctx.days
     employees = ctx.employees
     workstations = ctx.workstations
     periods = ctx.periods
@@ -242,107 +241,46 @@ def add_compound_fatigue_repetition_penalty(ctx: RuleContext):
     from datetime import timedelta
     from domain.models.EmployeeWorkHistoryModel import EmployeeWorkHistoryModel
 
-    for d in range(days):
-        today = start_date + timedelta(days=d)
-        for i, emp in enumerate(employees):
-            # Check if employee worked all three types in history
-            did_A = did_B = did_C = False
+    today = start_date
+    for i, emp in enumerate(employees):
+        # Check if employee worked all three types in history
+        did_A = did_B = did_C = False
 
-            for k in range(1, lookback + 1):
-                past_date = today - timedelta(days=k)
-                entries = session.query(EmployeeWorkHistoryModel).filter_by(
-                    employee_id=emp.id, 
-                    worked_date=past_date
-                ).all()
+        for k in range(1, lookback + 1):
+            past_date = today - timedelta(days=k)
+            entries = session.query(EmployeeWorkHistoryModel).filter_by(
+                employee_id=emp.id, 
+                worked_date=past_date
+            ).all()
 
-                for entry in entries:
-                    ws = ws_by_id.get(entry.station_id)
-                    if not ws:
-                        continue
-
-                    if ws.name == "H010":
-                        did_A = True
-                    elif ws.name in ["BW010", "H170"]:
-                        did_B = True
-                    elif ws.name in ["M050", "M090"]:
-                        did_C = True
-
-            # If employee worked all three types in history, penalize doing it again
-            if did_A and did_B and did_C:
-                # Find station indices for today
-                setA = [j for j, ws in enumerate(workstations) if ws.name == "H010"]
-                setB = [j for j, ws in enumerate(workstations) if ws.name in ["BW010", "H170"]]
-                setC = [j for j, ws in enumerate(workstations) if ws.name in ["M050", "M090"]]
-
-                # Skip if any set is empty (station not found)
-                if not setA or not setB or not setC:
+            for entry in entries:
+                ws = ws_by_id.get(entry.station_id)
+                if not ws:
                     continue
 
-                # Create boolean variables for each set
-                hasA = model.NewBoolVar(f"cf_hist_a_e{i}")
-                hasB = model.NewBoolVar(f"cf_hist_b_e{i}")
-                hasC = model.NewBoolVar(f"cf_hist_c_e{i}")
-                pen = model.NewBoolVar(f"cf_hist_penalty_e{i}")
+                if ws.name == "H010":
+                    did_A = True
+                elif ws.name in ["BW010", "H170"]:
+                    did_B = True
+                elif ws.name in ["M050", "M090"]:
+                    did_C = True
 
-                # hasA is true if employee works at any station in setA
-                model.AddBoolOr([assign[(i, j, p)] for j in setA for p in range(periods)]).OnlyEnforceIf(hasA)
-                model.AddBoolAnd([assign[(i, j, p)].Not() for j in setA for p in range(periods)]).OnlyEnforceIf(hasA.Not())
+        # If employee worked all three types in history, penalize doing it again
+        if did_A and did_B and did_C:
+            # Find station indices for today
+            setA = [j for j, ws in enumerate(workstations) if ws.name == "H010"]
+            setB = [j for j, ws in enumerate(workstations) if ws.name in ["BW010", "H170"]]
+            setC = [j for j, ws in enumerate(workstations) if ws.name in ["M050", "M090"]]
 
-                # hasB is true if employee works at any station in setB
-                model.AddBoolOr([assign[(i, j, p)] for j in setB for p in range(periods)]).OnlyEnforceIf(hasB)
-                model.AddBoolAnd([assign[(i, j, p)].Not() for j in setB for p in range(periods)]).OnlyEnforceIf(hasB.Not())
+            # Skip if any set is empty (station not found)
+            if not setA or not setB or not setC:
+                continue
 
-                # hasC is true if employee works at any station in setC
-                model.AddBoolOr([assign[(i, j, p)] for j in setC for p in range(periods)]).OnlyEnforceIf(hasC)
-                model.AddBoolAnd([assign[(i, j, p)].Not() for j in setC for p in range(periods)]).OnlyEnforceIf(hasC.Not())
-
-                # Penalty is true if employee works at all three types
-                model.AddBoolAnd([hasA, hasB, hasC]).OnlyEnforceIf(pen)
-                model.AddBoolOr([hasA.Not(), hasB.Not(), hasC.Not()]).OnlyEnforceIf(pen.Not())
-
-                penalties.append(pen)
-
-    return penalties
-
-
-@rule_metadata(uses=["model", "assign", "days", "employees", "workstations", "periods", "lookback"])
-def add_consecutive_day_combo_penalties(ctx: RuleContext):
-    """
-    Penalize employees who are assigned to all three types of demanding stations on consecutive days.
-
-    This rule encourages variety across days by penalizing employees who are assigned
-    to all three types of demanding stations on consecutive days.
-
-    Returns:
-        List of penalty variables to be added to the objective function
-    """
-    model = ctx.model
-    assign = ctx.assign
-    days = ctx.days
-    employees = ctx.employees
-    workstations = ctx.workstations
-    periods = ctx.periods
-    lookback = ctx.lookback or 3
-
-    # Find station indices
-    name_to_idx = {ws.name: j for j, ws in enumerate(workstations)}
-
-    setA = [name_to_idx.get("H010")]
-    setB = [name_to_idx.get(n) for n in ["BW010", "H170"] if n in name_to_idx]
-    setC = [name_to_idx.get(n) for n in ["M050", "M090"] if n in name_to_idx]
-
-    # Skip if any set is empty (station not found)
-    if not setA or not setB or not setC:
-        return []
-
-    # First, for each day and employee, build a boolean variable indicating if they work all three types
-    combo = {}
-    for d in range(days):
-        for i in range(len(employees)):
             # Create boolean variables for each set
-            hasA = model.NewBoolVar(f"A_e{i}")
-            hasB = model.NewBoolVar(f"B_e{i}")
-            hasC = model.NewBoolVar(f"C_e{i}")
+            hasA = model.NewBoolVar(f"cf_hist_a_e{i}")
+            hasB = model.NewBoolVar(f"cf_hist_b_e{i}")
+            hasC = model.NewBoolVar(f"cf_hist_c_e{i}")
+            pen = model.NewBoolVar(f"cf_hist_penalty_e{i}")
 
             # hasA is true if employee works at any station in setA
             model.AddBoolOr([assign[(i, j, p)] for j in setA for p in range(periods)]).OnlyEnforceIf(hasA)
@@ -356,38 +294,118 @@ def add_consecutive_day_combo_penalties(ctx: RuleContext):
             model.AddBoolOr([assign[(i, j, p)] for j in setC for p in range(periods)]).OnlyEnforceIf(hasC)
             model.AddBoolAnd([assign[(i, j, p)].Not() for j in setC for p in range(periods)]).OnlyEnforceIf(hasC.Not())
 
-            # combo is true if employee works at all three types
-            combo_var = model.NewBoolVar(f"combo_e{i}")
-            model.AddBoolAnd([hasA, hasB, hasC]).OnlyEnforceIf(combo_var)
-            model.AddBoolOr([hasA.Not(), hasB.Not(), hasC.Not()]).OnlyEnforceIf(combo_var.Not())
+            # Penalty is true if employee works at all three types
+            model.AddBoolAnd([hasA, hasB, hasC]).OnlyEnforceIf(pen)
+            model.AddBoolOr([hasA.Not(), hasB.Not(), hasC.Not()]).OnlyEnforceIf(pen.Not())
 
-            combo[(d, i)] = combo_var
-
-    # Now penalize any repetition of combo within the lookback window
-    penalties = []
-    for d in range(days):
-        for i in range(len(employees)):
-            for k in range(1, lookback + 1):
-                prev = d - k
-                if prev < 0:
-                    continue
-
-                pen = model.NewBoolVar(f"consec_combo_e{i}_k{k}")
-
-                # Penalty is true if employee has combo on both days
-                model.AddBoolAnd([combo[(d, i)], combo[(prev, i)]]).OnlyEnforceIf(pen)
-                model.AddBoolOr([combo[(d, i)].Not(), combo[(prev, i)].Not()]).OnlyEnforceIf(pen.Not())
-
-                penalties.append(pen)
+            penalties.append(pen)
 
     return penalties
 
 
-@rule_metadata(uses=["model", "assign", "days", "employees", "workstations", "periods", "start_date", "lookback", "session"])
+@rule_metadata(uses=["model", "assign", "employees", "workstations", "periods", "lookback", "start_date", "session"])
+def add_consecutive_day_combo_penalties(ctx: RuleContext):
+    """
+    Penalize employees who are assigned to all three types of demanding stations after
+    having worked all three in the recent past (within the lookback window).
+
+    This rule encourages variety across days by penalizing employees who have already
+    worked all three types of demanding stations in the recent past.
+
+    Returns:
+        List of penalty variables to be added to the objective function
+    """
+    model = ctx.model
+    assign = ctx.assign
+    employees = ctx.employees
+    workstations = ctx.workstations
+    periods = ctx.periods
+    lookback = ctx.lookback or 3
+    start_date = ctx.start_date
+    session = ctx.session
+
+    if not start_date or not session:
+        return []  # Can't check history without start date or session
+
+    # Find station indices
+    name_to_idx = {ws.name: j for j, ws in enumerate(workstations)}
+
+    setA = [name_to_idx.get("H010")]
+    setB = [name_to_idx.get(n) for n in ["BW010", "H170"] if n in name_to_idx]
+    setC = [name_to_idx.get(n) for n in ["M050", "M090"] if n in name_to_idx]
+
+    # Skip if any set is empty (station not found)
+    if not setA or not setB or not setC:
+        return []
+
+    from datetime import timedelta
+    from domain.models.EmployeeWorkHistoryModel import EmployeeWorkHistoryModel
+
+    penalties = []
+    for i, emp in enumerate(employees):
+        # First, check if the employee worked all three types in the past
+        past_combo = False
+
+        # Check historical data for each day in the lookback window
+        for k in range(1, lookback + 1):
+            past_date = start_date - timedelta(days=k)
+            entries = session.query(EmployeeWorkHistoryModel).filter_by(
+                employee_id=emp.id,
+                worked_date=past_date
+            ).all()
+
+            # Check if employee worked all three types on this past day
+            did_A = did_B = did_C = False
+            for entry in entries:
+                ws_name = next((ws.name for ws in workstations if ws.id == entry.station_id), None)
+                if not ws_name:
+                    continue
+
+                if ws_name == "H010":
+                    did_A = True
+                elif ws_name in ["BW010", "H170"]:
+                    did_B = True
+                elif ws_name in ["M050", "M090"]:
+                    did_C = True
+
+            # If they worked all three types on this day, set past_combo to True
+            if did_A and did_B and did_C:
+                past_combo = True
+                break
+
+        # If they worked all three types in the past, penalize them working all three types today
+        if past_combo:
+            # Create boolean variables for each set
+            hasA = model.NewBoolVar(f"consec_A_e{i}")
+            hasB = model.NewBoolVar(f"consec_B_e{i}")
+            hasC = model.NewBoolVar(f"consec_C_e{i}")
+            pen = model.NewBoolVar(f"consec_combo_e{i}")
+
+            # hasA is true if employee works at any station in setA
+            model.AddBoolOr([assign[(i, j, p)] for j in setA for p in range(periods)]).OnlyEnforceIf(hasA)
+            model.AddBoolAnd([assign[(i, j, p)].Not() for j in setA for p in range(periods)]).OnlyEnforceIf(hasA.Not())
+
+            # hasB is true if employee works at any station in setB
+            model.AddBoolOr([assign[(i, j, p)] for j in setB for p in range(periods)]).OnlyEnforceIf(hasB)
+            model.AddBoolAnd([assign[(i, j, p)].Not() for j in setB for p in range(periods)]).OnlyEnforceIf(hasB.Not())
+
+            # hasC is true if employee works at any station in setC
+            model.AddBoolOr([assign[(i, j, p)] for j in setC for p in range(periods)]).OnlyEnforceIf(hasC)
+            model.AddBoolAnd([assign[(i, j, p)].Not() for j in setC for p in range(periods)]).OnlyEnforceIf(hasC.Not())
+
+            # Penalty is true if employee works at all three types today
+            model.AddBoolAnd([hasA, hasB, hasC]).OnlyEnforceIf(pen)
+            model.AddBoolOr([hasA.Not(), hasB.Not(), hasC.Not()]).OnlyEnforceIf(pen.Not())
+
+            penalties.append(pen)
+
+    return penalties
+
+
+@rule_metadata(uses=["model", "assign", "employees", "workstations", "periods", "start_date", "lookback", "session"])
 def add_cross_day_repeat_penalties(ctx: RuleContext):
     """
-    For each future day d in [0..days-1], look back up to `lookback` days
-    in EmployeeWorkHistory and penalize assigning an employee to
+    Look back up to `lookback` days in EmployeeWorkHistory and penalize assigning an employee to
     the same (station, period) they worked on in that window.
 
     This rule encourages variety in an employee's assignments across days by
@@ -398,7 +416,6 @@ def add_cross_day_repeat_penalties(ctx: RuleContext):
     """
     model = ctx.model
     assign = ctx.assign
-    days = ctx.days
     employees = ctx.employees
     workstations = ctx.workstations
     periods = ctx.periods
@@ -413,40 +430,38 @@ def add_cross_day_repeat_penalties(ctx: RuleContext):
     # map station_id -> index j
     ws_idx = {ws.id: j for j, ws in enumerate(workstations)}
 
+    from datetime import timedelta
     from domain.models.EmployeeWorkHistoryModel import EmployeeWorkHistoryModel
 
-    for d in range(days):
-        this_date = start_date + timedelta(days=d)
+    for i, emp in enumerate(employees):
+        # gather all (j,p) pairs they did in the last `lookback` days
+        prev_pairs = set()
+        for k in range(1, lookback + 1):
+            prev_date = start_date - timedelta(days=k)
+            past = (
+                session.query(EmployeeWorkHistoryModel)
+                       .filter_by(employee_id=emp.id,
+                                  worked_date=prev_date)
+                       .all()
+            )
+            for ent in past:
+                j = ws_idx.get(ent.station_id)
+                # assume ent.work_period is 1-based; convert to 0-based
+                p = ent.work_period - 1
+                if j is not None and 0 <= p < periods:
+                    prev_pairs.add((j, p))
 
-        for i, emp in enumerate(employees):
-            # gather all (j,p) pairs they did in the last `lookback` days
-            prev_pairs = set()
-            for k in range(1, lookback + 1):
-                prev_date = this_date - timedelta(days=k)
-                past = (
-                    session.query(EmployeeWorkHistoryModel)
-                           .filter_by(employee_id=emp.id,
-                                      worked_date=prev_date)
-                           .all()
-                )
-                for ent in past:
-                    j = ws_idx.get(ent.station_id)
-                    # assume ent.work_period is 1-based; convert to 0-based
-                    p = ent.work_period - 1
-                    if j is not None and 0 <= p < periods:
-                        prev_pairs.add((j, p))
-
-            # now penalize any match today
-            for j, p in prev_pairs:
-                pen = model.NewBoolVar(f"crosshist_e{i}_j{j}_p{p}")
-                # enforce: pen == assign[d,i,j,p]
-                model.Add(assign[(i, j, p)] == pen)
-                penalties.append(pen)
+        # now penalize any match today
+        for j, p in prev_pairs:
+            pen = model.NewBoolVar(f"crosshist_e{i}_j{j}_p{p}")
+            # enforce: pen == assign[i,j,p]
+            model.Add(assign[(i, j, p)] == pen)
+            penalties.append(pen)
 
     return penalties
 
 
-@rule_metadata(uses=["model", "assign", "days", "employees", "workstations", "periods", "session", "start_date"])
+@rule_metadata(uses=["model", "assign", "employees", "workstations", "periods", "session", "start_date"])
 def add_historical_station_fairness(ctx: RuleContext):
     """
     Minimize deviation from fair distribution of stations based on historical assignments.
@@ -459,7 +474,6 @@ def add_historical_station_fairness(ctx: RuleContext):
     """
     model = ctx.model
     assign = ctx.assign
-    days = ctx.days
     employees = ctx.employees
     workstations = ctx.workstations
     periods = ctx.periods
@@ -473,6 +487,7 @@ def add_historical_station_fairness(ctx: RuleContext):
     penalties = []
 
     from sqlalchemy import func
+    from datetime import timedelta
     from domain.models.EmployeeWorkHistoryModel import EmployeeWorkHistoryModel
 
     # 1) Load last-30-day true history
@@ -513,7 +528,7 @@ def add_historical_station_fairness(ctx: RuleContext):
             hist_counts.get((emp.id, ws.id), 0)
             for _, emp in qualified
         )
-        total_future = days * periods
+        total_future = periods  # Just one day
         avg = (total_hist + total_future) / len(qualified)
 
         for i, emp in qualified:
@@ -521,17 +536,16 @@ def add_historical_station_fairness(ctx: RuleContext):
             h = hist_counts.get((emp.id, ws.id), 0)
 
             # New slots variable
-            new_var = model.NewIntVar(0, days * periods, f"new_j{j}_e{i}")
+            new_var = model.NewIntVar(0, periods, f"new_j{j}_e{i}")
             model.Add(new_var == sum(
                 assign[(i, j, p)]
-                for d in range(days)
                 for p in range(periods)
             ))
 
             # Combined total
             comb = model.NewIntVar(
                 0,
-                days * periods + history_lookback_days * periods,
+                periods + history_lookback_days * periods,
                 f"comb_j{j}_e{i}"
             )
             model.Add(comb == new_var + h)
@@ -539,7 +553,7 @@ def add_historical_station_fairness(ctx: RuleContext):
             # Absolute deviation
             diff = model.NewIntVar(
                 0,
-                days * periods + history_lookback_days * periods,
+                periods + history_lookback_days * periods,
                 f"fair_j{j}_e{i}"
             )
             model.Add(diff >= comb - int(avg))

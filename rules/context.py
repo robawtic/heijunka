@@ -17,7 +17,7 @@ class RuleContext:
     interface for all scheduling rules regardless of their specific needs.
     """
     model: CpModel
-    assign: Dict[Tuple[ int, int, int], Any]  # (day, employee_idx, workstation_idx, period) -> BoolVar
+    assign: Dict[Tuple[int, int, int], Any]  # (employee_idx, workstation_idx, period) -> BoolVar
     employees: List[Employee]
     workstations: List[Workstation]
     periods: int
