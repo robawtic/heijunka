@@ -48,7 +48,7 @@ def setup_dependencies():
     Set up and return the dependencies needed for the application.
 
     Returns:
-        tuple: A tuple containing (session, employee_repository, workstation_repository, team_repository, schedule_service, assignment_repository, work_history_repository, aro_repository, aro_service)
+        tuple: A tuple containing (session, employee_repository, workstation_repository, team_repository, schedule_service, assignment_repository, work_history_repository, aro_repository, aro_service, aro_graph_service)
     """
     session = Session()
     employee_repository = SqlAlchemyEmployeeRepository(session)
@@ -65,16 +65,26 @@ def setup_dependencies():
     # Create and register the schedule recalculation handler
     from domain.services.aro_service import AROService
     from domain.services.schedule_recalculation_handler import ScheduleRecalculationHandler
+    from domain.services.aro_graph_service import AROGraphService
 
     aro_service = AROService(aro_repository, employee_repository, team_repository)
     schedule_recalculation_handler = ScheduleRecalculationHandler(team_repository, schedule_service)
+
+    # Create the ARO graph service
+    aro_graph_service = AROGraphService(
+        aro_service=aro_service,
+        aro_repository=aro_repository,
+        employee_repository=employee_repository,
+        team_repository=team_repository,
+        workstation_repository=workstation_repository
+    )
 
     # Register event handlers
     aro_service.register_event_handler('aro_assignment_created', schedule_recalculation_handler.handle_aro_assignment_created)
     aro_service.register_event_handler('aro_assignment_removed', schedule_recalculation_handler.handle_aro_assignment_removed)
     aro_service.register_event_handler('aro_assignment_updated', schedule_recalculation_handler.handle_aro_assignment_updated)
 
-    return session, employee_repository, workstation_repository, team_repository, schedule_service, assignment_repository, work_history_repository, aro_repository, aro_service
+    return session, employee_repository, workstation_repository, team_repository, schedule_service, assignment_repository, work_history_repository, aro_repository, aro_service, aro_graph_service
 
 
 def parse_arguments():
@@ -121,6 +131,14 @@ def parse_arguments():
     aro_remove_parser.add_argument('--employee', '-e', type=str, required=True, help='Employee name')
     aro_remove_parser.add_argument('--date', '-d', type=str, default=date.today().isoformat(), help='Assignment date (YYYY-MM-DD)')
     aro_remove_parser.add_argument('--period', '-p', type=int, default=None, help='Period (1-4, omit for full day)')
+
+    # ARO optimize command
+    aro_optimize_parser = aro_subparsers.add_parser('optimize', help='Optimize ARO assignments using graph theory')
+    aro_optimize_parser.add_argument('--team', '-t', type=str, required=True, help='Understaffed team name')
+    aro_optimize_parser.add_argument('--count', '-c', type=int, required=True, help='Number of AROs needed')
+    aro_optimize_parser.add_argument('--date', '-d', type=str, default=date.today().isoformat(), help='Assignment date (YYYY-MM-DD)')
+    aro_optimize_parser.add_argument('--period', '-p', type=int, default=None, help='Period (1-4, omit for full day)')
+    aro_optimize_parser.add_argument('--max-hops', '-m', type=int, default=2, help='Maximum number of intermediate teams (default: 2)')
 
     return parser.parse_args()
 
@@ -258,7 +276,7 @@ def format_schedule_table(assignments, employees, workstations, periods, date_ob
     return f"Schedule for {date_obj}:\n{table_str}"
 
 
-def handle_aro_assignment(args, session, aro_service=None):
+def handle_aro_assignment(args, session, aro_service=None, aro_graph_service=None):
     """
     Handle the ARO management commands.
 
@@ -266,11 +284,13 @@ def handle_aro_assignment(args, session, aro_service=None):
         args: Command line arguments
         session: Database session
         aro_service: Optional ARO service instance (if None, a new one will be created)
+        aro_graph_service: Optional ARO graph service instance
     """
     try:
         # Setup repositories
         employee_repository = SqlAlchemyEmployeeRepository(session)
         team_repository = SqlAlchemyTeamRepository(session)
+        workstation_repository = SqlAlchemyWorkstationRepository(session)
 
         # Use the provided ARO service or create a new one
         if aro_service is None:
@@ -279,18 +299,77 @@ def handle_aro_assignment(args, session, aro_service=None):
             from domain.services.aro_service import AROService
             aro_service = AROService(aro_repository, employee_repository, team_repository)
 
-        # Get employee by name
-        employee = employee_repository.get_by_name(args.employee)
-        if not employee:
-            print(f"Error: Employee '{args.employee}' not found", file=sys.stderr)
-            return False
+        # Handle ARO optimize command
+        if args.aro_command == 'optimize':
+            # Create ARO graph service if not provided
+            if aro_graph_service is None:
+                from domain.repositories.implementations.sqlalchemy_aro_assignment_repository import SqlAlchemyAROAssignmentRepository
+                aro_repository = SqlAlchemyAROAssignmentRepository(session)
+                from domain.services.aro_graph_service import AROGraphService
+                aro_graph_service = AROGraphService(
+                    aro_service=aro_service,
+                    aro_repository=aro_repository,
+                    employee_repository=employee_repository,
+                    team_repository=team_repository,
+                    workstation_repository=workstation_repository
+                )
 
-        # Parse date
-        try:
-            assignment_date = datetime.strptime(args.date, "%Y-%m-%d").date()
-        except ValueError:
-            print(f"Error: Invalid date format. Use YYYY-MM-DD", file=sys.stderr)
-            return False
+            # Get team by name
+            team = team_repository.get_by_name(args.team)
+            if not team:
+                print(f"Error: Team '{args.team}' not found", file=sys.stderr)
+                return False
+
+            # Parse date
+            try:
+                assignment_date = datetime.strptime(args.date, "%Y-%m-%d").date()
+            except ValueError:
+                print(f"Error: Invalid date format. Use YYYY-MM-DD", file=sys.stderr)
+                return False
+
+            # Assign optimal AROs
+            assignments = aro_graph_service.assign_optimal_aros(
+                understaffed_team_id=team.id,
+                needed_aros=args.count,
+                assignment_date=assignment_date,
+                period=args.period
+            )
+
+            if assignments:
+                print(f"Successfully assigned {len(assignments)} AROs to team {args.team}.")
+
+                # Display the assignments
+                for assignment in assignments:
+                    employee = employee_repository.get(assignment.employee_id)
+                    from_team = team_repository.get(assignment.from_team_id)
+                    to_team = team_repository.get(assignment.to_team_id)
+
+                    employee_name = employee.name if employee else f"Employee {assignment.employee_id}"
+                    from_team_name = from_team.name if from_team else f"Team {assignment.from_team_id}"
+                    to_team_name = to_team.name if to_team else f"Team {assignment.to_team_id}"
+
+                    period_str = f" for period {assignment.period}" if assignment.period else " for the full day"
+                    print(f"- {employee_name} from {from_team_name} to {to_team_name}{period_str}")
+
+                return True
+            else:
+                print(f"Could not find suitable AROs for team {args.team}.")
+                return False
+
+        # For other commands, we need an employee
+        if args.aro_command != 'optimize':
+            # Get employee by name
+            employee = employee_repository.get_by_name(args.employee)
+            if not employee:
+                print(f"Error: Employee '{args.employee}' not found", file=sys.stderr)
+                return False
+
+            # Parse date
+            try:
+                assignment_date = datetime.strptime(args.date, "%Y-%m-%d").date()
+            except ValueError:
+                print(f"Error: Invalid date format. Use YYYY-MM-DD", file=sys.stderr)
+                return False
 
         # Handle ARO assign command
         if args.aro_command == 'assign':
@@ -477,9 +556,9 @@ def main():
             elif args.command == 'aro':
                 # Handle ARO management commands
                 if not hasattr(args, 'aro_command') or not args.aro_command:
-                    print("Error: No ARO command specified. Use 'aro assign' or 'aro remove'.", file=sys.stderr)
+                    print("Error: No ARO command specified. Use 'aro assign', 'aro remove', or 'aro optimize'.", file=sys.stderr)
                     sys.exit(1)
-                handle_aro_assignment(args, session, aro_service)
+                handle_aro_assignment(args, session, aro_service, aro_graph_service)
             else:
                 print("Error: No command specified. Use 'generate', 'assign', or 'aro'.", file=sys.stderr)
                 sys.exit(1)
