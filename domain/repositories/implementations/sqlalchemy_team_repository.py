@@ -154,17 +154,9 @@ class SqlAlchemyTeamRepository(BaseSqlAlchemyRepository[Team, TeamModel], TeamRe
         }
 
     def _to_domain(self, model: TeamModel) -> Team:
-        """Convert a TeamModel to a Team domain entity."""
-        members = [member.employee.to_domain() for member in model.members]
-        workstations = [self._workstation_to_domain(ws) for ws in model.workstations]
-
-        return Team(
-            id=model.id,
-            name=model.name,
-            description=model.description,
-            _members=members,
-            _workstations=workstations
-        )
+        """Convert a TeamModel to a Team domain entity using factory."""
+        from domain.factories.team_factory import TeamFactory
+        return TeamFactory.create_from_model(model)
 
     def _to_model(self, entity: Team) -> TeamModel:
         """Convert a Team domain entity to a TeamModel."""
@@ -182,13 +174,6 @@ class SqlAlchemyTeamRepository(BaseSqlAlchemyRepository[Team, TeamModel], TeamRe
         # Members and workstations would need to be updated through their respective relationships
 
     def _workstation_to_domain(self, model: WorkstationModel) -> Workstation:
-        """Convert a WorkstationModel to a Workstation domain entity."""
-        return Workstation(
-            id=model.id,
-            name=model.name,
-            line_type=str(model.line_type),
-            is_loading_job=model.is_loading_job,
-            is_heavy_job=model.is_heavy_job,
-            is_key_skill_job=model.is_key_skill_job,
-            team_id=model.team_id
-        )
+        """Convert a WorkstationModel to a Workstation domain entity using factory."""
+        from domain.factories.workstation_factory import WorkstationFactory
+        return WorkstationFactory.create_from_model(model)

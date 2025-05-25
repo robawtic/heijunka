@@ -4,9 +4,45 @@ from datetime import date
 
 from domain.entities.employee import Employee
 from domain.entities.workstation import Workstation
+from domain.factories.employee_factory import EmployeeFactory
+from domain.factories.workstation_factory import WorkstationFactory
 
 
 class EmployeeService:
+    def __init__(self, employee_repository=None, workstation_repository=None):
+        self._employee_repository = employee_repository
+        self._workstation_repository = workstation_repository
+
+    def create_employee(self, name: str, team_id: int, is_active: bool = True, roles: List[str] = None) -> Employee:
+        """Create a new employee using the factory."""
+        employee = EmployeeFactory.create_employee(
+            name=name,
+            team_id=team_id,
+            is_active=is_active,
+            roles=roles
+        )
+
+        if self._employee_repository:
+            return self._employee_repository.add(employee)
+        return employee
+
+    def create_workstation(self, name: str, line_type: str, team_id: int, 
+                          is_loading_job: bool = False, is_heavy_job: bool = False, 
+                          is_key_skill_job: bool = False) -> Workstation:
+        """Create a new workstation using the factory."""
+        workstation = WorkstationFactory.create_workstation(
+            name=name,
+            line_type=line_type,
+            team_id=team_id,
+            is_loading_job=is_loading_job,
+            is_heavy_job=is_heavy_job,
+            is_key_skill_job=is_key_skill_job
+        )
+
+        if self._workstation_repository:
+            return self._workstation_repository.add(workstation)
+        return workstation
+
     def assign_role(self, employee: Employee, role_name: str) -> None:
         """Assign a role to an employee"""
         if role_name not in employee.roles:

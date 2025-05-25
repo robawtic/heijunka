@@ -168,8 +168,9 @@ class SqlAlchemyEmployeeRepository(BaseSqlAlchemyRepository[Employee, EmployeeMo
         return None, None
 
     def _to_domain(self, model: EmployeeModel) -> Employee:
-        """Convert a SQLAlchemy model to a domain entity."""
-        return model.to_domain()
+        """Convert a SQLAlchemy model to a domain entity using factory."""
+        from domain.factories.employee_factory import EmployeeFactory
+        return EmployeeFactory.create_from_model(model)
 
     def _to_model(self, entity: Employee) -> EmployeeModel:
         """Convert a domain entity to a SQLAlchemy model."""

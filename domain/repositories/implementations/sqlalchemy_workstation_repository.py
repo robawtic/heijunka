@@ -67,16 +67,9 @@ class SqlAlchemyWorkstationRepository(BaseSqlAlchemyRepository[Workstation, Work
         return [self._to_domain(model) for model in query.offset(skip).limit(limit).all()]
 
     def _to_domain(self, model: WorkstationModel) -> Workstation:
-        """Convert a WorkstationModel to a Workstation domain entity."""
-        return Workstation(
-            id=model.id,
-            name=model.name,
-            line_type=model.line_type.name if model.line_type else None,
-            is_loading_job=model.is_loading_job,
-            is_heavy_job=model.is_heavy_job,
-            is_key_skill_job=model.is_key_skill_job,
-            team_id=model.team_id
-        )
+        """Convert a WorkstationModel to a Workstation domain entity using factory."""
+        from domain.factories.workstation_factory import WorkstationFactory
+        return WorkstationFactory.create_from_model(model)
 
     def _to_model(self, entity: Workstation) -> WorkstationModel:
         """Convert a Workstation domain entity to a WorkstationModel."""
