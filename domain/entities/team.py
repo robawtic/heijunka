@@ -106,7 +106,7 @@ class Team:
         self._team_members.append(team_member)
 
         # Register the domain event
-        self.register_domain_event(TeamMemberAdded(self.id, employee.id))
+        self.register_domain_event(TeamMemberAdded(self.id, employee.id, roles=[]))
 
         return True
 
