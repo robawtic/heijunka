@@ -8,7 +8,7 @@ Create Date: 2025-05-24 10:00:00.000000
 from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects import sqlite
-from domain.entities.employee_availability import AvailabilityStatus
+from domain.value_objects.employee_availability import AvailabilityStatus
 
 # revision identifiers, used by Alembic.
 revision = 'update_employee_availability'
@@ -30,7 +30,7 @@ def upgrade():
         sa.ForeignKeyConstraint(['employee_id'], ['employees.id'], ),
         sa.PrimaryKeyConstraint('id')
     )
-    
+
     # Copy data from the old table to the new table, converting boolean flags to status enum
     op.execute("""
     INSERT INTO employee_availability_new (id, employee_id, date, period, status)
@@ -44,10 +44,10 @@ def upgrade():
         END
     FROM employee_availability
     """)
-    
+
     # Drop the old table
     op.drop_table('employee_availability')
-    
+
     # Rename the new table to the original name
     op.rename_table('employee_availability_new', 'employee_availability')
 
@@ -67,7 +67,7 @@ def downgrade():
         sa.ForeignKeyConstraint(['employee_id'], ['employees.id'], ),
         sa.PrimaryKeyConstraint('id')
     )
-    
+
     # Copy data from the new table to the old table, converting status enum to boolean flags
     op.execute("""
     INSERT INTO employee_availability_old (id, employee_id, date, period, is_partial, is_call_in, is_aro, is_offline)
@@ -78,9 +78,9 @@ def downgrade():
         CASE WHEN status = 'OFFLINE' THEN 1 ELSE 0 END
     FROM employee_availability
     """)
-    
+
     # Drop the new table
     op.drop_table('employee_availability')
-    
+
     # Rename the old table to the original name
     op.rename_table('employee_availability_old', 'employee_availability')

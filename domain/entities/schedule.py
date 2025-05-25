@@ -316,7 +316,7 @@ class Schedule:
             self.register_domain_event(ScheduleUpdated(schedule_id=self.id))
 
     def generate_assignments(self, employees: List["Employee"], workstations: List["Workstation"],
-                            rule_context: Optional[Any] = None) -> bool:
+                            rule_context: Optional[Any] = None, session=None, team_repository=None) -> bool:
         """
         Generate assignments for this schedule using constraint programming.
 
@@ -324,6 +324,8 @@ class Schedule:
             employees: List of employees available for scheduling
             workstations: List of workstations to be staffed
             rule_context: Optional pre-configured rule context
+            session: Database session for accessing work history data
+            team_repository: Optional repository for retrieving team information
 
         Returns:
             True if assignments were successfully generated, False otherwise
@@ -352,8 +354,12 @@ class Schedule:
 
         # Create or use rule context
         if rule_context is None:
-            # Get team name from team_id (would need to be injected or passed)
-            team_name = "default"  # This would be retrieved from a repository
+            # Get team name from team_id
+            team_name = "default"  # Default if no repository is provided
+            if team_repository and self.team_id:
+                team = team_repository.get(self.team_id)
+                if team:
+                    team_name = team.name.lower()
 
             ctx = create_context_for_team(
                 team_name=team_name,
@@ -364,6 +370,7 @@ class Schedule:
                 periods=self.periods_per_day,
                 start_date=self.start_date,
                 lookback=3,  # Default lookback of 3 days
+                session=session,
                 call_ins=self.call_ins,
                 employee_offline_periods=employee_offline_periods,
                 backup_idx=next((i for i, e in enumerate(employees) if e.has_role("Backup")), None),

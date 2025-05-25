@@ -2,7 +2,7 @@
 from typing import List, Optional
 from datetime import date
 from domain.entities.employee import Employee
-from domain.entities.employee_availability import EmployeeAvailability
+from domain.value_objects.employee_availability import EmployeeAvailability
 from domain.entities.team_member import TeamMember
 from domain.value_objects.workstation_assignment import WorkstationAssignment
 from domain.value_objects.work_history_entry import WorkHistoryEntry

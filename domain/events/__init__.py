@@ -29,3 +29,6 @@ from .group import (
 from .assignment import (
     AssignmentCreated, AssignmentAdded, AssignmentRemoved
 )
+from .aro import (
+    AROAssignmentCreated, AROAssignmentRemoved, AROAssignmentUpdated
+)

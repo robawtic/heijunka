@@ -6,7 +6,7 @@ from domain.factories.employee_factory import EmployeeFactory
 from domain.factories.workstation_factory import WorkstationFactory
 from domain.entities.employee import Employee
 from domain.entities.workstation import Workstation
-from domain.entities.employee_availability import EmployeeAvailability, AvailabilityStatus
+from domain.value_objects.employee_availability import EmployeeAvailability, AvailabilityStatus
 from domain.entities.team_member import TeamMember
 from domain.value_objects.workstation_assignment import WorkstationAssignment
 

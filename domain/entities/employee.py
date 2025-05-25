@@ -2,7 +2,7 @@
 from dataclasses import dataclass, field
 from typing import List, Optional, Set
 from datetime import date
-from domain.entities.employee_availability import EmployeeAvailability, AvailabilityStatus
+from domain.value_objects.employee_availability import EmployeeAvailability, AvailabilityStatus
 from domain.entities.team_member import TeamMember
 from domain.value_objects.work_history_entry import WorkHistoryEntry
 from domain.value_objects.workstation_assignment import WorkstationAssignment
@@ -217,6 +217,28 @@ class Employee:
 
         self._available_periods.append(availability)
         return True
+
+    def assign_as_aro(self, to_team_id: int, assignment_date: date, period: Optional[int] = None) -> bool:
+        """
+        Assign this employee as an ARO to another team.
+
+        Args:
+            to_team_id: The ID of the team the employee is being assigned to
+            assignment_date: The date of the assignment
+            period: Optional period of the day for the assignment
+
+        Returns:
+            True if the assignment was created, False if already assigned
+        """
+        # Create an availability record with ARO status
+        availability = EmployeeAvailability(
+            employee_id=self.id,
+            date=assignment_date,
+            period=period,
+            status=AvailabilityStatus.ARO
+        )
+
+        return self.add_availability(availability)
 
     def add_work_history_entry(self, workstation_id: int, worked_date: date, work_period: int) -> bool:
         """

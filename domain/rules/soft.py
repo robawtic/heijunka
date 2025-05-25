@@ -24,7 +24,6 @@ def add_rotation_penalties(ctx: RuleContext):
     session = ctx.session
 
     penalties = []
-
     # Create a mapping from employee/workstation IDs to their indices in the lists
     emp_idx = {e.id: i for i, e in enumerate(employees)}
     ws_idx = {w.id: j for j, w in enumerate(workstations)}

@@ -66,7 +66,8 @@ class ScheduleService:
     def generate_schedule(self, employees: List[Employee], workstations: List[Workstation],
                           start_date: date, periods_per_day: int,
                           team_name: str, call_ins: List[str] = None, offline: List[str] = None, 
-                          force_complete: bool = False, session=None) -> List[WorkAssignment]:
+                          force_complete: bool = False, session=None, team_repository=None, 
+                          aro_assignment_repository=None) -> List[WorkAssignment]:
         """
         Generate a schedule for the given employees, workstations, and time period
 
@@ -86,6 +87,8 @@ class ScheduleService:
             offline: List of strings in format "employee:periods" specifying which employees are offline for which periods
             force_complete: Whether to force completion of the schedule
             session: Database session for accessing work history data
+            team_repository: Optional repository for retrieving team information
+            aro_assignment_repository: Optional repository for retrieving ARO assignments
 
         Returns:
             List of work assignments
@@ -100,8 +103,39 @@ class ScheduleService:
                     periods = [int(p) for p in periods_str.split(',')]
                     offline_dict[emp_name] = periods
 
-        # Get team_id from team_name (in a real implementation, this would be done via a repository)
+        # Get team_id from team_name
         team_id = 1  # Placeholder, would be retrieved from a repository
+        if team_repository:
+            team = team_repository.get_by_name(team_name)
+            if team:
+                team_id = team.id
+
+        # Get employees leaving as AROs
+        aro_out_ids = []
+        if aro_assignment_repository:
+            aro_out_ids = aro_assignment_repository.get_employees_leaving(team_id, start_date)
+
+        # Get employees joining as AROs
+        aro_in_ids = []
+        if aro_assignment_repository:
+            aro_in_ids = aro_assignment_repository.get_employees_joining(team_id, start_date)
+
+        # Filter out employees leaving as AROs
+        available_employees = [e for e in employees if e.id not in aro_out_ids]
+
+        # Add employees joining as AROs
+        if aro_in_ids and team_repository and aro_assignment_repository:
+            for aro_id in aro_in_ids:
+                # Get the employee from their original team
+                aro_assignments = aro_assignment_repository.get_by_employee_id(aro_id, start_date)
+                if aro_assignments:
+                    assignment = aro_assignments[0]  # Take the first assignment if multiple exist
+                    from_team = team_repository.get(assignment.from_team_id)
+                    if from_team:
+                        for emp in from_team.members:
+                            if emp.id == aro_id:
+                                available_employees.append(emp)
+                                break
 
         # Create a Schedule entity
         from domain.entities.schedule import Schedule
@@ -120,7 +154,7 @@ class ScheduleService:
         from domain.rules.registry import create_context_for_team
 
         # Generate assignments using the Schedule entity
-        success = schedule.generate_assignments(employees, workstations)
+        success = schedule.generate_assignments(employees, workstations, session=session, team_repository=team_repository)
 
         if success:
             print(f"Generated {len(schedule.assignments)} assignments")

@@ -48,7 +48,7 @@ def setup_dependencies():
     Set up and return the dependencies needed for the application.
 
     Returns:
-        tuple: A tuple containing (session, employee_repository, workstation_repository, team_repository, schedule_service, assignment_repository, work_history_repository)
+        tuple: A tuple containing (session, employee_repository, workstation_repository, team_repository, schedule_service, assignment_repository, work_history_repository, aro_repository, aro_service)
     """
     session = Session()
     employee_repository = SqlAlchemyEmployeeRepository(session)
@@ -58,7 +58,23 @@ def setup_dependencies():
     assignment_repository = SqlAlchemyAssignmentRepository(session)
     work_history_repository = SqlAlchemyEmployeeWorkHistoryRepository(session)
 
-    return session, employee_repository, workstation_repository, team_repository, schedule_service, assignment_repository, work_history_repository
+    # Import here to avoid circular imports
+    from domain.repositories.implementations.sqlalchemy_aro_assignment_repository import SqlAlchemyAROAssignmentRepository
+    aro_repository = SqlAlchemyAROAssignmentRepository(session)
+
+    # Create and register the schedule recalculation handler
+    from domain.services.aro_service import AROService
+    from domain.services.schedule_recalculation_handler import ScheduleRecalculationHandler
+
+    aro_service = AROService(aro_repository, employee_repository, team_repository)
+    schedule_recalculation_handler = ScheduleRecalculationHandler(team_repository, schedule_service)
+
+    # Register event handlers
+    aro_service.register_event_handler('aro_assignment_created', schedule_recalculation_handler.handle_aro_assignment_created)
+    aro_service.register_event_handler('aro_assignment_removed', schedule_recalculation_handler.handle_aro_assignment_removed)
+    aro_service.register_event_handler('aro_assignment_updated', schedule_recalculation_handler.handle_aro_assignment_updated)
+
+    return session, employee_repository, workstation_repository, team_repository, schedule_service, assignment_repository, work_history_repository, aro_repository, aro_service
 
 
 def parse_arguments():
@@ -87,6 +103,24 @@ def parse_arguments():
     assign_parser.add_argument('--date', type=str, default=date.today().isoformat(), help='Assignment date (YYYY-MM-DD)')
     assign_parser.add_argument('--period', type=int, required=True, help='Work period (1-4)')
     assign_parser.add_argument('--schedule-id', type=int, help='Schedule ID (optional)')
+
+    # ARO assignment commands
+    aro_subparsers = subparsers.add_parser('aro', help='ARO management commands')
+    aro_subparsers = aro_subparsers.add_subparsers(dest='aro_command', help='ARO command to execute')
+
+    # ARO assign command
+    aro_assign_parser = aro_subparsers.add_parser('assign', help='Assign an employee as an ARO to another team')
+    aro_assign_parser.add_argument('--employee', '-e', type=str, required=True, help='Employee name')
+    aro_assign_parser.add_argument('--from-team', '-f', type=str, required=True, help='From team name')
+    aro_assign_parser.add_argument('--to-team', '-t', type=str, required=True, help='To team name')
+    aro_assign_parser.add_argument('--date', '-d', type=str, default=date.today().isoformat(), help='Assignment date (YYYY-MM-DD)')
+    aro_assign_parser.add_argument('--period', '-p', type=int, default=None, help='Period (1-4, omit for full day)')
+
+    # ARO remove command
+    aro_remove_parser = aro_subparsers.add_parser('remove', help='Remove an ARO assignment')
+    aro_remove_parser.add_argument('--employee', '-e', type=str, required=True, help='Employee name')
+    aro_remove_parser.add_argument('--date', '-d', type=str, default=date.today().isoformat(), help='Assignment date (YYYY-MM-DD)')
+    aro_remove_parser.add_argument('--period', '-p', type=int, default=None, help='Period (1-4, omit for full day)')
 
     return parser.parse_args()
 
@@ -224,6 +258,104 @@ def format_schedule_table(assignments, employees, workstations, periods, date_ob
     return f"Schedule for {date_obj}:\n{table_str}"
 
 
+def handle_aro_assignment(args, session, aro_service=None):
+    """
+    Handle the ARO management commands.
+
+    Args:
+        args: Command line arguments
+        session: Database session
+        aro_service: Optional ARO service instance (if None, a new one will be created)
+    """
+    try:
+        # Setup repositories
+        employee_repository = SqlAlchemyEmployeeRepository(session)
+        team_repository = SqlAlchemyTeamRepository(session)
+
+        # Use the provided ARO service or create a new one
+        if aro_service is None:
+            from domain.repositories.implementations.sqlalchemy_aro_assignment_repository import SqlAlchemyAROAssignmentRepository
+            aro_repository = SqlAlchemyAROAssignmentRepository(session)
+            from domain.services.aro_service import AROService
+            aro_service = AROService(aro_repository, employee_repository, team_repository)
+
+        # Get employee by name
+        employee = employee_repository.get_by_name(args.employee)
+        if not employee:
+            print(f"Error: Employee '{args.employee}' not found", file=sys.stderr)
+            return False
+
+        # Parse date
+        try:
+            assignment_date = datetime.strptime(args.date, "%Y-%m-%d").date()
+        except ValueError:
+            print(f"Error: Invalid date format. Use YYYY-MM-DD", file=sys.stderr)
+            return False
+
+        # Handle ARO assign command
+        if args.aro_command == 'assign':
+            # Get from team by name
+            from_team = team_repository.get_by_name(args.from_team)
+            if not from_team:
+                print(f"Error: Team '{args.from_team}' not found", file=sys.stderr)
+                return False
+
+            # Get to team by name
+            to_team = team_repository.get_by_name(args.to_team)
+            if not to_team:
+                print(f"Error: Team '{args.to_team}' not found", file=sys.stderr)
+                return False
+
+            # Verify employee belongs to from_team
+            if employee.team_id != from_team.id:
+                print(f"Error: Employee '{args.employee}' does not belong to team '{args.from_team}'", file=sys.stderr)
+                return False
+
+            # Assign ARO
+            result = aro_service.assign_aro(employee.id, to_team.id, assignment_date, args.period)
+
+            if result["status"] == "success":
+                period_str = f" for period {args.period}" if args.period else " for the full day"
+                print(f"Successfully assigned {args.employee} as ARO from {args.from_team} to {args.to_team} on {args.date}{period_str}")
+                return True
+            else:
+                print(f"Error: {result['message']}", file=sys.stderr)
+                return False
+
+        # Handle ARO remove command
+        elif args.aro_command == 'remove':
+            # Find the ARO assignment
+            assignment = aro_service.find_aro_assignment(employee.id, assignment_date, args.period)
+            if not assignment:
+                period_str = f" for period {args.period}" if args.period else " for the full day"
+                print(f"Error: No ARO assignment found for {args.employee} on {args.date}{period_str}", file=sys.stderr)
+                return False
+
+            # Get the from and to teams for display
+            from_team = team_repository.get(assignment.from_team_id)
+            to_team = team_repository.get(assignment.to_team_id)
+
+            # Remove the ARO assignment
+            result = aro_service.remove_aro_assignment(assignment.id)
+
+            if result["status"] == "success":
+                period_str = f" for period {args.period}" if args.period else " for the full day"
+                from_team_name = from_team.name if from_team else f"team {assignment.from_team_id}"
+                to_team_name = to_team.name if to_team else f"team {assignment.to_team_id}"
+                print(f"Successfully removed ARO assignment for {args.employee} from {from_team_name} to {to_team_name} on {args.date}{period_str}")
+                return True
+            else:
+                print(f"Error: {result['message']}", file=sys.stderr)
+                return False
+
+        else:
+            print(f"Error: Unknown ARO command '{args.aro_command}'", file=sys.stderr)
+            return False
+
+    except Exception as e:
+        print(f"Error handling ARO command: {e}", file=sys.stderr)
+        return False
+
 def handle_manual_assignment(args, session):
     """
     Handle the manual assignment command.
@@ -297,7 +429,7 @@ def main():
         args = parse_arguments()
 
         # Setup dependencies
-        session, employee_repository, workstation_repository, team_repository, schedule_service, assignment_repository, work_history_repository = setup_dependencies()
+        session, employee_repository, workstation_repository, team_repository, schedule_service, assignment_repository, work_history_repository, aro_repository, aro_service = setup_dependencies()
 
         try:
             if args.command == 'generate':
@@ -342,8 +474,14 @@ def main():
             elif args.command == 'assign':
                 # Handle manual assignment
                 handle_manual_assignment(args, session)
+            elif args.command == 'aro':
+                # Handle ARO management commands
+                if not hasattr(args, 'aro_command') or not args.aro_command:
+                    print("Error: No ARO command specified. Use 'aro assign' or 'aro remove'.", file=sys.stderr)
+                    sys.exit(1)
+                handle_aro_assignment(args, session, aro_service)
             else:
-                print("Error: No command specified. Use 'generate' or 'assign'.", file=sys.stderr)
+                print("Error: No command specified. Use 'generate', 'assign', or 'aro'.", file=sys.stderr)
                 sys.exit(1)
 
             # Display results for generate command
