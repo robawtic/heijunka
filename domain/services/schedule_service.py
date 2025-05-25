@@ -10,7 +10,7 @@ from domain.value_objects.schedule_period import SchedulePeriod
 from domain.value_objects.work_assignment import WorkAssignment
 from domain.value_objects.schedule_constraint import ScheduleConstraint, ConstraintType
 from domain.events import AssignmentCreated
-from rules.context import RuleContext
+from domain.rules.context import RuleContext
 
 
 class ScheduleService:
@@ -117,7 +117,7 @@ class ScheduleService:
         )
 
         # Create a rule context (optional, could be done inside the Schedule entity)
-        from rules.registry import create_context_for_team
+        from domain.rules.registry import create_context_for_team
 
         # Generate assignments using the Schedule entity
         success = schedule.generate_assignments(employees, workstations)

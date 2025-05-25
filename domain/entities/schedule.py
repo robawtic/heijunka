@@ -328,7 +328,7 @@ class Schedule:
         Returns:
             True if assignments were successfully generated, False otherwise
         """
-        from rules.registry import get_rules_for_team, create_context_for_team
+        from domain.rules.registry import get_rules_for_team, create_context_for_team
 
         # Clear existing assignments if any
         self._assignments = []

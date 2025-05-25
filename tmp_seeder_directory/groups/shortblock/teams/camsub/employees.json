@@ -1,0 +1,84 @@
+{
+  "employees": [
+    {
+      "name": "Jennifer",
+      "role": "Team Leader",
+      "is_active": true,
+      "known_stations": ["CS010", "CS020", "CS030"],
+      "hire_date": "2019-10-05",
+      "skills": {
+        "leadership": "High",
+        "technical": "High",
+        "problem_solving": "High"
+      },
+      "availability_pattern": {
+        "regular_days_off": ["Saturday", "Sunday"],
+        "vacation_days": ["2024-07-22", "2024-07-23", "2024-07-24", "2024-07-25", "2024-07-26"],
+        "training_days": ["2024-06-05"]
+      },
+      "certifications": ["CS020 - Cam Timing Specialist"]
+    },
+    {
+      "name": "Robert",
+      "role": "Backup",
+      "is_active": true,
+      "known_stations": ["CS010", "CS020", "CS030"],
+      "hire_date": "2020-06-15",
+      "skills": {
+        "leadership": "Medium",
+        "technical": "High",
+        "problem_solving": "Medium"
+      },
+      "availability_pattern": {
+        "regular_days_off": ["Saturday", "Sunday"],
+        "vacation_days": ["2024-09-15", "2024-09-16", "2024-09-17", "2024-09-18", "2024-09-19"],
+        "training_days": ["2024-08-01"]
+      },
+      "certifications": ["CS020 - Cam Timing Specialist"]
+    },
+    {
+      "name": "Maria",
+      "role": "Associate",
+      "is_active": true,
+      "known_stations": ["CS010", "CS030"],
+      "hire_date": "2021-09-01",
+      "skills": {
+        "leadership": "Low",
+        "technical": "Medium",
+        "problem_solving": "Medium"
+      },
+      "availability_pattern": {
+        "regular_days_off": ["Saturday", "Sunday"],
+        "vacation_days": ["2024-11-01", "2024-11-02", "2024-11-03", "2024-11-04"],
+        "training_days": ["2024-07-10", "2024-07-11", "2024-07-12"]
+      },
+      "training_progress": {
+        "CS020": {
+          "hours_completed": 20,
+          "hours_required": 30,
+          "expected_completion_date": "2024-08-30"
+        }
+      }
+    },
+    {
+      "name": "James",
+      "role": "Associate",
+      "is_active": true,
+      "known_stations": ["CS010", "CS020", "CS030"],
+      "hire_date": "2020-04-10",
+      "is_trainer": true,
+      "skills": {
+        "leadership": "Medium",
+        "technical": "High",
+        "problem_solving": "High"
+      },
+      "availability_pattern": {
+        "regular_days_off": ["Saturday", "Sunday"],
+        "vacation_days": ["2024-08-15", "2024-08-16", "2024-08-17", "2024-08-18", "2024-08-19"],
+        "training_days": []
+      },
+      "certifications": ["CS020 - Cam Timing Specialist"],
+      "notes": "Primary trainer for CS020 certification"
+    }
+  ]
+}

@@ -1,0 +1,39 @@
+{
+  "workstations": [
+    {
+      "name": "SB010",
+      "line_type": "Sub-Assembly",
+      "is_loading_job": true,
+      "is_heavy_job": true,
+      "is_key_skill_job": false,
+      "description": "Initial block preparation and component loading",
+      "cycle_time_minutes": 15,
+      "required_tools": ["Engine block fixture", "Hoist", "Cleaning tools"],
+      "safety_equipment": ["Gloves", "Safety glasses", "Steel-toed boots", "Back brace"]
+    },
+    {
+      "name": "SB020",
+      "line_type": "Sub-Assembly",
+      "is_loading_job": false,
+      "is_heavy_job": false,
+      "is_key_skill_job": false,
+      "description": "Piston and connecting rod installation",
+      "cycle_time_minutes": 12,
+      "required_tools": ["Piston ring compressor", "Torque wrench", "Assembly lubricant"],
+      "safety_equipment": ["Gloves", "Safety glasses"]
+    },
+    {
+      "name": "SB030",
+      "line_type": "Sub-Assembly",
+      "is_loading_job": false,
+      "is_heavy_job": false,
+      "is_key_skill_job": true,
+      "description": "Crankshaft installation and torque application",
+      "cycle_time_minutes": 18,
+      "required_tools": ["Bearing installation tool", "Torque wrench", "Dial indicator"],
+      "safety_equipment": ["Gloves", "Safety glasses"],
+      "certification_required": true,
+      "training_hours_required": 40
+    }
+  ]
+}

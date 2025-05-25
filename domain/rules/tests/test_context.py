@@ -6,7 +6,7 @@ from ortools.sat.python.cp_model import CpModel
 
 from domain.entities.employee import Employee
 from domain.entities.workstation import Workstation
-from rules.context import RuleContext, HeadsubRuleContext, rule_metadata, adapt_rule
+from domain.rules.context import RuleContext, HeadsubRuleContext, rule_metadata, adapt_rule
 
 
 class TestRuleContext(unittest.TestCase):

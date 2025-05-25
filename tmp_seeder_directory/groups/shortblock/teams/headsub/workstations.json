@@ -1,0 +1,114 @@
+{
+  "workstations": [
+    {
+      "name": "Parts Wash",
+      "line_type": "Sub-Assembly",
+      "is_loading_job": false,
+      "is_heavy_job": false,
+      "is_key_skill_job": false,
+      "description": "Cleaning and preparation of cylinder head components",
+      "cycle_time_minutes": 5,
+      "required_tools": ["Wash basin", "Air gun", "Cleaning solution"],
+      "safety_equipment": ["Gloves", "Safety glasses", "Apron"]
+    },
+    {
+      "name": "H010",
+      "line_type": "Sub-Assembly",
+      "is_loading_job": true,
+      "is_heavy_job": false,
+      "is_key_skill_job": false,
+      "description": "Initial cylinder head assembly",
+      "cycle_time_minutes": 8,
+      "required_tools": ["Torque wrench", "Assembly fixture", "Hand tools"],
+      "safety_equipment": ["Gloves", "Safety glasses"]
+    },
+    {
+      "name": "H080/H090",
+      "line_type": "Sub-Assembly",
+      "is_loading_job": false,
+      "is_heavy_job": false,
+      "is_key_skill_job": false,
+      "description": "Valve installation and adjustment",
+      "cycle_time_minutes": 10,
+      "required_tools": ["Valve spring compressor", "Feeler gauges", "Torque wrench"],
+      "safety_equipment": ["Gloves", "Safety glasses"]
+    },
+    {
+      "name": "H100",
+      "line_type": "Sub-Assembly",
+      "is_loading_job": false,
+      "is_heavy_job": false,
+      "is_key_skill_job": false,
+      "description": "Seal installation",
+      "cycle_time_minutes": 6,
+      "required_tools": ["Seal driver", "Mallet", "Alignment tool"],
+      "safety_equipment": ["Gloves", "Safety glasses"]
+    },
+    {
+      "name": "H110/H120",
+      "line_type": "Sub-Assembly",
+      "is_loading_job": false,
+      "is_heavy_job": false,
+      "is_key_skill_job": false,
+      "description": "Quality checks and measurements",
+      "cycle_time_minutes": 7,
+      "required_tools": ["Calipers", "Dial indicator", "Go/no-go gauges"],
+      "safety_equipment": ["Gloves", "Safety glasses"]
+    },
+    {
+      "name": "H170",
+      "line_type": "Sub-Assembly",
+      "is_loading_job": true,
+      "is_heavy_job": true,
+      "is_key_skill_job": false,
+      "description": "Final cylinder head assembly",
+      "cycle_time_minutes": 12,
+      "required_tools": ["Torque wrench", "Lifting assist", "Assembly fixture"],
+      "safety_equipment": ["Gloves", "Safety glasses", "Back brace"]
+    },
+    {
+      "name": "BW010",
+      "line_type": "Mainline",
+      "is_loading_job": true,
+      "is_heavy_job": true,
+      "is_key_skill_job": false,
+      "description": "Block-to-head mating",
+      "cycle_time_minutes": 15,
+      "required_tools": ["Hoist", "Alignment pins", "Torque wrench"],
+      "safety_equipment": ["Gloves", "Safety glasses", "Steel-toed boots"]
+    },
+    {
+      "name": "BW070",
+      "line_type": "Mainline",
+      "is_loading_job": false,
+      "is_heavy_job": false,
+      "is_key_skill_job": false,
+      "description": "Torque application and verification",
+      "cycle_time_minutes": 9,
+      "required_tools": ["Torque wrench", "Angle gauge", "Verification tool"],
+      "safety_equipment": ["Gloves", "Safety glasses"]
+    },
+    {
+      "name": "M050",
+      "line_type": "Mainline",
+      "is_loading_job": true,
+      "is_heavy_job": true,
+      "is_key_skill_job": false,
+      "description": "Additional component installation",
+      "cycle_time_minutes": 14,
+      "required_tools": ["Lifting assist", "Torque wrench", "Assembly fixture"],
+      "safety_equipment": ["Gloves", "Safety glasses", "Back brace"]
+    },
+    {
+      "name": "M090",
+      "line_type": "Mainline",
+      "is_loading_job": true,
+      "is_heavy_job": true,
+      "is_key_skill_job": false,
+      "description": "Final quality checks",
+      "cycle_time_minutes": 11,
+      "required_tools": ["Inspection camera", "Leak tester", "Diagnostic tool"],
+      "safety_equipment": ["Gloves", "Safety glasses"]
+    }
+  ]
+}

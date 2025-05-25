@@ -7,8 +7,8 @@ from ortools.sat.python.cp_model import CpModel
 from domain.entities.employee import Employee
 from domain.entities.workstation import Workstation
 from domain.value_objects.work_history_entry import WorkHistoryEntry
-from rules.context import RuleContext
-from rules.soft import (
+from domain.rules.context import RuleContext
+from domain.rules.soft import (
     add_rotation_penalties,
     add_repeat_station_penalties,
     add_workload_deviation

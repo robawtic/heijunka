@@ -1,6 +1,6 @@
 # scheduler/engine.py
 
-from rules.registry import get_rules_for_team, create_context_for_team
+from domain.rules.registry import get_rules_for_team, create_context_for_team
 from models import load_models
 
 def run_schedule(teams, call_ins, overrides, config):

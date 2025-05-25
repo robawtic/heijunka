@@ -6,8 +6,8 @@ from ortools.sat.python.cp_model import CpModel
 
 from domain.entities.employee import Employee
 from domain.entities.workstation import Workstation
-from rules.context import RuleContext
-from rules.hard import (
+from domain.rules.context import RuleContext
+from domain.rules.hard import (
     forbid_unavailable,
     forbid_unknown_stations,
     add_one_station_per_employee,
