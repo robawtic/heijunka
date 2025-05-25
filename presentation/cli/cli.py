@@ -66,6 +66,7 @@ def setup_dependencies():
     from domain.services.aro_service import AROService
     from domain.services.schedule_recalculation_handler import ScheduleRecalculationHandler
     from domain.services.aro_graph_service import AROGraphService
+    from domain.services.cache_invalidation_handler import CacheInvalidationHandler
 
     aro_service = AROService(aro_repository, employee_repository, team_repository)
     schedule_recalculation_handler = ScheduleRecalculationHandler(team_repository, schedule_service)
@@ -79,10 +80,18 @@ def setup_dependencies():
         workstation_repository=workstation_repository
     )
 
-    # Register event handlers
+    # Create the cache invalidation handler
+    cache_invalidation_handler = CacheInvalidationHandler(aro_graph_service)
+
+    # Register event handlers for schedule recalculation
     aro_service.register_event_handler('aro_assignment_created', schedule_recalculation_handler.handle_aro_assignment_created)
     aro_service.register_event_handler('aro_assignment_removed', schedule_recalculation_handler.handle_aro_assignment_removed)
     aro_service.register_event_handler('aro_assignment_updated', schedule_recalculation_handler.handle_aro_assignment_updated)
+
+    # Register event handlers for cache invalidation
+    aro_service.register_event_handler('aro_assignment_created', cache_invalidation_handler.handle_aro_assignment_created)
+    aro_service.register_event_handler('aro_assignment_removed', cache_invalidation_handler.handle_aro_assignment_removed)
+    aro_service.register_event_handler('aro_assignment_updated', cache_invalidation_handler.handle_aro_assignment_updated)
 
     return session, employee_repository, workstation_repository, team_repository, schedule_service, assignment_repository, work_history_repository, aro_repository, aro_service, aro_graph_service
 
@@ -508,7 +517,7 @@ def main():
         args = parse_arguments()
 
         # Setup dependencies
-        session, employee_repository, workstation_repository, team_repository, schedule_service, assignment_repository, work_history_repository, aro_repository, aro_service = setup_dependencies()
+        session, employee_repository, workstation_repository, team_repository, schedule_service, assignment_repository, work_history_repository, aro_repository, aro_service, aro_graph_service = setup_dependencies()
 
         try:
             if args.command == 'generate':
