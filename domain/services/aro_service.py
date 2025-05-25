@@ -2,20 +2,23 @@ from typing import List, Optional, Dict, Callable, Any
 from datetime import date
 
 from domain.entities.employee import Employee
-from domain.value_objects.aro_assignment import AROAssignment
+from domain.aggregates.aro_assignment import AROAssignment
 from domain.repositories.interfaces.aro_assignment_repository import AROAssignmentRepositoryInterface
 from domain.repositories.interfaces.employee_repository import EmployeeRepositoryInterface
 from domain.repositories.interfaces.team_repository import TeamRepositoryInterface
 from domain.events import AROAssignmentCreated, AROAssignmentRemoved, AROAssignmentUpdated
+from domain.events.publisher import DomainEventPublisher
 
 class AROService:
     def __init__(self, 
                  aro_repository: AROAssignmentRepositoryInterface,
                  employee_repository: EmployeeRepositoryInterface,
-                 team_repository: TeamRepositoryInterface):
+                 team_repository: TeamRepositoryInterface,
+                 event_publisher: DomainEventPublisher):
         self.aro_repository = aro_repository
         self.employee_repository = employee_repository
         self.team_repository = team_repository
+        self.event_publisher = event_publisher
         self._event_handlers = {
             'aro_assignment_created': [],
             'aro_assignment_removed': [],
@@ -78,8 +81,8 @@ class AROService:
             if assignment.period == period:
                 return {"status": "error", "message": "Employee already assigned as ARO for this date/period"}
 
-        # Create the ARO assignment
-        aro_assignment = AROAssignment(
+        # Create the ARO assignment through the aggregate
+        aro_assignment = AROAssignment.create(
             employee_id=employee_id,
             from_team_id=employee.team_id,
             to_team_id=to_team_id,
@@ -94,15 +97,20 @@ class AROService:
         employee.assign_as_aro(to_team_id, assignment_date, period)
         self.employee_repository.update(employee)
 
-        # Create and trigger the event
-        event = AROAssignmentCreated(
-            employee_id=employee_id,
-            from_team_id=employee.team_id,
-            to_team_id=to_team_id,
-            assignment_date=assignment_date,
-            period=period
-        )
-        self._trigger_event('aro_assignment_created', event)
+        # Publish domain events
+        for event in aro_assignment.domain_events:
+            self.event_publisher.publish(event)
+
+            # Also trigger the legacy event handlers for backward compatibility
+            if isinstance(event, AROAssignmentCreated):
+                self._trigger_event('aro_assignment_created', event)
+            elif isinstance(event, AROAssignmentRemoved):
+                self._trigger_event('aro_assignment_removed', event)
+            elif isinstance(event, AROAssignmentUpdated):
+                self._trigger_event('aro_assignment_updated', event)
+
+        # Clear domain events after publishing
+        aro_assignment.clear_domain_events()
 
         return {"status": "success", "message": "Employee assigned as ARO"}
 
@@ -144,20 +152,28 @@ class AROService:
         if not employee:
             return {"status": "error", "message": "Employee not found"}
 
+        # Mark the assignment for removal
+        assignment.remove()
+
         # Remove the assignment
         success = self.aro_repository.delete(assignment_id)
         if not success:
             return {"status": "error", "message": "Failed to remove ARO assignment"}
 
-        # Create and trigger the event
-        event = AROAssignmentRemoved(
-            employee_id=assignment.employee_id,
-            from_team_id=assignment.from_team_id,
-            to_team_id=assignment.to_team_id,
-            assignment_date=assignment.assignment_date,
-            period=assignment.period
-        )
-        self._trigger_event('aro_assignment_removed', event)
+        # Publish domain events
+        for event in assignment.domain_events:
+            self.event_publisher.publish(event)
+
+            # Also trigger the legacy event handlers for backward compatibility
+            if isinstance(event, AROAssignmentCreated):
+                self._trigger_event('aro_assignment_created', event)
+            elif isinstance(event, AROAssignmentRemoved):
+                self._trigger_event('aro_assignment_removed', event)
+            elif isinstance(event, AROAssignmentUpdated):
+                self._trigger_event('aro_assignment_updated', event)
+
+        # Clear domain events after publishing
+        assignment.clear_domain_events()
 
         return {"status": "success", "message": "ARO assignment removed"}
 

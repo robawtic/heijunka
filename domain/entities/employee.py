@@ -238,7 +238,12 @@ class Employee:
             status=AvailabilityStatus.ARO
         )
 
-        return self.add_availability(availability)
+        # Add the availability record
+        if not self.add_availability(availability):
+            return False
+
+        # No need to raise an event here as the AROAssignment aggregate will do that
+        return True
 
     def add_work_history_entry(self, workstation_id: int, worked_date: date, work_period: int) -> bool:
         """
