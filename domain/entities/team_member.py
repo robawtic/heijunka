@@ -1,13 +1,13 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import List, Optional
 
 
 @dataclass
 class TeamMember:
-    team_member_id: int
-    team_id: int
-    employee_id: int
-    roles: List[str] = None  # List of role names assigned to the team member
+    team_member_id: Optional[int] = None  # Assigned by repository/persistence layer
+    team_id: int = 0
+    employee_id: int = 0
+    roles: List[str] = field(default_factory=list)  # List of role names assigned to the team member
     team: Optional['Team'] = None  # Back-reference to the team
     employee: Optional['Employee'] = None  # Back-reference to the employee
 

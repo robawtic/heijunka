@@ -26,8 +26,22 @@ class TeamModel(Base):
         """Convert TeamModel to Team domain entity"""
         from domain.entities.employee import Employee
         from domain.entities.workstation import Workstation
+        from domain.entities.team_member import TeamMember
 
-        members = [member.employee.to_domain() for member in self.members]
+        # Create team members
+        team_members = []
+        for member_model in self.members:
+            employee = member_model.employee.to_domain() if member_model.employee else None
+            team_member = TeamMember(
+                team_member_id=member_model.id,
+                team_id=self.id,
+                employee_id=member_model.employee_id,
+                employee=employee,
+                roles=[role.name for role in member_model.roles] if hasattr(member_model, 'roles') else []
+            )
+            team_members.append(team_member)
+
+        # Create workstations
         workstations = [
             Workstation(
                 id=ws.station_id,
@@ -44,7 +58,7 @@ class TeamModel(Base):
             id=self.id,
             name=self.name,
             description=self.description,
-            _members=members,
+            _team_members=team_members,
             _workstations=workstations
         )
 

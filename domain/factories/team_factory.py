@@ -44,7 +44,6 @@ class TeamFactory:
             id=id or 0,
             name=name,
             description=description,
-            _members=[],
             _workstations=[],
             _team_members=[]
         )
@@ -62,16 +61,20 @@ class TeamFactory:
         # Add team members if provided
         if team_members:
             for team_member in team_members:
-                # We need to create a new TeamMember and add it to the team
-                # Since there's no direct method to add a TeamMember, we'll need to
-                # find or create the corresponding Employee and add it to the team
-                employee = team.get_member_by_id(team_member.employee_id)
-                if not employee:
-                    # If the employee isn't already a member, we can't add the TeamMember
-                    # This is a limitation of the current design
+                # Check if this team member already exists
+                exists = False
+                for existing_tm in team._team_members:
+                    if existing_tm.employee_id == team_member.employee_id:
+                        exists = True
+                        break
+
+                if exists:
                     continue
 
-                # Add roles from the TeamMember to the employee in this team
+                # Add the team member directly
+                team._team_members.append(team_member)
+
+                # Add roles if needed
                 for role in team_member.roles:
                     team.assign_role_to_member(team_member.employee_id, role)
 
@@ -102,17 +105,13 @@ class TeamFactory:
         Raises:
             ValueError: If validation fails
         """
-        team = TeamFactory.create_team(
+        # This method can simply delegate to create_team since it already handles members
+        return TeamFactory.create_team(
             id=id,
             name=name,
-            description=description
+            description=description,
+            members=members
         )
-
-        if members:
-            for member in members:
-                team.add_member(member)
-
-        return team
 
     @staticmethod
     def create_team_with_workstations(
@@ -136,17 +135,13 @@ class TeamFactory:
         Raises:
             ValueError: If validation fails
         """
-        team = TeamFactory.create_team(
+        # This method can simply delegate to create_team since it already handles workstations
+        return TeamFactory.create_team(
             id=id,
             name=name,
-            description=description
+            description=description,
+            workstations=workstations
         )
-
-        if workstations:
-            for workstation in workstations:
-                team.add_workstation(workstation)
-
-        return team
 
     @staticmethod
     def create_from_model(model: Any) -> Team:
@@ -162,15 +157,26 @@ class TeamFactory:
         Raises:
             ValueError: If validation fails
         """
-        # Extract members and workstations from the model
-        members = []
+        # Extract team members and workstations from the model
+        team_members = []
         if hasattr(model, 'members') and model.members:
-            for member in model.members:
-                if hasattr(member, 'employee') and member.employee:
+            for member_model in model.members:
+                employee = None
+                if hasattr(member_model, 'employee') and member_model.employee:
                     # Convert employee model to domain entity
                     from domain.factories.employee_factory import EmployeeFactory
-                    employee = EmployeeFactory.create_from_model(member.employee)
-                    members.append(employee)
+                    employee = EmployeeFactory.create_from_model(member_model.employee)
+
+                # Create team member
+                from domain.entities.team_member import TeamMember
+                team_member = TeamMember(
+                    team_member_id=member_model.id,
+                    team_id=model.id,
+                    employee_id=member_model.employee_id,
+                    employee=employee,
+                    roles=[role.name for role in member_model.roles] if hasattr(member_model, 'roles') else []
+                )
+                team_members.append(team_member)
 
         workstations = []
         if hasattr(model, 'workstations') and model.workstations:
@@ -180,20 +186,11 @@ class TeamFactory:
                 workstation = WorkstationFactory.create_from_model(ws)
                 workstations.append(workstation)
 
-        # Create the team first
-        team = TeamFactory.create_team(
+        # Create the team
+        return Team(
             id=model.id,
             name=model.name,
             description=model.description if hasattr(model, 'description') else "",
-            members=members,
-            workstations=workstations
+            _team_members=team_members,
+            _workstations=workstations
         )
-
-        # Add roles to team members
-        if hasattr(model, 'members') and model.members:
-            for member_model in model.members:
-                if hasattr(member_model, 'roles') and member_model.roles:
-                    for role in member_model.roles:
-                        team.assign_role_to_member(member_model.employee_id, role.name)
-
-        return team

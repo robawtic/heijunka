@@ -10,15 +10,15 @@ from domain.events import AROAssignmentCreated, AROAssignmentRemoved, AROAssignm
 from domain.events.publisher import DomainEventPublisher
 
 class AROService:
-    def __init__(self, 
+    def __init__(self,
                  aro_repository: AROAssignmentRepositoryInterface,
                  employee_repository: EmployeeRepositoryInterface,
                  team_repository: TeamRepositoryInterface,
-                 event_publisher: DomainEventPublisher):
+                 event_publisher: DomainEventPublisher = None):
         self.aro_repository = aro_repository
         self.employee_repository = employee_repository
         self.team_repository = team_repository
-        self.event_publisher = event_publisher
+        self.event_publisher = event_publisher or DomainEventPublisher()
         self._event_handlers = {
             'aro_assignment_created': [],
             'aro_assignment_removed': [],

@@ -30,9 +30,10 @@ async def generate_schedule_async(
     Returns:
         Dictionary with schedule ID and assignments
     """
-    # This would normally be a blocking operation, so we run it in a thread pool
+    # Get repositories and services
     repositories = get_repositories(db)
     schedule_service = get_schedule_service()
+    schedule_repo = repositories["schedule_repository"]
 
     # Create handler
     handler = GenerateScheduleHandler(
@@ -54,19 +55,31 @@ async def generate_schedule_async(
         force_complete=schedule_data.get("force_complete", False)
     )
 
-    # Run the blocking operation in a thread pool
-    loop = asyncio.get_event_loop()
-    assignments = await loop.run_in_executor(
-        None, 
-        lambda: handler.handle(command)
-    )
+    try:
+        # Run the blocking operation in a thread pool
+        loop = asyncio.get_event_loop()
+        assignments = await loop.run_in_executor(
+            None, 
+            lambda: handler.handle(command)
+        )
 
-    # In a real implementation, you would update the schedule in the database
-    # For now, we'll just return the schedule ID and assignments
-    return {
-        "schedule_id": schedule_data.get("id", 1),  # Placeholder
-        "assignments": assignments
-    }
+        # Update schedule status to completed
+        schedule_repo.update_status(schedule_data["id"], "completed")
+
+        return {
+            "schedule_id": schedule_data["id"],
+            "assignments": assignments
+        }
+    except Exception as e:
+        # Update schedule status to failed with error message
+        error_message = str(e)
+        schedule_repo.update_status(schedule_data["id"], "failed", error_message)
+
+        return {
+            "schedule_id": schedule_data["id"],
+            "assignments": [],
+            "error": error_message
+        }
 
 @router.post("/", response_model=ScheduleResponse, status_code=202, responses={401: {"model": ErrorResponse}, 403: {"model": ErrorResponse}})
 async def create_schedule(
@@ -98,8 +111,8 @@ async def create_schedule(
         force_complete=schedule.force_complete
     )
 
-    # Convert Pydantic model to dict for the task
-    schedule_data = schedule.dict()
+    # Convert Pydantic model to model_dump for the task
+    schedule_data = schedule.model_dump()
     schedule_data["id"] = new_schedule.id
 
     # Create a background task
@@ -188,6 +201,15 @@ async def get_schedule_by_task(
         TaskStatus.FAILED: "failed"
     }
 
+    # Update schedule status based on task status if needed
+    current_status = status_map.get(task.status, "unknown")
+    if schedule.status != current_status:
+        schedule_repo.update_status(
+            schedule.id, 
+            current_status, 
+            task.error if task.status == TaskStatus.FAILED else None
+        )
+
     # Create error message if task failed
     error_message = task.error if task.status == TaskStatus.FAILED else None
 
@@ -201,7 +223,7 @@ async def get_schedule_by_task(
         offline=schedule.offline,
         force_complete=schedule.force_complete,
         assignments=assignments,
-        status=status_map.get(task.status, "unknown"),
+        status=current_status,
         error_message=error_message,
         task_id=task_id,
         created_at=schedule.created_at,
@@ -332,6 +354,105 @@ async def create_manual_assignment(
             period=assignment.period
         )
     )
+
+@router.put("/{schedule_id}", response_model=ScheduleResponse, responses={401: {"model": ErrorResponse}, 403: {"model": ErrorResponse}, 404: {"model": ErrorResponse}})
+async def update_schedule(
+    schedule_id: int,
+    schedule_update: ScheduleUpdate,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_scheduler_user)
+):
+    """
+    Update an existing schedule.
+
+    This endpoint allows updating schedule properties like call-ins, offline periods, 
+    or force_complete flag. It doesn't regenerate the schedule.
+    """
+    repositories = get_repositories(db)
+    schedule_repo = repositories["schedule_repository"]
+
+    # Get the schedule from the database
+    schedule = schedule_repo.get_by_id(schedule_id)
+    if not schedule:
+        raise HTTPException(status_code=404, detail=f"Schedule with ID {schedule_id} not found")
+
+    # Update the schedule
+    updated_schedule = schedule_repo.update(
+        schedule_id,
+        call_ins=schedule_update.call_ins,
+        offline=schedule_update.offline,
+        force_complete=schedule_update.force_complete
+    )
+
+    team = repositories["team_repository"].get_by_id(updated_schedule.team_id)
+
+    # Get assignments for this schedule
+    assignment_repo = repositories["assignment_repository"]
+    assignments_data = assignment_repo.get_by_schedule_id(schedule_id)
+
+    # Convert assignments to response format
+    assignments = []
+    for assignment in assignments_data:
+        employee = repositories["employee_repository"].get_by_id(assignment.employee_id)
+        workstation = repositories["workstation_repository"].get_by_id(assignment.workstation_id)
+
+        assignments.append(
+            AssignmentInfo(
+                employee_id=employee.id,
+                employee_name=employee.name,
+                workstation_id=workstation.id,
+                workstation_name=workstation.name,
+                period=PeriodInfo(
+                    date=assignment.assignment_date,
+                    period=assignment.period
+                )
+            )
+        )
+
+    return ScheduleResponse(
+        id=updated_schedule.id,
+        team_id=updated_schedule.team_id,
+        team_name=team.name,
+        start_date=updated_schedule.start_date,
+        periods_per_day=updated_schedule.periods_per_day,
+        call_ins=updated_schedule.call_ins,
+        offline=updated_schedule.offline,
+        force_complete=updated_schedule.force_complete,
+        assignments=assignments,
+        status=updated_schedule.status,
+        error_message=updated_schedule.error_message,
+        task_id=updated_schedule.task_id,
+        created_at=updated_schedule.created_at,
+        updated_at=updated_schedule.updated_at
+    )
+
+@router.delete("/{schedule_id}", status_code=204, responses={401: {"model": ErrorResponse}, 403: {"model": ErrorResponse}, 404: {"model": ErrorResponse}})
+async def delete_schedule(
+    schedule_id: int,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_scheduler_user)
+):
+    """
+    Delete a schedule.
+
+    This endpoint deletes a schedule and all its assignments.
+    """
+    repositories = get_repositories(db)
+    schedule_repo = repositories["schedule_repository"]
+
+    # Get the schedule from the database
+    schedule = schedule_repo.get_by_id(schedule_id)
+    if not schedule:
+        raise HTTPException(status_code=404, detail=f"Schedule with ID {schedule_id} not found")
+
+    # Delete all assignments for this schedule
+    assignment_repo = repositories["assignment_repository"]
+    assignment_repo.delete_by_schedule_id(schedule_id)
+
+    # Delete the schedule
+    schedule_repo.delete(schedule_id)
+
+    return None
 
 @router.get("/", response_model=Page[ScheduleResponse], responses={401: {"model": ErrorResponse}, 403: {"model": ErrorResponse}})
 @cache(expire=settings.cache_ttl_seconds)

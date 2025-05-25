@@ -231,6 +231,26 @@ class SqlAlchemyAssignmentRepository(BaseSqlAlchemyRepository[WorkAssignment, Em
             self._session.rollback()
             return False
 
+    def delete_by_schedule_id(self, schedule_id: int) -> bool:
+        """
+        Delete all assignments for a specific schedule.
+
+        Args:
+            schedule_id: ID of the schedule
+
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            self._session.query(EmployeeWorkHistoryModel).filter(
+                EmployeeWorkHistoryModel.schedule_id == schedule_id
+            ).delete()
+            self._session.commit()
+            return True
+        except SQLAlchemyError as e:
+            self._session.rollback()
+            raise RepositoryError(f"Error deleting assignments for schedule {schedule_id}: {str(e)}")
+
     def _update_model(self, model: EmployeeWorkHistoryModel, entity: WorkAssignment) -> None:
         """Update a SQLAlchemy model with values from a domain entity."""
         model.employee_id = entity.employee.id

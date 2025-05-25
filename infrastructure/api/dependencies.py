@@ -5,6 +5,7 @@ from domain.repositories.implementations.sqlalchemy_team_repository import SqlAl
 from domain.repositories.implementations.sqlalchemy_assignment_repository import SqlAlchemyAssignmentRepository
 from domain.repositories.implementations.sqlalchemy_employee_work_history_repository import SqlAlchemyEmployeeWorkHistoryRepository
 from domain.repositories.implementations.sqlalchemy_schedule_repository import SqlAlchemyScheduleRepository
+from domain.repositories.implementations.sqlalchemy_aro_assignment_repository import SqlAlchemyAROAssignmentRepository
 from domain.services.schedule_service import ScheduleService
 from domain.models.db import Session as DBSession
 
@@ -24,7 +25,8 @@ def get_repositories(db: Session):
         "team_repository": SqlAlchemyTeamRepository(db),
         "assignment_repository": SqlAlchemyAssignmentRepository(db),
         "work_history_repository": SqlAlchemyEmployeeWorkHistoryRepository(db),
-        "schedule_repository": SqlAlchemyScheduleRepository(db)
+        "schedule_repository": SqlAlchemyScheduleRepository(db),
+        "aro_assignment_repository": SqlAlchemyAROAssignmentRepository(db)
     }
 
 def get_schedule_service():
