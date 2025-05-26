@@ -1,3 +1,4 @@
+from fastapi import Depends
 from sqlalchemy.orm import Session
 from domain.repositories.implementations.sqlalchemy_employee_repository import SqlAlchemyEmployeeRepository
 from domain.repositories.implementations.sqlalchemy_workstation_repository import SqlAlchemyWorkstationRepository

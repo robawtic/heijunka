@@ -80,9 +80,6 @@ async def login_for_access_token(
         # Get CSRF token from the request context
         csrf_token = get_csrf_token_from_request(request)
 
-        # Update last login timestamp
-        user_service.update_last_login(user.id)
-
         logger.info(f"Successful login for user: {user.username}")
 
         return TokenResponse(

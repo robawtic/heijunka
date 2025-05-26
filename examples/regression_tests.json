@@ -1,0 +1,92 @@
+[
+  {
+    "name": "Baseline_Regression",
+    "call_ins": [],
+    "offline": [],
+    "force_complete": false,
+    "periods_per_day": 4,
+    "metadata": {
+      "description": "Baseline scenario for regression testing"
+    },
+    "expected_metrics": {
+      "total_assignments": 16,
+      "min_employee_assignments": 2,
+      "max_employee_assignments": 4,
+      "avg_employee_assignments": 3.2,
+      "std_dev_employee_assignments": 0.8,
+      "min_workstation_utilization": 2,
+      "max_workstation_utilization": 4,
+      "avg_workstation_utilization": 3.2
+    },
+    "tolerance_thresholds": {
+      "total_assignments": 0,
+      "min_employee_assignments": 0,
+      "max_employee_assignments": 0,
+      "avg_employee_assignments": 0.1,
+      "std_dev_employee_assignments": 0.2,
+      "min_workstation_utilization": 0,
+      "max_workstation_utilization": 0,
+      "avg_workstation_utilization": 0.1
+    }
+  },
+  {
+    "name": "High_Absenteeism_Regression",
+    "call_ins": ["John Doe", "Jane Smith"],
+    "offline": [],
+    "force_complete": true,
+    "periods_per_day": 4,
+    "metadata": {
+      "description": "High absenteeism scenario for regression testing"
+    },
+    "expected_metrics": {
+      "total_assignments": 16,
+      "min_employee_assignments": 4,
+      "max_employee_assignments": 6,
+      "avg_employee_assignments": 5.33,
+      "std_dev_employee_assignments": 0.94,
+      "min_workstation_utilization": 2,
+      "max_workstation_utilization": 4,
+      "avg_workstation_utilization": 3.2
+    },
+    "tolerance_thresholds": {
+      "total_assignments": 0,
+      "min_employee_assignments": 0,
+      "max_employee_assignments": 0,
+      "avg_employee_assignments": 0.1,
+      "std_dev_employee_assignments": 0.2,
+      "min_workstation_utilization": 0,
+      "max_workstation_utilization": 0,
+      "avg_workstation_utilization": 0.1
+    }
+  },
+  {
+    "name": "Partial_Offline_Regression",
+    "call_ins": [],
+    "offline": ["John Doe:1,2", "Jane Smith:3,4"],
+    "force_complete": false,
+    "periods_per_day": 4,
+    "metadata": {
+      "description": "Partial offline scenario for regression testing"
+    },
+    "expected_metrics": {
+      "total_assignments": 16,
+      "min_employee_assignments": 2,
+      "max_employee_assignments": 4,
+      "avg_employee_assignments": 3.2,
+      "std_dev_employee_assignments": 0.8,
+      "min_workstation_utilization": 2,
+      "max_workstation_utilization": 4,
+      "avg_workstation_utilization": 3.2
+    },
+    "tolerance_thresholds": {
+      "total_assignments": 0,
+      "min_employee_assignments": 0,
+      "max_employee_assignments": 0,
+      "avg_employee_assignments": 0.1,
+      "std_dev_employee_assignments": 0.2,
+      "min_workstation_utilization": 0,
+      "max_workstation_utilization": 0,
+      "avg_workstation_utilization": 0.1
+    }
+  }
+]

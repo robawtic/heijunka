@@ -1,0 +1,38 @@
+[
+  {
+    "name": "Baseline",
+    "call_ins": [],
+    "offline": [],
+    "force_complete": false,
+    "metadata": {
+      "description": "Baseline scenario with no call-ins or offline employees"
+    }
+  },
+  {
+    "name": "High_Absenteeism",
+    "call_ins": ["John Doe", "Jane Smith"],
+    "offline": [],
+    "force_complete": true,
+    "metadata": {
+      "description": "Scenario with high absenteeism (2 employees calling in)"
+    }
+  },
+  {
+    "name": "Partial_Offline",
+    "call_ins": [],
+    "offline": ["John Doe:1,2", "Jane Smith:3,4"],
+    "force_complete": false,
+    "metadata": {
+      "description": "Scenario with employees partially offline for specific periods"
+    }
+  },
+  {
+    "name": "Combined_Challenges",
+    "call_ins": ["John Doe"],
+    "offline": ["Jane Smith:1,2", "Bob Johnson:3,4"],
+    "force_complete": true,
+    "metadata": {
+      "description": "Scenario with both call-ins and offline employees"
+    }
+  }
+]

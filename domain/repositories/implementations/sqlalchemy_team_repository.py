@@ -178,6 +178,55 @@ class SqlAlchemyTeamRepository(BaseSqlAlchemyRepository[Team, TeamModel], TeamRe
         from domain.factories.workstation_factory import WorkstationFactory
         return WorkstationFactory.create_from_model(model)
 
+    def get_by_group_name(self, group_name: str) -> List[Team]:
+        """
+        Retrieve all teams that belong to a group with the given name.
+
+        Args:
+            group_name: The name of the group.
+
+        Returns:
+            A list of teams that belong to the group.
+        """
+        from domain.models.GroupModel import GroupModel
+
+        # Find the group by name
+        group = self._session.query(GroupModel).filter(GroupModel.name == group_name).first()
+        if not group:
+            return []
+
+        # Get all teams that belong to this group
+        team_models = self._session.query(TeamModel).filter(TeamModel.group_id == group.id).all()
+        return [self._to_domain(team_model) for team_model in team_models]
+
+    def get_by_department_name(self, department_name: str) -> List[Team]:
+        """
+        Retrieve all teams that belong to a department with the given name.
+
+        Args:
+            department_name: The name of the department.
+
+        Returns:
+            A list of teams that belong to the department (directly or through groups).
+        """
+        from domain.models.DepartmentModel import DepartmentModel
+        from domain.models.GroupModel import GroupModel
+
+        # Find the department by name
+        department = self._session.query(DepartmentModel).filter(DepartmentModel.name == department_name).first()
+        if not department:
+            return []
+
+        # Get all groups that belong to this department
+        groups = self._session.query(GroupModel).filter(GroupModel.department_id == department.id).all()
+        if not groups:
+            return []
+
+        # Get all teams that belong to any of these groups
+        group_ids = [group.id for group in groups]
+        team_models = self._session.query(TeamModel).filter(TeamModel.group_id.in_(group_ids)).all()
+        return [self._to_domain(team_model) for team_model in team_models]
+
     def get(self, id):
         """Retrieve an team by their ID.
 

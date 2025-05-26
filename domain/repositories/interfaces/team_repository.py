@@ -120,3 +120,29 @@ class TeamRepositoryInterface(BaseRepository[Team]):
             Example: {'team': team, 'employee_count': 10, 'workstation_count': 5}
         """
         pass
+
+    @abstractmethod
+    def get_by_group_name(self, group_name: str) -> List[Team]:
+        """
+        Retrieve all teams that belong to a group with the given name.
+
+        Args:
+            group_name: The name of the group.
+
+        Returns:
+            A list of teams that belong to the group.
+        """
+        pass
+
+    @abstractmethod
+    def get_by_department_name(self, department_name: str) -> List[Team]:
+        """
+        Retrieve all teams that belong to a department with the given name.
+
+        Args:
+            department_name: The name of the department.
+
+        Returns:
+            A list of teams that belong to the department (directly or through groups).
+        """
+        pass

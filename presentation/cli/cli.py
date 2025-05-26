@@ -1,6 +1,7 @@
 # presentation/cli/cli.py
 import argparse
 import sys
+import os
 from datetime import datetime, date
 
 from sqlalchemy.exc import SQLAlchemyError
@@ -10,7 +11,6 @@ from application.commands.generate_schedule_command import GenerateScheduleComma
 from application.commands.generate_schedule_handler import GenerateScheduleHandler
 from application.commands.create_manual_assignment_command import CreateManualAssignmentCommand
 from application.commands.create_manual_assignment_handler import CreateManualAssignmentHandler
-from domain.models.TeamModel import TeamModel
 from domain.models.db import Session
 from domain.repositories.implementations.sqlalchemy_employee_repository import SqlAlchemyEmployeeRepository
 from domain.repositories.implementations.sqlalchemy_workstation_repository import SqlAlchemyWorkstationRepository
@@ -21,27 +21,6 @@ from domain.repositories.implementations.sqlalchemy_schedule_repository import S
 from domain.services.schedule_service import ScheduleService
 
 
-def get_team_by_name(name):
-    """
-    Look up a team by name and return its ID.
-
-    Args:
-        name (str): The name of the team to look up
-
-    Returns:
-        int: The team ID if found
-
-    Raises:
-        ValueError: If the team is not found
-    """
-    session = Session()
-    try:
-        team = session.query(TeamModel).filter_by(name=name).first()
-        if not team:
-            raise ValueError(f"TeamModel '{name}' not found")
-        return team.id
-    finally:
-        session.close()
 
 
 def setup_dependencies():
@@ -110,12 +89,35 @@ def parse_arguments():
 
     # Generate schedule command
     generate_parser = subparsers.add_parser('generate', help='Generate a schedule')
-    generate_parser.add_argument('--team', type=str, required=True, help='Team name')
+    team_group = generate_parser.add_mutually_exclusive_group(required=True)
+    team_group.add_argument('--team', type=str, help='Team name')
+    team_group.add_argument('--group', type=str, help='Group name (generates schedules for all teams in the group)')
+    team_group.add_argument('--department', type=str, help='Department name (generates schedules for all teams in the department)')
     generate_parser.add_argument('--start-date', type=str, default=date.today(), help='Start date for the schedule')
     generate_parser.add_argument('--periods', type=int, default=4, help='Number of periods per day')
     generate_parser.add_argument('--call-ins', type=str, nargs='*', help='Employees calling in')
     generate_parser.add_argument('--offline', type=str, nargs='*', help='Employees offline for specific periods in format "employee:periods" (e.g., "John:1,2")')
     generate_parser.add_argument('--force-complete', action='store_true', help='Force complete the schedule')
+
+    # Simulation command
+    simulate_parser = subparsers.add_parser('simulate', help='Run scheduling simulations')
+    simulate_parser.add_argument('--team', type=str, required=True, help='Team name')
+    simulate_parser.add_argument('--start-date', type=str, default=date.today().isoformat(), help='Start date for the schedule (YYYY-MM-DD)')
+    simulate_parser.add_argument('--periods', type=int, default=4, help='Number of periods per day')
+    simulate_parser.add_argument('--scenarios', type=str, required=True, help='Path to scenarios JSON file')
+    simulate_parser.add_argument('--output-dir', type=str, default='.', help='Directory to save output files')
+    simulate_parser.add_argument('--advanced', action='store_true', help='Generate advanced analytics')
+
+    # Regression test command
+    regression_parser = subparsers.add_parser('regression-test', help='Run regression tests against golden outputs')
+    regression_parser.add_argument('--team', type=str, required=True, help='Team name')
+    regression_parser.add_argument('--start-date', type=str, default=date.today().isoformat(), help='Start date for the schedule (YYYY-MM-DD)')
+    regression_parser.add_argument('--periods', type=int, default=4, help='Number of periods per day')
+    regression_parser.add_argument('--tests', type=str, required=True, help='Path to regression tests JSON file')
+    regression_parser.add_argument('--output-dir', type=str, default='.', help='Directory to save output files')
+    regression_parser.add_argument('--generate-golden', action='store_true', help='Generate golden outputs instead of running tests')
+    regression_parser.add_argument('--golden-output', type=str, help='Path to save golden outputs (required if --generate-golden is used)')
+    regression_parser.add_argument('--threshold', type=float, default=0.0, help='Global threshold for all metrics (overrides defaults)')
 
     # Manual assignment command
     assign_parser = subparsers.add_parser('assign', help='Create a manual assignment')
@@ -446,6 +448,289 @@ def handle_aro_assignment(args, session, aro_service=None, aro_graph_service=Non
         print(f"Error handling ARO command: {e}", file=sys.stderr)
         return False
 
+def handle_regression_test(args, session):
+    """
+    Handle the regression test command.
+
+    Args:
+        args: Command line arguments
+        session: Database session
+    """
+    try:
+        from domain.services.regression_test_service import RegressionTestService
+        from domain.value_objects.regression_test_scenario import RegressionTestScenario
+        from tabulate import tabulate
+        import os
+
+        # Setup repositories
+        employee_repository = SqlAlchemyEmployeeRepository(session)
+        workstation_repository = SqlAlchemyWorkstationRepository(session)
+        team_repository = SqlAlchemyTeamRepository(session)
+        schedule_repository = SqlAlchemyScheduleRepository(session)
+        schedule_service = ScheduleService()
+
+        # Get team by name
+        team = team_repository.get_by_name(args.team)
+        if not team:
+            print(f"Error: Team '{args.team}' not found", file=sys.stderr)
+            return False
+
+        # Parse start date
+        try:
+            start_date = datetime.strptime(args.start_date, "%Y-%m-%d").date()
+        except ValueError:
+            print(f"Error: Invalid date format. Use YYYY-MM-DD", file=sys.stderr)
+            return False
+
+        # Create regression test service
+        regression_service = RegressionTestService(
+            employee_repository=employee_repository,
+            workstation_repository=workstation_repository,
+            team_repository=team_repository,
+            schedule_service=schedule_service,
+            schedule_repository=schedule_repository,
+            session=session
+        )
+
+        # Check if we're generating golden outputs
+        if args.generate_golden:
+            if not args.golden_output:
+                print("Error: --golden-output is required when using --generate-golden", file=sys.stderr)
+                return False
+
+            # Load scenarios from the tests file
+            try:
+                scenarios = regression_service.load_regression_tests_from_file(args.tests, args.team, start_date)
+            except Exception as e:
+                print(f"Error loading regression tests: {e}", file=sys.stderr)
+                return False
+
+            # Apply global threshold if specified
+            if args.threshold > 0:
+                for scenario in scenarios:
+                    for metric in scenario.tolerance_thresholds:
+                        scenario.tolerance_thresholds[metric] = args.threshold
+
+            # Generate golden outputs
+            try:
+                regression_service.save_golden_outputs(scenarios, args.golden_output)
+                print(f"Generated golden outputs for {len(scenarios)} scenarios and saved to {args.golden_output}")
+                return True
+            except Exception as e:
+                print(f"Error generating golden outputs: {e}", file=sys.stderr)
+                return False
+
+        # Run regression tests
+        try:
+            # Load regression tests
+            scenarios = regression_service.load_regression_tests_from_file(args.tests, args.team, start_date)
+
+            # Apply global threshold if specified
+            if args.threshold > 0:
+                for scenario in scenarios:
+                    for metric in scenario.tolerance_thresholds:
+                        scenario.tolerance_thresholds[metric] = args.threshold
+
+            print(f"Running {len(scenarios)} regression tests for team '{args.team}'...")
+
+            # Run tests
+            results = regression_service.run_regression_tests(scenarios)
+
+            # Count passed/failed tests
+            passed = sum(1 for r in results if r.passed)
+            failed = len(results) - passed
+
+            print(f"\nRegression Test Results: {passed} passed, {failed} failed")
+
+            # Create results table
+            table_data = []
+            for result in results:
+                status = "PASSED" if result.passed else "FAILED"
+                if result.error_message:
+                    reason = result.error_message
+                elif not result.passed:
+                    failed_metrics = result.get_failed_metrics()
+                    reason = ", ".join(f"{m}: expected={e}, actual={a}" for m, (e, a) in failed_metrics.items())
+                else:
+                    reason = ""
+
+                table_data.append([result.scenario_name, status, reason])
+
+            # Print results table
+            print("\n" + tabulate(
+                table_data,
+                headers=["Scenario", "Status", "Reason"],
+                tablefmt="grid"
+            ))
+
+            # Save detailed results to file if output directory is specified
+            if args.output_dir:
+                os.makedirs(args.output_dir, exist_ok=True)
+
+                # Save summary to file
+                summary_file = os.path.join(args.output_dir, "regression_test_summary.txt")
+                with open(summary_file, 'w') as f:
+                    f.write(f"Regression Test Results: {passed} passed, {failed} failed\n\n")
+                    f.write(tabulate(
+                        table_data,
+                        headers=["Scenario", "Status", "Reason"],
+                        tablefmt="grid"
+                    ))
+
+                print(f"\nSaved summary to {summary_file}")
+
+                # Save detailed results for each scenario
+                for i, result in enumerate(results):
+                    if not result.passed:
+                        detail_file = os.path.join(args.output_dir, f"regression_test_{result.scenario_name}.txt")
+                        with open(detail_file, 'w') as f:
+                            f.write(f"Regression Test: {result.scenario_name}\n")
+                            f.write(f"Status: {'PASSED' if result.passed else 'FAILED'}\n")
+
+                            if result.error_message:
+                                f.write(f"Error: {result.error_message}\n")
+                            else:
+                                f.write("\nMetrics Comparison:\n")
+                                metrics_table = []
+                                for metric, (expected, actual, passed) in result.metrics_results.items():
+                                    if expected is not None:  # Only include metrics with expected values
+                                        status = "PASSED" if passed else "FAILED"
+                                        metrics_table.append([metric, expected, actual, status])
+
+                                f.write(tabulate(
+                                    metrics_table,
+                                    headers=["Metric", "Expected", "Actual", "Status"],
+                                    tablefmt="grid"
+                                ))
+
+                        print(f"Saved detailed results for '{result.scenario_name}' to {detail_file}")
+
+            # Return True if all tests passed, False otherwise
+            return passed == len(results)
+
+        except Exception as e:
+            print(f"Error running regression tests: {e}", file=sys.stderr)
+            return False
+
+    except Exception as e:
+        print(f"Error handling regression test command: {e}", file=sys.stderr)
+        return False
+
+def handle_simulation(args, session):
+    """
+    Handle the simulation command.
+
+    Args:
+        args: Command line arguments
+        session: Database session
+    """
+    try:
+        import json
+        from domain.value_objects.scenario import Scenario
+        from domain.services.scenario_simulator import ScenarioSimulator
+        from domain.services.scenario_comparator import ScenarioComparator
+
+        # Setup repositories
+        employee_repository = SqlAlchemyEmployeeRepository(session)
+        workstation_repository = SqlAlchemyWorkstationRepository(session)
+        team_repository = SqlAlchemyTeamRepository(session)
+        schedule_repository = SqlAlchemyScheduleRepository(session)
+        schedule_service = ScheduleService()
+
+        # Get team by name
+        team = team_repository.get_by_name(args.team)
+        if not team:
+            print(f"Error: Team '{args.team}' not found", file=sys.stderr)
+            return False
+
+        # Parse start date
+        try:
+            start_date = datetime.strptime(args.start_date, "%Y-%m-%d").date()
+        except ValueError:
+            print(f"Error: Invalid date format. Use YYYY-MM-DD", file=sys.stderr)
+            return False
+
+        # Load scenarios from JSON file
+        try:
+            with open(args.scenarios, 'r') as f:
+                scenarios_data = json.load(f)
+        except Exception as e:
+            print(f"Error loading scenarios file: {e}", file=sys.stderr)
+            return False
+
+        # Create scenario objects
+        scenarios = []
+        for i, scenario_data in enumerate(scenarios_data):
+            scenario = Scenario(
+                name=scenario_data.get('name', f"Scenario_{i+1}"),
+                team_id=team.id,
+                start_date=start_date,
+                periods_per_day=args.periods,
+                call_ins=scenario_data.get('call_ins', []),
+                offline=scenario_data.get('offline', []),
+                force_complete=scenario_data.get('force_complete', False),
+                metadata=scenario_data.get('metadata', {})
+            )
+            scenarios.append(scenario)
+
+        print(f"Running {len(scenarios)} scenarios for team '{args.team}'...")
+
+        # Create simulator and run scenarios
+        simulator = ScenarioSimulator(
+            employee_repository=employee_repository,
+            workstation_repository=workstation_repository,
+            team_repository=team_repository,
+            schedule_service=schedule_service,
+            schedule_repository=schedule_repository,
+            session=session
+        )
+
+        results = simulator.run_scenarios(scenarios)
+
+        print(f"Successfully ran {len(results)} scenarios.")
+
+        # Compare results
+        if args.advanced:
+            # Use advanced analytics
+            from domain.analytics.scenario_analytics import ScenarioAnalytics
+            analytics = ScenarioAnalytics(results, session=session)
+            analytics.generate_advanced_analytics(args.output_dir)
+            print(f"Generated advanced analytics in: {args.output_dir}")
+
+            # Get comparison report for summary table
+            comparison_df = analytics.comparator.generate_comparison_report(os.path.join(args.output_dir, "scenario_comparison.csv"))
+        else:
+            # Use basic comparator
+            comparator = ScenarioComparator(results)
+
+            # Generate comparison report
+            report_path = os.path.join(args.output_dir, "scenario_comparison.csv")
+            comparison_df = comparator.generate_comparison_report(report_path)
+            print(f"Generated comparison report: {report_path}")
+
+            # Generate comparison charts
+            comparator.generate_comparison_charts(args.output_dir)
+            print(f"Generated comparison charts in: {args.output_dir}")
+
+            # Generate scenario heatmap
+            comparator.generate_scenario_heatmap(args.output_dir)
+            print(f"Generated scenario heatmap in: {args.output_dir}")
+
+        # Print summary table
+        print("\nScenario Comparison Summary:")
+        summary_cols = ['Scenario', 'Total Assignments']
+        if 'Min Employee Assignments' in comparison_df.columns:
+            summary_cols.extend(['Min Employee Assignments', 'Max Employee Assignments', 'Avg Employee Assignments'])
+        print(tabulate(comparison_df[summary_cols].values.tolist(), 
+                      headers=summary_cols, 
+                      tablefmt="grid"))
+
+        return True
+
+    except Exception as e:
+        print(f"Error running simulations: {e}", file=sys.stderr)
+        return False
+
 def handle_manual_assignment(args, session):
     """
     Handle the manual assignment command.
@@ -523,13 +808,6 @@ def main():
 
         try:
             if args.command == 'generate':
-                # Get team ID from name
-                try:
-                    team_id = get_team_by_name(args.team)
-                except ValueError as e:
-                    print(f"Error: {e}", file=sys.stderr)
-                    sys.exit(1)
-
                 # Create handler
                 handler = GenerateScheduleHandler(
                     employee_repository=employee_repository,
@@ -541,7 +819,6 @@ def main():
                     session=session
                 )
 
-                # Create command
                 # Parse start_date if it's a string
                 start_date = args.start_date
                 if isinstance(start_date, str):
@@ -551,20 +828,70 @@ def main():
                         print(f"Error: Invalid start date format. Use YYYY-MM-DD", file=sys.stderr)
                         sys.exit(1)
 
-                command = GenerateScheduleCommand(
-                    team_id=team_id,
-                    start_date=start_date,
-                    periods_per_day=args.periods,
-                    call_ins=args.call_ins,
-                    offline=args.offline,
-                    force_complete=args.force_complete
-                )
+                # Get teams based on the provided arguments
+                teams = []
+                if args.team:
+                    # Get team by name
+                    try:
+                        team = team_repository.get_by_name(args.team)
+                        if not team:
+                            raise ValueError(f"Team '{args.team}' not found")
+                        teams = [team]
+                    except ValueError as e:
+                        print(f"Error: {e}", file=sys.stderr)
+                        sys.exit(1)
+                elif args.group:
+                    # Get teams by group name
+                    teams = team_repository.get_by_group_name(args.group)
+                    if not teams:
+                        print(f"Error: No teams found in group '{args.group}'", file=sys.stderr)
+                        sys.exit(1)
+                    print(f"Generating schedules for {len(teams)} teams in group '{args.group}'")
+                elif args.department:
+                    # Get teams by department name
+                    teams = team_repository.get_by_department_name(args.department)
+                    if not teams:
+                        print(f"Error: No teams found in department '{args.department}'", file=sys.stderr)
+                        sys.exit(1)
+                    print(f"Generating schedules for {len(teams)} teams in department '{args.department}'")
 
-                # Handle command
-                assignments = handler.handle(command)
+                # Initialize assignments list
+                all_assignments = []
+
+                # Generate schedules for each team
+                for team in teams:
+                    print(f"\nGenerating schedule for team '{team.name}'...")
+
+                    # Create command for this team
+                    command = GenerateScheduleCommand(
+                        team_id=team.id,
+                        start_date=start_date,
+                        periods_per_day=args.periods,
+                        call_ins=args.call_ins,
+                        offline=args.offline,
+                        force_complete=args.force_complete
+                    )
+
+                    # Handle command
+                    team_assignments = handler.handle(command)
+
+                    if team_assignments:
+                        print(f"Generated {len(team_assignments)} assignments for team '{team.name}'")
+                        all_assignments.extend(team_assignments)
+                    else:
+                        print(f"No assignments generated for team '{team.name}'")
+
+                # Set assignments to all_assignments for display later
+                assignments = all_assignments
             elif args.command == 'assign':
                 # Handle manual assignment
                 handle_manual_assignment(args, session)
+            elif args.command == 'simulate':
+                # Handle simulation command
+                handle_simulation(args, session)
+            elif args.command == 'regression-test':
+                # Handle regression test command
+                handle_regression_test(args, session)
             elif args.command == 'aro':
                 # Handle ARO management commands
                 if not hasattr(args, 'aro_command') or not args.aro_command:
@@ -572,23 +899,24 @@ def main():
                     sys.exit(1)
                 handle_aro_assignment(args, session, aro_service, aro_graph_service)
             else:
-                print("Error: No command specified. Use 'generate', 'assign', or 'aro'.", file=sys.stderr)
+                print("Error: No command specified. Use 'generate', 'assign', 'simulate', 'regression-test', or 'aro'.", file=sys.stderr)
                 sys.exit(1)
 
             # Display results for generate command
             if args.command == 'generate':
                 if not assignments:
-                    print("No assignments generated.")
+                    print("\nNo assignments generated.")
                 else:
-                    print(f"Generated {len(assignments)} assignments")
+                    print(f"\nGenerated a total of {len(assignments)} assignments across all teams")
                     print("Assignments have been saved to the employee_work_history table.")
 
                     # Verify assignments were saved to the database
-                    start_date = command.start_date
-                    end_date = command.start_date  # For now, just verify the first day
-
-                    # Get work history entries for the date range
                     try:
+                        # Get the start date from the first team's command
+                        start_date = start_date  # We already have this from earlier
+                        end_date = start_date  # For now, just verify the first day
+
+                        # Get work history entries for the date range
                         work_history_entries = work_history_repository.get_by_date_range(start_date, end_date)
                         saved_count = len(work_history_entries)
 
@@ -607,30 +935,42 @@ def main():
                     except Exception as e:
                         print(f"Warning: Could not verify assignments in database: {e}")
 
-                    # Get employees and workstations for the team
-                    employees = employee_repository.get_by_team_id(team_id)
-                    workstations = workstation_repository.get_by_team_id(team_id)
-
-                    # Group assignments by date
-                    assignments_by_date = {}
+                    # Group assignments by team and date
+                    assignments_by_team_and_date = {}
                     for assignment in assignments:
+                        team_id = assignment.employee.team_id
                         date_key = assignment.period.date
-                        if date_key not in assignments_by_date:
-                            assignments_by_date[date_key] = []
-                        assignments_by_date[date_key].append(assignment)
 
-                    # Print schedule for each date
-                    for date_key in sorted(assignments_by_date.keys()):
-                        print(format_schedule_table(
-                            assignments_by_date[date_key], 
-                            employees, 
-                            workstations, 
-                            args.periods, 
-                            date_key,
-                            args.call_ins,
-                            args.offline
-                        ))
-                        print("\n")  # Add some space between dates
+                        if team_id not in assignments_by_team_and_date:
+                            assignments_by_team_and_date[team_id] = {}
+
+                        if date_key not in assignments_by_team_and_date[team_id]:
+                            assignments_by_team_and_date[team_id][date_key] = []
+
+                        assignments_by_team_and_date[team_id][date_key].append(assignment)
+
+                    # Print schedule for each team and date
+                    for team_id, dates in assignments_by_team_and_date.items():
+                        team = team_repository.get(team_id)
+                        if team:
+                            print(f"\n\n=== Schedule for Team: {team.name} ===")
+
+                            # Get employees and workstations for this team
+                            employees = employee_repository.get_by_team_id(team_id)
+                            workstations = workstation_repository.get_by_team_id(team_id)
+
+                            # Print schedule for each date for this team
+                            for date_key in sorted(dates.keys()):
+                                print(format_schedule_table(
+                                    dates[date_key], 
+                                    employees, 
+                                    workstations, 
+                                    args.periods, 
+                                    date_key,
+                                    args.call_ins,
+                                    args.offline
+                                ))
+                                print()  # Add some space between dates
 
         except Exception as e:
             print(f"Error generating schedule: {e}", file=sys.stderr)

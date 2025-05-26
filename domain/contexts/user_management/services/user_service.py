@@ -125,7 +125,7 @@ class UserService:
             return None
 
         # Update last login time
-        self._user_repository.update_last_login(user.id)
+        self.update_last_login(user.id)
 
         return user
 
@@ -308,3 +308,15 @@ class UserService:
             True if the user was deleted successfully, False otherwise
         """
         return self._user_repository.delete(user_id)
+
+    def update_last_login(self, user_id: int) -> bool:
+        """
+        Update the last login timestamp for a user.
+
+        Args:
+            user_id: The ID of the user to update
+
+        Returns:
+            True if the update was successful, False otherwise
+        """
+        return self._user_repository.update_last_login(user_id)
