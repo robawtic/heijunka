@@ -15,7 +15,8 @@ from infrastructure.config.settings import settings
 from infrastructure.logging.config import configure_logging, set_request_id, clear_request_id
 from infrastructure.monitoring.metrics import MetricsMiddleware
 from infrastructure.cache.config import setup_cache
-from infrastructure.api.csrf import setup_csrf
+from fastapi_csrf_protect import CsrfProtect
+from infrastructure.config.csrf_config import get_csrf_config
 from infrastructure.api.security import SecurityHeadersMiddleware
 from infrastructure.api.sanitization import InputSanitizationMiddleware
 
@@ -111,8 +112,8 @@ app.add_middleware(
 
 app.add_middleware(SecurityHeadersMiddleware)
 
-# Setup CSRF protection
-setup_csrf(app)
+# CSRF protection is now handled by fastapi-csrf-protect
+# No middleware is needed as it's dependency-injected
 
 # Add Prometheus metrics endpoint
 app.add_route("/metrics", metrics)

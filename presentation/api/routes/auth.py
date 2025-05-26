@@ -5,7 +5,7 @@ import logging
 
 from infrastructure.api.auth import create_access_token, Role, ACCESS_TOKEN_EXPIRE_MINUTES, get_current_user
 from presentation.api.models import ErrorResponse, TokenRequest, TokenResponse, CSRFTokenResponse, UserMeResponse
-from infrastructure.api.csrf import get_csrf_token, get_csrf_token_from_request
+from infrastructure.security.csrf import set_csrf_cookie, verify_csrf_token
 from infrastructure.api.dependencies import get_user_service
 from domain.contexts.user_management.services.user_service import UserService
 from domain.entities.user import User
@@ -28,17 +28,19 @@ def get_user(username: str, user_service: UserService = Depends(get_user_service
         return None
     return user_service.get_user_by_username(username)
 
-@router.post("/token", response_model=TokenResponse, responses={401: {"model": ErrorResponse}, 400: {"model": ErrorResponse}})
+@router.post("/token", response_model=TokenResponse, responses={401: {"model": ErrorResponse}, 400: {"model": ErrorResponse}, 403: {"model": ErrorResponse}})
 async def login_for_access_token(
-    request: Request, 
+    response: Response,
     form_data: TokenRequest,
-    user_service: UserService = Depends(get_user_service)
+    user_service: UserService = Depends(get_user_service),
+    _=Depends(set_csrf_cookie)  # Set CSRF cookie but don't require validation for login
+    # Note: We don't require CSRF validation for login since it's the initial authentication point
 ):
     """
     Get an access token for authentication.
 
     Args:
-        request: The HTTP request
+        response: The HTTP response
         form_data: The token request containing username and password
         user_service: The user service for authentication
 
@@ -77,15 +79,12 @@ async def login_for_access_token(
             expires_delta=access_token_expires
         )
 
-        # Get CSRF token from the request context
-        csrf_token = get_csrf_token_from_request(request)
-
         logger.info(f"Successful login for user: {user.username}")
 
+        # CSRF token is set in the cookie by the set_csrf_cookie dependency
         return TokenResponse(
             access_token=access_token, 
-            token_type="bearer",
-            csrf_token=csrf_token
+            token_type="bearer"
         )
     except Exception as e:
         logger.error(f"Token generation error: {str(e)}")
@@ -97,7 +96,9 @@ async def login_for_access_token(
 @router.get("/me", response_model=UserMeResponse, responses={401: {"model": ErrorResponse}, 403: {"model": ErrorResponse}, 404: {"model": ErrorResponse}})
 async def read_users_me(
     current_user: Dict = Depends(get_current_user),
-    user_service: UserService = Depends(get_user_service)
+    user_service: UserService = Depends(get_user_service),
+    response: Response = None,
+    _=Depends(set_csrf_cookie)  # Set CSRF cookie for subsequent requests
 ):
     """
     Get information about the current authenticated user.
@@ -134,16 +135,16 @@ async def read_users_me(
     )
 
 @router.get("/csrf-token", response_model=CSRFTokenResponse, responses={500: {"model": ErrorResponse}})
-async def get_csrf_token_endpoint(request: Request, response: Response):
+async def get_csrf_token_endpoint(response: Response, _=Depends(set_csrf_cookie)):
     """
     Get a CSRF token for use in subsequent requests.
 
-    This endpoint ensures a CSRF token is created if one doesn't exist yet.
+    This endpoint sets a CSRF token in a cookie and returns it in the response.
     Frontend applications should call this endpoint before making any requests
     that require CSRF protection.
 
     Args:
-        request: The HTTP request
+        response: The HTTP response
 
     Returns:
         CSRFTokenResponse: The CSRF token response
@@ -152,13 +153,11 @@ async def get_csrf_token_endpoint(request: Request, response: Response):
         HTTPException: If the CSRF token cannot be generated
     """
     try:
-        # Get or create a CSRF token
-        csrf_token = get_csrf_token_from_request(request)
-        response.headers["X-CSRF-Token"] = csrf_token
-
+        # The CSRF token is set in the cookie by the set_csrf_cookie dependency
+        # We return a message to confirm it was set
         logger.info("CSRF token provided to client")
 
-        return CSRFTokenResponse(csrf_token=csrf_token)
+        return CSRFTokenResponse(message="CSRF token set in cookie")
     except Exception as e:
         logger.error(f"CSRF token generation error: {str(e)}")
         raise HTTPException(

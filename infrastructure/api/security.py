@@ -1,26 +1,19 @@
-from secure import SecureHeaders
+from secure import Secure
+from secure.headers import ContentSecurityPolicy, StrictTransportSecurity, XFrameOptions
 from starlette.middleware.base import BaseHTTPMiddleware
 from fastapi import Request
 
-# Initialize SecureHeaders
-secure_headers = SecureHeaders(
-    csp={
-        'default-src': "'self'",
-        'script-src': "'self'",
-        'style-src': "'self'",
-        'img-src': "'self' data:",
-        'font-src': "'self'",
-        'connect-src': "'self'",
-        'frame-src': "'none'",
-        'object-src': "'none'",
-        'base-uri': "'self'",
-        'form-action': "'self'",
-    },
-    hsts={
-        'max-age': 31536000,
-        'includeSubDomains': True
-    },
-    xfo='DENY'
+# Initialize Secure with security headers
+csp = ContentSecurityPolicy().default_src("'self'").script_src("'self'").style_src("'self'").img_src("'self'", "data:").font_src("'self'").connect_src("'self'").frame_src("'none'").object_src("'none'").base_uri("'self'").form_action("'self'")
+
+hsts = StrictTransportSecurity().max_age(31536000).include_subdomains()
+
+xfo = XFrameOptions().deny()
+
+secure_headers = Secure(
+    csp=csp,
+    hsts=hsts,
+    xfo=xfo
 )
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
@@ -29,8 +22,8 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     """
     async def dispatch(self, request: Request, call_next):
         response = await call_next(request)
-        
+
         # Add security headers
         secure_headers.framework.fastapi(response)
-        
+
         return response

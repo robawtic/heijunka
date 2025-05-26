@@ -147,9 +147,10 @@ class CSRFTokenResponse(BaseModel):
     """
     Response model for CSRF token endpoint.
 
-    This is used by the frontend to get a CSRF token for subsequent requests.
+    This is used by the frontend to confirm a CSRF token has been set in the cookie.
+    The actual token is not returned in the response body for security reasons.
     """
-    csrf_token: str
+    message: str
 
 # Error response models
 class ErrorDetail(BaseModel):
