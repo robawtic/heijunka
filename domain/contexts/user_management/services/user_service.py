@@ -67,8 +67,11 @@ class UserService:
         Raises:
             ValueError: If the username already exists or the password is invalid
         """
+        # Normalize username
+        normalized_username = self._normalize_username(username)
+
         # Validate username
-        if self._user_repository.username_exists(username):
+        if self._user_repository.username_exists(normalized_username):
             raise ValueError(f"Username '{username}' already exists")
 
         # Validate email if provided
@@ -77,7 +80,7 @@ class UserService:
 
         # Create user entity
         user = User(
-            username=username,
+            username=normalized_username,
             email=email,
             is_active=is_active
         )
