@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 from domain.models import EmployeeModel, TeamModel, RoleModel, TeamMemberModel, WorkstationModel, EmployeeWorkstationModel, GroupModel, LineTypeModel
 from domain.models.DepartmentModel import DepartmentModel
@@ -16,7 +16,34 @@ def get_test_date():
 def reset_database():
     # Drop all tables
     print("Dropping all tables...")
-    Base.metadata.drop_all(engine)
+
+    # Check if we're using PostgreSQL
+    if str(engine.url).startswith('postgresql'):
+        # For PostgreSQL, we need to handle foreign key constraints
+        print("Using PostgreSQL-specific approach to drop tables...")
+
+        # Use SQLAlchemy's inspector to get all table names
+        from sqlalchemy import inspect
+        inspector = inspect(engine)
+
+        # Get all table names
+        table_names = inspector.get_table_names()
+
+        # Create a connection and start a transaction
+        with engine.begin() as connection:
+            # Disable foreign key constraints for this transaction
+            connection.execute(text("SET CONSTRAINTS ALL DEFERRED"))
+
+            # Drop each table
+            for table_name in table_names:
+                try:
+                    connection.execute(text(f"DROP TABLE IF EXISTS {table_name} CASCADE"))
+                    print(f"Dropped table {table_name}")
+                except Exception as e:
+                    print(f"Error dropping table {table_name}: {e}")
+    else:
+        # For other databases, use the standard approach
+        Base.metadata.drop_all(engine)
 
     # Recreate all tables
     print("Recreating all tables...")

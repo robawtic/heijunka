@@ -10,8 +10,8 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = 'add_departments_and_update_groups'
-down_revision = 'add_description_and_timestamps_to_teams'
+revision = 'add_dept_groups'
+down_revision = 'add_desc_timestamps'
 branch_labels = None
 depends_on = None
 
@@ -26,7 +26,7 @@ def upgrade():
         sa.PrimaryKeyConstraint('id'),
         sa.UniqueConstraint('name')
     )
-    
+
     # Add department_id column to groups table
     op.add_column('groups', sa.Column('department_id', sa.Integer(), nullable=True))
     op.create_foreign_key(
@@ -39,9 +39,9 @@ def upgrade():
 def downgrade():
     # Drop foreign key constraint
     op.drop_constraint('fk_groups_department_id_departments', 'groups', type_='foreignkey')
-    
+
     # Drop department_id column from groups table
     op.drop_column('groups', 'department_id')
-    
+
     # Drop departments table
     op.drop_table('departments')

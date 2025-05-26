@@ -4,210 +4,73 @@
       "name": "Taylor",
       "role": "Team Leader",
       "is_active": true,
-      "known_stations": [],
-      "hire_date": "2020-01-15",
-      "skills": {
-        "leadership": "High",
-        "technical": "Medium",
-        "problem_solving": "High"
-      },
-      "availability_pattern": {
-        "regular_days_off": ["Saturday", "Sunday"],
-        "vacation_days": ["2024-07-01", "2024-07-02", "2024-07-03", "2024-07-04", "2024-07-05"],
-        "training_days": ["2024-06-15"]
-      }
+      "known_stations": []
     },
     {
       "name": "Ray",
       "role": "Associate",
       "is_active": true,
-      "known_stations": ["H010", "H080/H090", "H100", "H110/H120", "BW070", "H170", "M050"],
-      "hire_date": "2021-03-10",
-      "skills": {
-        "leadership": "Low",
-        "technical": "Medium",
-        "problem_solving": "Medium"
-      },
-      "availability_pattern": {
-        "regular_days_off": ["Saturday", "Sunday"],
-        "vacation_days": ["2024-08-10", "2024-08-11", "2024-08-12", "2024-08-13", "2024-08-14"],
-        "training_days": []
-      }
+      "known_stations": ["H010", "H080/H090", "H100", "H110/H120", "BW070", "H170", "M050"]
     },
     {
       "name": "Antonio",
       "role": "Associate",
       "is_active": true,
-      "known_stations": ["Parts Wash", "H010", "H080/H090", "H100", "H110/H120", "H170", "BW010", "BW070", "M050", "M090"],
-      "hire_date": "2019-05-20",
-      "is_trainer": true,
-      "skills": {
-        "leadership": "Medium",
-        "technical": "High",
-        "problem_solving": "High"
-      },
-      "availability_pattern": {
-        "regular_days_off": ["Saturday", "Sunday"],
-        "vacation_days": ["2024-09-20", "2024-09-21", "2024-09-22", "2024-09-23", "2024-09-24"],
-        "training_days": ["2024-06-10", "2024-06-11"]
-      }
+      "known_stations": ["Parts Wash", "H010", "H080/H090", "H100", "H110/H120", "H170", "BW010", "BW070", "M050", "M090"]
     },
     {
       "name": "Brian",
       "role": "Associate",
       "is_active": true,
-      "known_stations": ["H010", "H080/H090", "H100", "H110/H120", "H170", "BW010", "BW070", "M050", "M090"],
-      "hire_date": "2020-02-15",
-      "is_trainer": true,
-      "skills": {
-        "leadership": "Medium",
-        "technical": "High",
-        "problem_solving": "Medium"
-      },
-      "availability_pattern": {
-        "regular_days_off": ["Saturday", "Sunday"],
-        "vacation_days": ["2024-10-05", "2024-10-06", "2024-10-07", "2024-10-08", "2024-10-09"],
-        "training_days": ["2024-07-20"]
-      }
+      "known_stations": ["H010", "H080/H090", "H100", "H110/H120", "H170", "BW010", "BW070", "M050", "M090"]
     },
     {
       "name": "Rachael",
       "role": "Associate",
       "is_active": true,
-      "known_stations": ["H010", "H080/H090", "H100", "H110/H120", "H170", "BW010", "BW070", "M050"],
-      "hire_date": "2021-08-01",
-      "skills": {
-        "leadership": "Low",
-        "technical": "Medium",
-        "problem_solving": "Medium"
-      },
-      "availability_pattern": {
-        "regular_days_off": ["Saturday", "Sunday"],
-        "vacation_days": ["2024-11-15", "2024-11-16", "2024-11-17", "2024-11-18", "2024-11-19"],
-        "training_days": ["2024-08-05"]
-      }
+      "known_stations": ["H010", "H080/H090", "H100", "H110/H120", "H170", "BW010", "BW070", "M050"]
     },
     {
       "name": "Matt",
       "role": "Associate",
       "is_active": true,
-      "known_stations": ["Parts Wash", "H010", "H080/H090", "H100", "H110/H120", "H170", "BW010", "BW070", "M050", "M090"],
-      "hire_date": "2019-11-10",
-      "is_trainer": true,
-      "skills": {
-        "leadership": "High",
-        "technical": "High",
-        "problem_solving": "High"
-      },
-      "availability_pattern": {
-        "regular_days_off": ["Saturday", "Sunday"],
-        "vacation_days": ["2024-12-20", "2024-12-21", "2024-12-22", "2024-12-23", "2024-12-24"],
-        "training_days": ["2024-09-15"]
-      }
+      "known_stations": ["Parts Wash", "H010", "H080/H090", "H100", "H110/H120", "H170", "BW010", "BW070", "M050", "M090"]
     },
     {
       "name": "Kaden",
       "role": "Associate",
       "is_active": true,
-      "known_stations": ["H010", "H080/H090", "H100", "H110/H120", "H170", "BW010", "BW070", "M050", "M090"],
-      "hire_date": "2022-01-05",
-      "skills": {
-        "leadership": "Low",
-        "technical": "Medium",
-        "problem_solving": "Medium"
-      },
-      "availability_pattern": {
-        "regular_days_off": ["Saturday", "Sunday"],
-        "vacation_days": ["2024-06-25", "2024-06-26", "2024-06-27", "2024-06-28", "2024-06-29"],
-        "training_days": []
-      }
+      "known_stations": ["H010", "H080/H090", "H100", "H110/H120", "H170", "BW010", "BW070", "M050", "M090"]
     },
     {
       "name": "Aaron",
       "role": "Associate",
       "is_active": true,
-      "known_stations": ["Parts Wash", "H010", "H080/H090", "H100", "H110/H120", "H170", "BW010", "BW070", "M050", "M090"],
-      "hire_date": "2020-07-15",
-      "is_trainer": true,
-      "skills": {
-        "leadership": "Medium",
-        "technical": "High",
-        "problem_solving": "High"
-      },
-      "availability_pattern": {
-        "regular_days_off": ["Saturday", "Sunday"],
-        "vacation_days": ["2024-07-15", "2024-07-16", "2024-07-17", "2024-07-18", "2024-07-19"],
-        "training_days": ["2024-10-10"]
-      }
+      "known_stations": ["Parts Wash", "H010", "H080/H090", "H100", "H110/H120", "H170", "BW010", "BW070", "M050", "M090"]
     },
     {
       "name": "Luke",
       "role": "Backup",
       "is_active": true,
-      "known_stations": ["H010", "H080/H090", "H100", "H110/H120", "H170", "BW010", "BW070", "M050", "M090"],
-      "hire_date": "2020-09-01",
-      "skills": {
-        "leadership": "Medium",
-        "technical": "Medium",
-        "problem_solving": "High"
-      },
-      "availability_pattern": {
-        "regular_days_off": ["Saturday", "Sunday"],
-        "vacation_days": ["2024-08-20", "2024-08-21", "2024-08-22", "2024-08-23", "2024-08-24"],
-        "training_days": ["2024-11-05"]
-      }
+      "known_stations": ["H010", "H080/H090", "H100", "H110/H120", "H170", "BW010", "BW070", "M050", "M090"]
     },
     {
       "name": "Taje",
       "role": "Associate",
       "is_active": true,
-      "known_stations": ["H010", "H080/H090", "H100", "H110/H120", "H170", "BW010", "BW070", "M050", "M090"],
-      "hire_date": "2021-11-15",
-      "skills": {
-        "leadership": "Low",
-        "technical": "Medium",
-        "problem_solving": "Medium"
-      },
-      "availability_pattern": {
-        "regular_days_off": ["Saturday", "Sunday"],
-        "vacation_days": ["2024-09-05", "2024-09-06", "2024-09-07", "2024-09-08", "2024-09-09"],
-        "training_days": []
-      }
+      "known_stations": ["H010", "H080/H090", "H100", "H110/H120", "H170", "BW010", "BW070", "M050", "M090"]
     },
     {
       "name": "Chyla",
       "role": "Associate",
       "is_active": true,
-      "known_stations": ["H010", "H080/H090", "H100", "H110/H120", "H170", "BW010", "M050", "M090"],
-      "hire_date": "2022-03-10",
-      "skills": {
-        "leadership": "Low",
-        "technical": "Medium",
-        "problem_solving": "Low"
-      },
-      "availability_pattern": {
-        "regular_days_off": ["Saturday", "Sunday"],
-        "vacation_days": ["2024-10-15", "2024-10-16", "2024-10-17", "2024-10-18", "2024-10-19"],
-        "training_days": ["2024-12-01"]
-      }
+      "known_stations": ["H010", "H080/H090", "H100", "H110/H120", "H170", "BW010", "M050", "M090"]
     },
     {
       "name": "Fab",
       "role": "Associate",
       "is_active": true,
-      "known_stations": ["H010", "H080/H090", "H100", "H110/H120", "H170", "BW010", "BW070", "M050", "M090"],
-      "hire_date": "2020-05-20",
-      "is_trainer": true,
-      "skills": {
-        "leadership": "Medium",
-        "technical": "High",
-        "problem_solving": "High"
-      },
-      "availability_pattern": {
-        "regular_days_off": ["Saturday", "Sunday"],
-        "vacation_days": ["2024-11-25", "2024-11-26", "2024-11-27", "2024-11-28", "2024-11-29"],
-        "training_days": ["2024-07-01"]
-      }
+      "known_stations": ["H010", "H080/H090", "H100", "H110/H120", "H170", "BW010", "BW070", "M050", "M090"]
     }
   ]
 }

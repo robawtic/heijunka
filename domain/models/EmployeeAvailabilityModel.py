@@ -13,9 +13,9 @@ class EmployeeAvailabilityModel(Base):
     date = Column(Date, primary_key=True)
     # Use a default value of 0 for period when it's NULL in the domain object
     period = Column(Integer, primary_key=True, default=0)
-    is_partial = Column(Boolean, nullable=False, server_default=text('0'))
-    is_call_in = Column(Boolean, nullable=False, server_default=text('0'))
-    is_aro = Column(Boolean, nullable=False, server_default=text('0'))
+    is_partial = Column(Boolean, nullable=False, server_default=text('false'))
+    is_call_in = Column(Boolean, nullable=False, server_default=text('false'))
+    is_aro = Column(Boolean, nullable=False, server_default=text('false'))
 
     employee = relationship('EmployeeModel', back_populates='availability')
 
