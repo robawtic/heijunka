@@ -139,9 +139,22 @@ class TokenRequest(BaseModel):
         return re.sub(r'[<>\'";]', '', v)
 
 class TokenResponse(BaseModel):
+    """
+    Response model for authentication token endpoints.
+
+    The access_token is a JWT that should be included in the Authorization header
+    for authenticated requests. The refresh_token is not included in the response body
+    but is set as an HTTP-only cookie. The expires_at field indicates when the access
+    token will expire (in ISO format).
+
+    To refresh an access token, call the /refresh-token endpoint, which will use the
+    refresh token from the cookie to issue a new access token.
+    """
     access_token: str
     token_type: str
     csrf_token: Optional[str] = None
+    refresh_token: Optional[str] = None  # Not included in response, set as HTTP-only cookie
+    expires_at: Optional[str] = None  # ISO format timestamp for token expiration
 
 class CSRFTokenResponse(BaseModel):
     """

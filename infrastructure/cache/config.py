@@ -30,6 +30,9 @@ async def setup_cache(app: FastAPI) -> None:
         # Test the connection
         await redis.ping()
 
+        # Store Redis client in app.state for shutdown cleanup
+        app.state.redis_cache = redis
+
         # Initialize cache with Redis backend
         FastAPICache.init(
             RedisBackend(redis), 

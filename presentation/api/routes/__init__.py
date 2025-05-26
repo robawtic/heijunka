@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from presentation.api.routes import employees, workstations, teams, schedules, assignments, status, auth, tasks
+from presentation.api.routes import employees, workstations, teams, schedules, assignments, status, auth, tasks, api_keys
 
 router = APIRouter()
 
@@ -11,3 +11,4 @@ router.include_router(assignments.router, prefix="/assignments", tags=["assignme
 router.include_router(status.router, prefix="/status", tags=["status"])
 router.include_router(auth.router, prefix="/auth", tags=["auth"])
 router.include_router(tasks.router, prefix="/tasks", tags=["tasks"])
+router.include_router(api_keys.router, prefix="/api-keys", tags=["api-keys"])

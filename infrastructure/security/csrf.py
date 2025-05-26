@@ -140,17 +140,28 @@ def set_csrf_cookie(response: Response, csrf_protect: CsrfProtect = Depends()):
     csrf.set_cookie(response)
 
 
-def verify_csrf_token(csrf_protect: CsrfProtect = Depends()):
+def verify_csrf_token(request: Request, csrf_protect: CsrfProtect = Depends()):
     """
-    Validate the CSRF token in the request.
+    Validate the CSRF token in the request, unless the request is from an API client.
 
     This function is a wrapper around CSRFSecurity.validate for backward compatibility.
+    It exempts API clients from CSRF validation.
 
     Args:
+        request: The HTTP request
         csrf_protect: The CsrfProtect instance to use
 
     Raises:
         HTTPException: If the CSRF token is invalid
     """
+    # Import here to avoid circular imports
+    from infrastructure.security.api_key import is_api_client
+
+    # Skip CSRF validation for API clients
+    if is_api_client(request):
+        logger.debug("Skipping CSRF validation for API client")
+        return
+
+    # Validate CSRF token for browser clients
     csrf = CSRFSecurity(csrf_protect)
     csrf.validate()

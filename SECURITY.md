@@ -23,10 +23,10 @@ We will respond promptly and coordinate a fix as soon as possible.
 
 The Heijunka project enforces the following security best practices:
 
-- **Strict input validation and sanitization** using Pydantic models with regular expressions.
+- **Strict input validation and sanitization** using Pydantic models with regular expressions and HTML sanitization with `bleach`.
 - **CSRF protection** on all state-changing endpoints using `starlette-csrf`.
 - **Secure HTTP headers** (CSP, HSTS, X-Frame-Options, etc.) set by the [`secure`](https://github.com/talonsec/secure) middleware.
-- **Rate limiting** enabled on all API endpoints.
+- **Redis-based distributed rate limiting** enabled on all API endpoints to prevent abuse across multiple instances.
 - **JWT authentication** for all users with proper role-based access control.
 - **Secure password handling** using bcrypt for constant-time comparison to prevent timing attacks.
 - **Comprehensive error handling** with structured error responses and proper logging.
@@ -42,12 +42,13 @@ The Heijunka project enforces the following security best practices:
 | Area                    | Library           | Usage                                       |
 | ----------------------- | ---------------- | ------------------------------------------- |
 | Input validation        | Pydantic         | All API payloads use Pydantic models        |
+| HTML sanitization       | bleach           | Sanitize HTML content to prevent XSS        |
 | CSRF protection         | starlette-csrf   | CSRF middleware for browser-exposed APIs    |
 | Security headers        | secure           | Automatic HTTP header hardening             |
 | Password hashing        | bcrypt           | Secure password verification with bcrypt    |
 | JWT authentication      | python-jose      | Secure token-based authentication           |
 | File uploads            | FastAPI, custom  | File validation (type/size) enforced        |
-| Rate limiting           | Custom middleware| Prevent brute-force/API abuse               |
+| Rate limiting           | Redis, custom middleware| Distributed rate limiting to prevent abuse |
 | Error handling          | FastAPI          | Structured error responses                  |
 
 ---
@@ -79,4 +80,4 @@ Questions or concerns? Email [robawtic@gmail.com] or create a private GitHub sec
 
 ---
 
-_Last updated: 2024-06-10_
+_Last updated: 2024-08-21_

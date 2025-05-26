@@ -1455,3 +1455,30 @@ yarl==1.20.0 \
     --hash=sha256:fb0caeac4a164aadce342f1597297ec0ce261ec4532bbc5a9ca8da5622f53867 \
     --hash=sha256:fdb5204d17cb32b2de2d1e21c7461cabfacf17f3645e4b9039f210c5d3378bf3
     # via aiohttp
+
+SQLAlchemy~=2.0.41
+python-dotenv~=1.1.0
+ortools~=9.12.4544
+bcrypt~=4.1.2
+pandas~=2.2.3
+matplotlib~=3.10.3
+numpy~=2.2.6
+seaborn~=0.13.2
+requests~=2.32.3
+tabulate~=0.9.0
+PyYAML~=6.0.2
+alembic~=1.15.2
+uvicorn~=0.21.1
+fastapi~=0.115.12
+pytest~=8.3.5
+jose~=1.0.0
+python-jose~=3.4.0
+starlette~=0.46.2
+pydantic~=2.9.2
+secure~=0.3.0
+redis~=4.5.4
+bleach~=6.2.0
+pydantic-settings~=2.9.1
+python-json-logger~=2.0.7
+prometheus-client~=0.16.0
+Faker~=37.3.0

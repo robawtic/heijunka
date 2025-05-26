@@ -8,6 +8,8 @@ from domain.repositories.implementations.sqlalchemy_employee_work_history_reposi
 from domain.repositories.implementations.sqlalchemy_schedule_repository import SqlAlchemyScheduleRepository
 from domain.repositories.implementations.sqlalchemy_aro_assignment_repository import SqlAlchemyAROAssignmentRepository
 from domain.repositories.implementations.sqlalchemy_user_repository import SqlAlchemyUserRepository
+from domain.repositories.implementations.sqlalchemy_refresh_token_repository import SqlAlchemyRefreshTokenRepository
+from domain.repositories.implementations.sqlalchemy_api_key_repository import SqlAlchemyApiKeyRepository
 from domain.services.schedule_service import ScheduleService
 from domain.contexts.user_management.services.user_service import UserService
 from domain.events.publisher import DomainEventPublisher
@@ -43,3 +45,11 @@ def get_user_service(db: Session = Depends(get_db)):
 def get_schedule_service():
     """Get the schedule service."""
     return ScheduleService()
+
+def get_refresh_token_repository(db: Session = Depends(get_db)):
+    """Get the refresh token repository."""
+    return SqlAlchemyRefreshTokenRepository(db)
+
+def get_api_key_repository(db: Session = Depends(get_db)):
+    """Get the API key repository."""
+    return SqlAlchemyApiKeyRepository(db)
