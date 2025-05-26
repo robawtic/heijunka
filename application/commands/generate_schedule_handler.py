@@ -17,12 +17,14 @@ class GenerateScheduleHandler:
                  team_repository: TeamRepositoryInterface,
                  assignment_repository: AssignmentRepositoryInterface,
                  schedule_service: ScheduleService,
+                 schedule_repository=None,
                  session=None):
         self.employee_repository = employee_repository
         self.workstation_repository = workstation_repository
         self.team_repository = team_repository
         self.assignment_repository = assignment_repository
         self.schedule_service = schedule_service
+        self.schedule_repository = schedule_repository
         self.session = session
 
     def handle(self, command: GenerateScheduleCommand) -> List[WorkAssignment]:
@@ -45,7 +47,9 @@ class GenerateScheduleHandler:
             call_ins=command.call_ins,
             offline=command.offline,
             force_complete=command.force_complete,
-            session=self.session
+            session=self.session,
+            team_repository=self.team_repository,
+            schedule_repository=self.schedule_repository
         )
 
         # Save assignments

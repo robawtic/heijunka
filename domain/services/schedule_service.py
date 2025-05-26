@@ -24,7 +24,6 @@ logger = logging.getLogger(__name__)
 class ScheduleService:
     # Default values as class constants
     DEFAULT_PERIODS_PER_DAY = 4
-    DEFAULT_TEAM_ID = 1
     DEFAULT_SCHEDULE_ID = 1
 
     def __init__(self, constraints: List[ScheduleConstraint] = None):
@@ -122,37 +121,26 @@ class ScheduleService:
                         logger.warning(f"Invalid period format in offline string: {offline_str}")
         return offline_dict
 
-    def _get_team_id(self, employees: List[Employee], team_name: str, team_repository=None) -> int:
+    def _get_team_id(
+            self,
+            team_name: str,
+            team_repository
+    ) -> int:
         """
-        Get the team ID from the team name or employees.
-
-        Args:
-            employees: List of employees to get team_id from if team_repository fails
-            team_name: Name of the team to get ID for
-            team_repository: Optional repository for retrieving team information
-
-        Returns:
-            Team ID (defaults to DEFAULT_TEAM_ID if not found)
+        Resolve team ID by team name only.
+        Raises ValueError if not found.
         """
-        team_id = None
+        if not team_repository:
+            raise ValueError("team_repository is required to look up team_id by team name.")
 
-        # Try to get team_id from team_repository
-        if team_repository:
-            team = team_repository.get_by_name(team_name)
-            if team:
-                team_id = team.id
-                logger.debug(f"Found team_id={team_id} for team '{team_name}'")
-                return team_id
+        team = team_repository.get_by_name(team_name)
+        if team and hasattr(team, 'id'):
+            logger.debug(f"Found team_id={team.id} for team '{team_name}' via repository")
+            return team.id
 
-        # If team_repository is not provided or team not found, try to get team_id from employees
-        if employees and hasattr(employees[0], 'team_id'):
-            team_id = employees[0].team_id
-            logger.debug(f"Using team_id={team_id} from first employee for team '{team_name}'")
-            return team_id
-
-        # Fallback to default value if no other option
-        logger.warning(f"Using default team_id={self.DEFAULT_TEAM_ID} because team '{team_name}' not found")
-        return self.DEFAULT_TEAM_ID
+        error_msg = f"Could not resolve team_id for team '{team_name}'. No matching team found in repository."
+        logger.error(error_msg)
+        raise ValueError(error_msg)
 
     def _create_schedule(self, team_id: int, start_date: date, periods_per_day: int,
                           call_ins: Optional[List[str]], offline: Optional[List[str]],
@@ -193,20 +181,21 @@ class ScheduleService:
                 logger.error(f"Error creating schedule in repository: {str(e)}")
                 # Fall through to create in-memory schedule
 
-        # Fallback if no repository is provided or repository creation failed
-        logger.warning("Creating in-memory schedule (not persisted)")
-        return Schedule(
-            id=self.DEFAULT_SCHEDULE_ID,  # Use a positive ID to avoid validation errors
+        # Create an in-memory schedule if repository is not provided or repository creation failed
+        logger.warning("Creating in-memory schedule because repository is not provided or repository creation failed")
+        schedule = Schedule(
+            id=self.DEFAULT_SCHEDULE_ID,
             team_id=team_id,
             start_date=start_date,
             periods_per_day=periods_per_day,
-            status="pending",
-            call_ins=call_ins or [],
+            status="active",
+            call_ins=call_ins,
             offline=offline_dict,
             force_complete=force_complete
         )
+        return schedule
 
-    def _handle_aro_assignments(self, employees: List[Employee], team_id: int, 
+    def _handle_aro_assignments(self, employees: List[Employee], team_id: int,
                                start_date: date, team_repository=None, 
                                aro_assignment_repository=None) -> List[Employee]:
         """
@@ -306,7 +295,7 @@ class ScheduleService:
         offline_dict = self._parse_offline(offline)
 
         # Get team_id from team_name
-        team_id = self._get_team_id(employees, team_name, team_repository)
+        team_id = self._get_team_id(team_name, team_repository)
 
         # Handle ARO assignments (employees leaving/joining)
         available_employees = self._handle_aro_assignments(

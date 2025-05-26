@@ -3,7 +3,6 @@ from dataclasses import dataclass, field
 from typing import List, Optional, Dict, Any
 from datetime import date
 
-from domain.entities import Workstation, Employee
 from domain.entities.team_member import TeamMember
 from domain.events import (
     DomainEvent, TeamMemberAdded, TeamMemberRemoved, 

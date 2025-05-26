@@ -38,10 +38,10 @@ class TestSingleDayScheduling(unittest.TestCase):
         self.employee1.add_qualification("Station 1")
         self.employee1.add_qualification("Station 2")
         self.employee1.add_qualification("H010")
-        
+
         self.employee2.add_qualification("Station 1")
         self.employee2.add_qualification("H010")
-        
+
         self.employee3.add_qualification("Station 2")
         self.employee3.add_qualification("H010")
 
@@ -51,10 +51,14 @@ class TestSingleDayScheduling(unittest.TestCase):
         start_date = date.today()
         periods_per_day = 4
         team_name = "headsub"
-        
+
         # Create a mock session for database access
         mock_session = MagicMock()
-        
+
+        # Create a mock team repository
+        mock_team_repository = MagicMock()
+        mock_team_repository.get_by_name.return_value = self.team
+
         # Generate the schedule
         assignments = self.schedule_service.generate_schedule(
             employees=self.employees,
@@ -62,17 +66,18 @@ class TestSingleDayScheduling(unittest.TestCase):
             start_date=start_date,
             periods_per_day=periods_per_day,
             team_name=team_name,
-            session=mock_session
+            session=mock_session,
+            team_repository=mock_team_repository
         )
-        
+
         # Verify that assignments were generated
         self.assertIsNotNone(assignments)
         self.assertTrue(len(assignments) > 0)
-        
+
         # Verify that each assignment has the correct date
         for assignment in assignments:
             self.assertEqual(assignment.period.date, start_date)
-            
+
         # Verify that each employee is assigned to at most one workstation per period
         for period in range(1, periods_per_day + 1):
             employee_assignments = {}
@@ -82,7 +87,7 @@ class TestSingleDayScheduling(unittest.TestCase):
                     self.assertNotIn(employee_id, employee_assignments, 
                                     f"Employee {employee_id} assigned to multiple workstations in period {period}")
                     employee_assignments[employee_id] = assignment.workstation.id
-                    
+
         # Verify that each workstation has at most one employee per period
         for period in range(1, periods_per_day + 1):
             workstation_assignments = {}
@@ -92,7 +97,7 @@ class TestSingleDayScheduling(unittest.TestCase):
                     self.assertNotIn(workstation_id, workstation_assignments, 
                                     f"Workstation {workstation_id} assigned to multiple employees in period {period}")
                     workstation_assignments[workstation_id] = assignment.employee.id
-                    
+
         # Verify that employees are only assigned to workstations they are qualified for
         for assignment in assignments:
             employee = assignment.employee

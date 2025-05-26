@@ -42,6 +42,7 @@ async def generate_schedule_async(
         team_repository=repositories["team_repository"],
         assignment_repository=repositories["assignment_repository"],
         schedule_service=schedule_service,
+        schedule_repository=schedule_repo,
         session=db
     )
 

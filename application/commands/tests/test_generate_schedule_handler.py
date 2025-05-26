@@ -8,6 +8,7 @@ from domain.repositories.tests.mock_employee_repository import MockEmployeeRepos
 from domain.repositories.tests.mock_workstation_repository import MockWorkstationRepository
 from domain.repositories.tests.mock_team_repository import MockTeamRepository
 from domain.repositories.tests.mock_assignment_repository import MockAssignmentRepository
+from domain.repositories.tests.mock_schedule_repository import MockScheduleRepository
 from domain.services.schedule_service import ScheduleService
 from application.commands.generate_schedule_command import GenerateScheduleCommand
 from application.commands.generate_schedule_handler import GenerateScheduleHandler
@@ -21,6 +22,7 @@ class TestGenerateScheduleHandler(unittest.TestCase):
         self.workstation_repo = MockWorkstationRepository()
         self.team_repo = MockTeamRepository()
         self.assignment_repo = MockAssignmentRepository()
+        self.schedule_repo = MockScheduleRepository()
 
         # Create a schedule service
         self.schedule_service = ScheduleService()
@@ -31,7 +33,8 @@ class TestGenerateScheduleHandler(unittest.TestCase):
             workstation_repository=self.workstation_repo,
             team_repository=self.team_repo,
             assignment_repository=self.assignment_repo,
-            schedule_service=self.schedule_service
+            schedule_service=self.schedule_service,
+            schedule_repository=self.schedule_repo
         )
 
         # Add test data

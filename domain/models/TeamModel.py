@@ -44,7 +44,7 @@ class TeamModel(Base):
         # Create workstations
         workstations = [
             Workstation(
-                id=ws.station_id,
+                id=ws.id,
                 name=ws.name,
                 line_type=str(ws.line_type),
                 is_loading_job=ws.is_loading_job,

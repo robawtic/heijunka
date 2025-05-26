@@ -17,6 +17,7 @@ from domain.repositories.implementations.sqlalchemy_workstation_repository impor
 from domain.repositories.implementations.sqlalchemy_team_repository import SqlAlchemyTeamRepository
 from domain.repositories.implementations.sqlalchemy_assignment_repository import SqlAlchemyAssignmentRepository
 from domain.repositories.implementations.sqlalchemy_employee_work_history_repository import SqlAlchemyEmployeeWorkHistoryRepository
+from domain.repositories.implementations.sqlalchemy_schedule_repository import SqlAlchemyScheduleRepository
 from domain.services.schedule_service import ScheduleService
 
 
@@ -48,7 +49,7 @@ def setup_dependencies():
     Set up and return the dependencies needed for the application.
 
     Returns:
-        tuple: A tuple containing (session, employee_repository, workstation_repository, team_repository, schedule_service, assignment_repository, work_history_repository, aro_repository, aro_service, aro_graph_service)
+        tuple: A tuple containing (session, employee_repository, workstation_repository, team_repository, schedule_service, assignment_repository, work_history_repository, aro_repository, aro_service, aro_graph_service, schedule_repository)
     """
     session = Session()
     employee_repository = SqlAlchemyEmployeeRepository(session)
@@ -57,6 +58,7 @@ def setup_dependencies():
     schedule_service = ScheduleService()
     assignment_repository = SqlAlchemyAssignmentRepository(session)
     work_history_repository = SqlAlchemyEmployeeWorkHistoryRepository(session)
+    schedule_repository = SqlAlchemyScheduleRepository(session)
 
     # Import here to avoid circular imports
     from domain.repositories.implementations.sqlalchemy_aro_assignment_repository import SqlAlchemyAROAssignmentRepository
@@ -93,7 +95,7 @@ def setup_dependencies():
     aro_service.register_event_handler('aro_assignment_removed', cache_invalidation_handler.handle_aro_assignment_removed)
     aro_service.register_event_handler('aro_assignment_updated', cache_invalidation_handler.handle_aro_assignment_updated)
 
-    return session, employee_repository, workstation_repository, team_repository, schedule_service, assignment_repository, work_history_repository, aro_repository, aro_service, aro_graph_service
+    return session, employee_repository, workstation_repository, team_repository, schedule_service, assignment_repository, work_history_repository, aro_repository, aro_service, aro_graph_service, schedule_repository
 
 
 def parse_arguments():
@@ -517,7 +519,7 @@ def main():
         args = parse_arguments()
 
         # Setup dependencies
-        session, employee_repository, workstation_repository, team_repository, schedule_service, assignment_repository, work_history_repository, aro_repository, aro_service, aro_graph_service = setup_dependencies()
+        session, employee_repository, workstation_repository, team_repository, schedule_service, assignment_repository, work_history_repository, aro_repository, aro_service, aro_graph_service, schedule_repository = setup_dependencies()
 
         try:
             if args.command == 'generate':
@@ -535,6 +537,7 @@ def main():
                     team_repository=team_repository,
                     assignment_repository=assignment_repository,
                     schedule_service=schedule_service,
+                    schedule_repository=schedule_repository,
                     session=session
                 )
 

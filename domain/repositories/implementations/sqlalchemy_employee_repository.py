@@ -195,3 +195,20 @@ class SqlAlchemyEmployeeRepository(BaseSqlAlchemyRepository[Employee, EmployeeMo
         if not employee_model:
             return None
         return employee_model.to_domain()
+
+    def get(self, id: int) -> Optional[Employee]:
+        """Retrieve an employee by their ID.
+    
+    Args:
+        id: The unique identifier of the employee.
+        
+    Returns:
+        Employee object if found, None otherwise.
+        
+    Raises:
+        NotFoundError: If employee with given ID doesn't exist.
+    """
+        employee_model = self._session.query(EmployeeModel).filter(EmployeeModel.id == id).first()
+        if not employee_model:
+            return None
+        return employee_model.to_domain()

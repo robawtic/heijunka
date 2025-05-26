@@ -177,3 +177,20 @@ class SqlAlchemyTeamRepository(BaseSqlAlchemyRepository[Team, TeamModel], TeamRe
         """Convert a WorkstationModel to a Workstation domain entity using factory."""
         from domain.factories.workstation_factory import WorkstationFactory
         return WorkstationFactory.create_from_model(model)
+
+    def get(self, id):
+        """Retrieve an team by their ID.
+
+    Args:
+        id: The unique identifier of the employee.
+
+    Returns:
+        Team object if found, None otherwise.
+
+    Raises:
+        NotFoundError: If team with given ID doesn't exist.
+    """
+        team_model = self._session.query(TeamModel).filter(TeamModel.id == id).first()
+        if not team_model:
+            return None
+        return team_model.to_domain()
