@@ -96,8 +96,6 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
 app.add_middleware(RequestLoggingMiddleware)
 app.add_middleware(MetricsMiddleware)
 app.add_middleware(PrometheusMiddleware)
-app.add_middleware(SecurityHeadersMiddleware)  # Add security headers
-app.add_middleware(InputSanitizationMiddleware)  # Add input sanitization
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.allowed_origins_list,  # Use allowed_origins_list property to handle comma-separated string
@@ -110,6 +108,8 @@ app.add_middleware(
     limit=100,  # 100 requests
     window=60,  # per minute
 )
+
+app.add_middleware(SecurityHeadersMiddleware)
 
 # Setup CSRF protection
 setup_csrf(app)
@@ -149,14 +149,6 @@ def custom_openapi():
         This API uses JWT tokens for authentication. To authenticate:
         1. Call the `/api/v1/auth/token` endpoint with your credentials
         2. Use the returned token in the Authorization header: `Bearer {token}`
-
-        ## CSRF Protection
-
-        The API implements CSRF protection for all state-changing requests. To use:
-        1. Call the `/api/v1/auth/csrf-token` endpoint to get a CSRF token
-        2. Include the token in the X-CSRF-Token header for all POST, PUT, DELETE requests
-
-        Note: The CSRF token is also returned in the response when you authenticate.
 
         ## Rate Limiting
 
