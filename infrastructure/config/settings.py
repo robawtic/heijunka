@@ -19,6 +19,12 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     jwt_expiration_minutes: int = Field(30, env="JWT_EXPIRATION_MINUTES")
 
+    # CSRF and session settings
+    secret_key: str = Field(default="your-secret-key-for-sessions", env="SECRET_KEY")
+    csrf_secret: str = Field(default="your-csrf-secret-key", env="CSRF_SECRET")
+    cookie_secure: bool = Field(default=True, env="COOKIE_SECURE")
+    session_max_age: int = Field(default=14400, env="SESSION_MAX_AGE")  # 4 hours
+
     # CORS settings
     allowed_origins: str = Field("", env="ALLOWED_ORIGINS")
 

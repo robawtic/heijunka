@@ -1,7 +1,155 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, EmailStr, validator, constr
 from typing import List, Optional, Dict, Any, Union
 from datetime import date, datetime
 from enum import Enum
+import re
+
+# User models
+class UserBase(BaseModel):
+    username: constr(min_length=3, max_length=50, pattern=r'^[a-zA-Z0-9_-]+$') = Field(
+        ..., 
+        description="Username (3-50 chars, alphanumeric, underscore, hyphen only)"
+    )
+    email: Optional[EmailStr] = Field(
+        None, 
+        description="Email address"
+    )
+
+    # Validate username to prevent injection attacks
+    @validator('username')
+    def username_must_be_valid(cls, v):
+        if not re.match(r'^[a-zA-Z0-9_-]+$', v):
+            raise ValueError('Username contains invalid characters')
+        return v
+
+class UserCreate(UserBase):
+    password: constr(min_length=8, max_length=64) = Field(
+        ..., 
+        description="Password (min 8 chars)"
+    )
+    roles: List[str] = Field(
+        default_factory=list,
+        description="User roles"
+    )
+
+    # Validate password strength
+    @validator('password')
+    def password_strength(cls, v):
+        if not re.search(r'[A-Z]', v):
+            raise ValueError('Password must contain at least one uppercase letter')
+        if not re.search(r'[a-z]', v):
+            raise ValueError('Password must contain at least one lowercase letter')
+        if not re.search(r'[0-9]', v):
+            raise ValueError('Password must contain at least one digit')
+        if not re.search(r'[^A-Za-z0-9]', v):
+            raise ValueError('Password must contain at least one special character')
+        return v
+
+    # Validate roles
+    @validator('roles', each_item=True)
+    def validate_roles(cls, v):
+        valid_roles = ['admin', 'scheduler', 'operator', 'viewer']
+        if v not in valid_roles:
+            raise ValueError(f'Invalid role: {v}. Must be one of {valid_roles}')
+        return v
+
+class UserUpdate(BaseModel):
+    email: Optional[EmailStr] = None
+    password: Optional[constr(min_length=8, max_length=64)] = None
+    is_active: Optional[bool] = None
+    roles: Optional[List[str]] = None
+
+    # Reuse password validator if password is provided
+    @validator('password')
+    def password_strength(cls, v):
+        if v is None:
+            return v
+        if not re.search(r'[A-Z]', v):
+            raise ValueError('Password must contain at least one uppercase letter')
+        if not re.search(r'[a-z]', v):
+            raise ValueError('Password must contain at least one lowercase letter')
+        if not re.search(r'[0-9]', v):
+            raise ValueError('Password must contain at least one digit')
+        if not re.search(r'[^A-Za-z0-9]', v):
+            raise ValueError('Password must contain at least one special character')
+        return v
+
+    # Validate roles if provided
+    @validator('roles', each_item=True)
+    def validate_roles(cls, v):
+        valid_roles = ['admin', 'scheduler', 'operator', 'viewer']
+        if v not in valid_roles:
+            raise ValueError(f'Invalid role: {v}. Must be one of {valid_roles}')
+        return v
+
+class UserResponse(BaseResponse, UserBase):
+    id: int
+    is_active: bool
+    roles: List[str]
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+    last_login: Optional[datetime] = None
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "id": 1,
+                "username": "johndoe",
+                "email": "john.doe@example.com",
+                "is_active": True,
+                "roles": ["operator", "viewer"],
+                "created_at": "2023-01-15T10:30:00",
+                "updated_at": "2023-01-15T10:30:00",
+                "last_login": "2023-01-15T10:30:00"
+            }
+        }
+
+class UserMeResponse(BaseModel):
+    id: int
+    username: str
+    email: Optional[str]
+    roles: List[str]
+    is_active: bool
+    last_login: Optional[datetime]
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "id": 1,
+                "username": "johndoe",
+                "email": "john.doe@example.com",
+                "is_active": True,
+                "roles": ["operator", "viewer"],
+                "last_login": "2023-01-15T10:30:00"
+            }
+        }
+
+# Enhanced login models
+class TokenRequest(BaseModel):
+    username: constr(min_length=3, max_length=50) = Field(..., description="Username")
+    password: constr(min_length=1) = Field(..., description="Password")
+
+    # Sanitize inputs
+    @validator('username')
+    def sanitize_username(cls, v):
+        return re.sub(r'[<>\'";]', '', v)
+
+    @validator('password')
+    def sanitize_password(cls, v):
+        return re.sub(r'[<>\'";]', '', v)
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str
+    csrf_token: Optional[str] = None
+
+class CSRFTokenResponse(BaseModel):
+    """
+    Response model for CSRF token endpoint.
+
+    This is used by the frontend to get a CSRF token for subsequent requests.
+    """
+    csrf_token: str
 
 # Error response models
 class ErrorDetail(BaseModel):
