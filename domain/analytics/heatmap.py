@@ -13,6 +13,7 @@ from collections import defaultdict
 from datetime import datetime, timedelta
 from sqlalchemy import func
 from typing import Dict, List, Set, Tuple, Optional
+from utilities.secure_logging import redact_log_message
 
 from domain.models.EmployeeModel import EmployeeModel
 from domain.models.WorkstationModel import WorkstationModel
@@ -120,7 +121,7 @@ class WorkloadAnalysis:
 
         employee_station_path = f"{output_dir}/employee_station_heatmap.png"
         plt.savefig(employee_station_path)
-        print(f"Saved {employee_station_path}")
+        print(redact_log_message(f"Saved {employee_station_path}", file_paths=[employee_station_path]))
 
         # 2) Days with full A-B-C combo heatmap
         # Query all history entries
@@ -162,7 +163,7 @@ class WorkloadAnalysis:
 
         abc_combo_path = f"{output_dir}/abc_combo_heatmap.png"
         plt.savefig(abc_combo_path)
-        print(f"Saved {abc_combo_path}")
+        print(redact_log_message(f"Saved {abc_combo_path}", file_paths=[abc_combo_path]))
 
         return (employee_station_path, abc_combo_path)
 
@@ -209,7 +210,7 @@ class WorkloadAnalysis:
 
         path = f"{output_dir}/workload_balance_chart_{year}.png"
         plt.savefig(path)
-        print(f"Saved {path}")
+        print(redact_log_message(f"Saved {path}", file_paths=[path]))
         return path
 
     def generate_rotation_heatmap(self, output_dir='.'):
@@ -268,7 +269,7 @@ class WorkloadAnalysis:
 
         path = f"{output_dir}/rotation_effectiveness.png"
         plt.savefig(path)
-        print(f"Saved {path}")
+        print(redact_log_message(f"Saved {path}", file_paths=[path]))
         return path
 
     def generate_fatigue_chart(self, output_dir='.', 
@@ -349,7 +350,7 @@ class WorkloadAnalysis:
 
         path = f"{output_dir}/fatigue_distribution.png"
         plt.savefig(path)
-        print(f"Saved {path}")
+        print(redact_log_message(f"Saved {path}", file_paths=[path]))
         return path
 
     def generate_calendar_heatmap(self, output_dir='.', year=None):
@@ -401,10 +402,10 @@ class WorkloadAnalysis:
 
             path = f"{output_dir}/calendar_heatmap_{year}.png"
             plt.savefig(path)
-            print(f"Saved {path}")
+            print(redact_log_message(f"Saved {path}", file_paths=[path]))
             return path
         else:
-            print(f"No data available for calendar heatmap for year {year}")
+            print(redact_log_message(f"No data available for calendar heatmap for year {year}", dates=[str(year)]))
             return None
 
 

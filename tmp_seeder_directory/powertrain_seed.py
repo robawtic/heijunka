@@ -16,6 +16,7 @@ from faker import Faker
 import json
 import os
 from datetime import datetime
+from utilities.secure_logging import redact_log_message
 
 
 def get_test_date():
@@ -36,10 +37,10 @@ def load_json_data(file_path):
         with open(file_path, 'r') as f:
             return json.load(f)
     except FileNotFoundError:
-        print(f"Warning: File not found: {file_path}")
+        print(redact_log_message(f"Warning: File not found: {file_path}", file_paths=[file_path]))
         return None
     except json.JSONDecodeError:
-        print(f"Warning: Invalid JSON in file: {file_path}")
+        print(redact_log_message(f"Warning: Invalid JSON in file: {file_path}", file_paths=[file_path]))
         return None
 
 
@@ -171,7 +172,7 @@ def seed_powertrain_data(session):
                 )
                 session.add(workstation)
                 session.commit()
-                print(f"  Created workstation: {ws_data['name']}")
+                print(redact_log_message(f"  Created workstation: {ws_data['name']}", workstation_names=[ws_data['name']]))
             workstation_objects[(team_name, ws_data["name"])] = workstation
 
     # Create generic workstations for other teams
@@ -226,7 +227,7 @@ def seed_powertrain_data(session):
                 )
                 session.add(employee)
                 session.commit()
-                print(f"  Created employee: {employee_name}")
+                print(redact_log_message(f"  Created employee: {employee_name}", employee_names=[employee_name]))
             employee_objects[(team_name, i)] = employee
 
             # Create TeamMember entry

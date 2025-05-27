@@ -48,6 +48,12 @@ class Settings(BaseSettings):
 
     # Logging settings
     log_level: str = Field("INFO", env="LOG_LEVEL")
+    redaction_level: str = Field("high", env="REDACTION_LEVEL")  # Options: "none", "low", "high"
+    include_redacted_metadata: bool = Field(False, env="LOG_INCLUDE_REDACTED_METADATA")
+    log_dir: str = Field("logs", env="LOG_DIR")
+    max_log_size_mb: int = Field(10, env="MAX_LOG_SIZE_MB")
+    log_backup_count: int = Field(10, env="LOG_BACKUP_COUNT")
+    enable_audit_log: bool = Field(True, env="ENABLE_AUDIT_LOG")
 
     # Environment settings
     environment: str = Field("development", env="ENVIRONMENT")
