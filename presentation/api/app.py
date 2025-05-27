@@ -6,7 +6,8 @@ from sqlalchemy.exc import SQLAlchemyError
 from jose.exceptions import JWTError
 import logging
 from starlette.middleware.base import BaseHTTPMiddleware
-from starlette_prometheus import PrometheusMiddleware, metrics
+from starlette_prometheus import PrometheusMiddleware
+from infrastructure.monitoring.metrics import custom_metrics
 import time
 import uuid
 import asyncio
@@ -189,7 +190,7 @@ app.add_middleware(
 # No middleware is needed as it's dependency-injected
 
 # Add Prometheus metrics endpoint
-app.add_route("/metrics", metrics)
+app.add_route("/metrics", custom_metrics)
 
 # Add exception handlers
 app.add_exception_handler(RequestValidationError, validation_exception_handler)

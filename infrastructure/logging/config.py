@@ -17,6 +17,10 @@ class CustomJsonFormatter(jsonlogger.JsonFormatter):
         log_record['level'] = record.levelname
         log_record['logger'] = record.name
 
+        # Add timestamp if not already present
+        if 'timestamp' not in log_record:
+            log_record['timestamp'] = self.formatTime(record)
+
         # Add request_id if available in thread context
         request_id = getattr(record, 'request_id', None)
         if request_id:
@@ -33,6 +37,26 @@ class CustomJsonFormatter(jsonlogger.JsonFormatter):
         # Add is_audit flag if present
         if getattr(record, "is_audit", False):
             log_record["is_audit"] = True
+
+        # Add event type if present in extra
+        if hasattr(record, 'event_type'):
+            log_record['event'] = record.event_type
+
+        # Add user_id if present in extra
+        if hasattr(record, 'user_id'):
+            log_record['user_id'] = record.user_id
+
+        # Add ip_address if present in extra
+        if hasattr(record, 'ip_address'):
+            log_record['ip_address'] = record.ip_address
+
+        # Add user_agent if present in extra
+        if hasattr(record, 'user_agent'):
+            log_record['user_agent'] = record.user_agent
+
+        # Add rate_limited flag if present
+        if hasattr(record, 'rate_limited'):
+            log_record['rate_limited'] = record.rate_limited
 
 class RequestIdFilter(logging.Filter):
     def __init__(self, request_id_getter):
