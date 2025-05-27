@@ -1,8 +1,21 @@
 import re
 import os
 import logging
-from typing import Any, Dict, List, Union, Optional, Callable
+from typing import Any, Dict, List, Union, Optional, Callable, Tuple
+from dataclasses import dataclass
 from infrastructure.config.settings import settings
+
+@dataclass
+class RedactionResult:
+    """
+    Data class to hold the result of a redaction operation.
+
+    Attributes:
+        message: The redacted message
+        redacted_fields: List of field types that were redacted
+    """
+    message: str
+    redacted_fields: List[str]
 
 class SensitiveDataRedactor:
     """
@@ -24,6 +37,12 @@ class SensitiveDataRedactor:
         self.redaction_level = redaction_level or settings.redaction_level
         if self.redaction_level not in ["none", "low", "high"]:
             raise ValueError(f"Invalid redaction level: {self.redaction_level}. Must be one of: none, low, high")
+
+        # Warn if metadata is enabled but redaction level is not high
+        if settings.include_redacted_metadata and self.redaction_level != "high":
+            logging.getLogger("heijunka").warning(
+                "Redacted metadata is enabled, but redaction level is not 'high'. Metadata will not be included."
+            )
 
     def redact_text(self, text: str, data_type: str) -> str:
         """
@@ -110,7 +129,7 @@ class SensitiveDataRedactor:
                     # Default high redaction
                     return "[REDACTED]"
 
-    def redact_message(self, message: str, sensitive_data: Dict[str, Union[str, List[str]]]) -> str:
+    def redact_message(self, message: str, sensitive_data: Dict[str, Union[str, List[str]]]) -> RedactionResult:
         """
         Redact sensitive information in a log message.
 
@@ -121,12 +140,13 @@ class SensitiveDataRedactor:
                                   'employee_id': ['123456', '789012']}
 
         Returns:
-            Redacted log message
+            RedactionResult containing the redacted message and list of redacted fields
         """
         if self.redaction_level == "none":
-            return message
+            return RedactionResult(message=message, redacted_fields=[])
 
         result = message
+        redacted_fields = []
 
         # Process each type of sensitive data
         for data_type, values in sensitive_data.items():
@@ -136,14 +156,20 @@ class SensitiveDataRedactor:
                     if value and str(value) in result:
                         redacted = self.redact_text(str(value), data_type)
                         result = result.replace(str(value), redacted)
+                        if data_type not in redacted_fields:
+                            redacted_fields.append(data_type)
             elif isinstance(values, str) and values.startswith(r'\b'):
                 # Apply regex pattern redaction
                 pattern = values
-                result = re.sub(pattern, 
-                               lambda m: self.redact_text(m.group(0), data_type), 
-                               result)
+                # Check if there are any matches before applying redaction
+                if re.search(pattern, result):
+                    result = re.sub(pattern, 
+                                   lambda m: self.redact_text(m.group(0), data_type), 
+                                   result)
+                    if data_type not in redacted_fields:
+                        redacted_fields.append(data_type)
 
-        return result
+        return RedactionResult(message=result, redacted_fields=redacted_fields)
 
 # Global redactor instance
 _redactor = SensitiveDataRedactor()
@@ -156,7 +182,7 @@ def redact_log_message(message: str,
                      workstation_names: List[str] = None,
                      file_paths: List[str] = None,
                      dates: List[str] = None,
-                     custom_data: Dict[str, List[str]] = None) -> str:
+                     custom_data: Dict[str, List[str]] = None) -> RedactionResult:
     """
     Redact a log message by masking sensitive information.
 
@@ -172,7 +198,7 @@ def redact_log_message(message: str,
         custom_data: Dictionary of custom data types and values to redact
 
     Returns:
-        Redacted log message
+        RedactionResult containing the redacted message and list of redacted fields
     """
     sensitive_data = {}
 
@@ -225,7 +251,6 @@ def sanitize_exception(exc: Exception) -> str:
 
     # Extract potential employee names (assuming names are capitalized words)
     employee_names = []
-    import re
     # Look for patterns like "John Doe", "Jane Smith", etc.
     name_pattern = r'\b[A-Z][a-z]+ [A-Z][a-z]+\b'
     employee_names.extend(re.findall(name_pattern, message))
@@ -241,12 +266,13 @@ def sanitize_exception(exc: Exception) -> str:
     dates.extend(re.findall(date_pattern, message))
 
     # Now redact the message with the extracted sensitive data
-    return redact_log_message(
+    result = redact_log_message(
         message,
         employee_names=employee_names,
         employee_ids=employee_ids,
         dates=dates
     )
+    return result.message
 
 # Lazy-loaded audit logger
 _audit_logger = None
@@ -332,7 +358,7 @@ def log_audit_event(event_type: str,
 
     # Log to standard logger (redacted)
     log_func = getattr(logger, level.lower())
-    log_func(redact_log_message(
+    result = redact_log_message(
         redacted_message,
         employee_names=employee_names,
         employee_ids=employee_ids,
@@ -341,7 +367,8 @@ def log_audit_event(event_type: str,
         workstation_names=workstation_names,
         file_paths=file_paths,
         dates=dates
-    ))
+    )
+    log_func(result.message)
 
     # Log to audit logger (full details)
     audit_log_func = getattr(audit_logger, level.lower())

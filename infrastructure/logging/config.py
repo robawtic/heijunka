@@ -7,7 +7,7 @@ from pythonjsonlogger import jsonlogger
 import uuid
 from typing import Optional
 from infrastructure.config.settings import settings
-from utilities.secure_logging import redact_log_message
+from utilities.secure_logging import redact_log_message, RedactionResult
 
 class CustomJsonFormatter(jsonlogger.JsonFormatter):
     def add_fields(self, log_record, record, message_dict):
@@ -25,6 +25,14 @@ class CustomJsonFormatter(jsonlogger.JsonFormatter):
         # Add redacted flag if present
         if hasattr(record, 'redacted') and record.redacted:
             log_record['redacted'] = True
+
+            # Add redacted fields if present
+            if hasattr(record, 'redacted_fields') and record.redacted_fields:
+                log_record['redacted_fields'] = record.redacted_fields
+
+        # Add is_audit flag if present
+        if getattr(record, "is_audit", False):
+            log_record["is_audit"] = True
 
 class RequestIdFilter(logging.Filter):
     def __init__(self, request_id_getter):
@@ -49,11 +57,14 @@ class SecureLogFilter(logging.Filter):
         if isinstance(record.msg, str):
             original_msg = record.msg
             # Redact the message
-            record.msg = redact_log_message(record.msg)
+            result = redact_log_message(record.msg)
+            record.msg = result.message
 
             # Add redacted flag if message was changed
             if record.msg != original_msg:
                 record.redacted = True
+                # Add redacted fields to the record
+                record.redacted_fields = result.redacted_fields
         return True
 
 def ensure_log_directory(log_dir):
@@ -113,6 +124,10 @@ def configure_logging(log_level: str = None):
             'audit': {
                 'format': '%(asctime)s - AUDIT - %(levelname)s - [%(request_id)s] - %(message)s',
             },
+            'audit_json': {
+                '()': CustomJsonFormatter,
+                'format': '%(timestamp)s %(level)s %(name)s %(message)s',
+            },
         },
         'filters': {
             'request_id': {
@@ -126,13 +141,13 @@ def configure_logging(log_level: str = None):
         'handlers': {
             'console': {
                 'class': 'logging.StreamHandler',
-                'formatter': 'standard',
+                'formatter': 'standard' if settings.environment == "development" else 'json',
                 'filters': ['request_id', 'secure_log'],
                 'level': log_level,
             },
             'file': {
                 'class': 'logging.handlers.RotatingFileHandler',
-                'formatter': 'standard',
+                'formatter': 'standard' if settings.environment == "development" else 'json',
                 'filters': ['request_id', 'secure_log'],
                 'filename': app_log_path,
                 'maxBytes': settings.max_log_size_mb * 1024 * 1024,  # Convert MB to bytes
@@ -141,7 +156,7 @@ def configure_logging(log_level: str = None):
             },
             'audit_file': {
                 'class': 'logging.handlers.RotatingFileHandler',
-                'formatter': 'audit',
+                'formatter': 'audit' if settings.environment == "development" else 'audit_json',
                 'filters': ['request_id'],  # No redaction for audit logs
                 'filename': audit_log_path,
                 'maxBytes': settings.max_log_size_mb * 1024 * 1024,  # Convert MB to bytes
