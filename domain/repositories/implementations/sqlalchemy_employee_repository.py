@@ -4,7 +4,6 @@ from datetime import date
 from sqlalchemy import and_
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
-import logging
 
 from domain.entities.employee import Employee
 from domain.models import EmployeeWorkstationModel, EmployeeWorkHistoryModel
@@ -16,12 +15,14 @@ from domain.repositories.interfaces.employee_repository import EmployeeRepositor
 from domain.repositories.implementations.base_sqlalchemy_repository import BaseSqlAlchemyRepository
 from infrastructure.exceptions import RepositoryError
 from utilities.secure_logging import redact_log_message, sanitize_exception, log_audit_event
+from utilities.logging_factory import get_logger
 
 
 class SqlAlchemyEmployeeRepository(BaseSqlAlchemyRepository[Employee, EmployeeModel], EmployeeRepositoryInterface):
     def __init__(self, session: Session):
         super().__init__(session, EmployeeModel, Employee)
-        self.logger = logging.getLogger("heijunka.repositories.employee")
+        self.logger = get_logger("heijunka.repositories.employee")
+        self.rate_limited_logger = get_logger("heijunka.repositories.employee", rate_limit=True)
 
     @contextmanager
     def session_scope(self) -> Generator[Session, None, None]:
@@ -32,26 +33,60 @@ class SqlAlchemyEmployeeRepository(BaseSqlAlchemyRepository[Employee, EmployeeMo
         except SQLAlchemyError as e:
             self._session.rollback()
             error_msg = sanitize_exception(e)
-            self.logger.error(f"Database operation failed: {error_msg}")
+            self.logger.error(
+                f"Database operation failed: {error_msg}",
+                extra={
+                    "event_type": "database_error",
+                    "error_type": type(e).__name__,
+                    "repository": "employee"
+                }
+            )
             raise RepositoryError(f"Database operation failed: {error_msg}")
         except Exception as e:
             self._session.rollback()
-            self.logger.error(f"Unexpected error in employee repository: {sanitize_exception(e)}")
+            self.logger.error(
+                f"Unexpected error in employee repository: {sanitize_exception(e)}",
+                extra={
+                    "event_type": "unexpected_error",
+                    "error_type": type(e).__name__,
+                    "repository": "employee"
+                }
+            )
             raise
 
     def get_by_team_id(self, team_id: int) -> List[Employee]:
         """Retrieve all employees for a specific team and return as domain entities."""
-        self.logger.info(f"Retrieving employees for team ID: {team_id}")
+        self.logger.info(
+            f"Retrieving employees for team ID: {team_id}",
+            extra={
+                "event_type": "team_employees_lookup",
+                "team_id": team_id
+            }
+        )
         try:
             employee_models = self._session.query(EmployeeModel).filter(
                 EmployeeModel.team_id == team_id
             ).all()
             employee_count = len(employee_models)
-            self.logger.info(f"Found {employee_count} employees for team ID: {team_id}")
+            self.logger.info(
+                f"Found {employee_count} employees for team ID: {team_id}",
+                extra={
+                    "event_type": "team_employees_lookup_success",
+                    "team_id": team_id,
+                    "employee_count": employee_count
+                }
+            )
             return [model.to_domain() for model in employee_models]
         except SQLAlchemyError as e:
             error_msg = sanitize_exception(e)
-            self.logger.error(f"Error retrieving employees for team ID {team_id}: {error_msg}")
+            self.logger.error(
+                f"Error retrieving employees for team ID {team_id}: {error_msg}",
+                extra={
+                    "event_type": "team_employees_lookup_error",
+                    "team_id": team_id,
+                    "error_type": type(e).__name__
+                }
+            )
             raise RepositoryError(f"Error retrieving employees for team: {error_msg}")
 
     def is_available(self, employee_id: int, date_obj: date, period: Optional[int] = None) -> bool:
@@ -59,18 +94,35 @@ class SqlAlchemyEmployeeRepository(BaseSqlAlchemyRepository[Employee, EmployeeMo
         try:
             employee = self._session.query(EmployeeModel).get(employee_id)
             if not employee:
-                self.logger.warning(f"Availability check failed - employee not found", 
-                                   extra={"employee_id": employee_id})
+                self.logger.warning("Availability check failed - employee not found", 
+                                   extra={
+                                       "event_type": "availability_check_failed",
+                                       "employee_id": employee_id,
+                                       "reason": "employee_not_found"
+                                   })
                 return False
 
-            # Log with redaction
+            # Log with redaction using rate-limited logger
             result = redact_log_message(
                 f"Checking availability for employee {employee.name} (ID: {employee_id}) on {date_obj}",
                 employee_names=[employee.name],
                 employee_ids=[str(employee_id)],
                 dates=[str(date_obj)]
             )
-            self.logger.info(result.message)
+
+            # Use rate-limited logger for this high-frequency operation
+            self.rate_limited_logger.info(
+                result.message,
+                event_type="availability_check",
+                identifier=f"{employee_id}:{date_obj}",
+                extra={
+                    "employee_id": employee_id,
+                    "date": str(date_obj),
+                    "period": period,
+                    "redacted": True,
+                    "redacted_fields": result.redacted_fields
+                }
+            )
 
             # Check availability logic
             is_available = True
@@ -84,19 +136,41 @@ class SqlAlchemyEmployeeRepository(BaseSqlAlchemyRepository[Employee, EmployeeMo
                     is_available = False
                     break
 
-            # Log result with redaction
+            # Log result with redaction using rate-limited logger
             result = redact_log_message(
                 f"Employee {employee.name} (ID: {employee_id}) is {'available' if is_available else 'not available'} on {date_obj}",
                 employee_names=[employee.name],
                 employee_ids=[str(employee_id)],
                 dates=[str(date_obj)]
             )
-            self.logger.info(result.message)
+
+            self.rate_limited_logger.info(
+                result.message,
+                event_type="availability_result",
+                identifier=f"{employee_id}:{date_obj}",
+                extra={
+                    "employee_id": employee_id,
+                    "date": str(date_obj),
+                    "period": period,
+                    "is_available": is_available,
+                    "redacted": True,
+                    "redacted_fields": result.redacted_fields
+                }
+            )
 
             return is_available
         except SQLAlchemyError as e:
             error_msg = sanitize_exception(e)
-            self.logger.error(f"Error checking availability for employee ID {employee_id}: {error_msg}")
+            self.logger.error(
+                f"Error checking availability for employee ID {employee_id}: {error_msg}",
+                extra={
+                    "event_type": "availability_check_error",
+                    "employee_id": employee_id,
+                    "error_type": type(e).__name__,
+                    "date": str(date_obj) if date_obj else None,
+                    "period": period
+                }
+            )
             raise RepositoryError(f"Error checking employee availability: {error_msg}")
 
     def assign_role(self, employee_id: int, role_name: str, team_id: int) -> Dict[str, str]:
@@ -395,7 +469,17 @@ class SqlAlchemyEmployeeRepository(BaseSqlAlchemyRepository[Employee, EmployeeMo
                              workstation_id: int) -> Tuple[Optional[date], Optional[int]]:
         """Get the last date an employee worked at a specific workstation."""
         try:
-            self.logger.info(f"Retrieving last worked date for employee ID: {employee_id} at workstation ID: {workstation_id}")
+            # Use rate-limited logger for this high-frequency operation
+            self.rate_limited_logger.info(
+                f"Retrieving last worked date",
+                event_type="last_worked_date_check",
+                identifier=f"{employee_id}:{workstation_id}",
+                extra={
+                    "employee_id": employee_id,
+                    "workstation_id": workstation_id,
+                    "operation": "get_last_worked_date"
+                }
+            )
 
             # Get employee and workstation names for better logging
             employee = self._session.query(EmployeeModel).get(employee_id)
@@ -408,7 +492,18 @@ class SqlAlchemyEmployeeRepository(BaseSqlAlchemyRepository[Employee, EmployeeMo
                     employee_names=[employee.name],
                     workstation_names=[workstation.name]
                 )
-                self.logger.info(result.message)
+
+                self.rate_limited_logger.info(
+                    result.message,
+                    event_type="last_worked_date_check_detail",
+                    identifier=f"{employee_id}:{workstation_id}",
+                    extra={
+                        "employee_id": employee_id,
+                        "workstation_id": workstation_id,
+                        "redacted": True,
+                        "redacted_fields": result.redacted_fields
+                    }
+                )
 
             entry = self._session.query(EmployeeWorkHistoryModel).filter(
                 and_(
@@ -421,16 +516,42 @@ class SqlAlchemyEmployeeRepository(BaseSqlAlchemyRepository[Employee, EmployeeMo
             ).first()
 
             if entry:
-                self.logger.info(
-                    f"Found last worked date for employee ID: {employee_id} - Date: {entry.worked_date}, Period: {entry.work_period}"
+                self.rate_limited_logger.info(
+                    f"Found last worked date",
+                    event_type="last_worked_date_result",
+                    identifier=f"{employee_id}:{workstation_id}",
+                    extra={
+                        "employee_id": employee_id,
+                        "workstation_id": workstation_id,
+                        "found": True,
+                        "date": str(entry.worked_date),
+                        "period": entry.work_period
+                    }
                 )
                 return entry.worked_date, entry.work_period
             else:
-                self.logger.info(f"No work history found for employee ID: {employee_id} at workstation ID: {workstation_id}")
+                self.rate_limited_logger.info(
+                    f"No work history found",
+                    event_type="last_worked_date_result",
+                    identifier=f"{employee_id}:{workstation_id}",
+                    extra={
+                        "employee_id": employee_id,
+                        "workstation_id": workstation_id,
+                        "found": False
+                    }
+                )
                 return None, None
         except SQLAlchemyError as e:
             error_msg = sanitize_exception(e)
-            self.logger.error(f"Error retrieving last worked date: {error_msg}")
+            self.logger.error(
+                f"Error retrieving last worked date: {error_msg}",
+                extra={
+                    "event_type": "last_worked_date_error",
+                    "employee_id": employee_id,
+                    "workstation_id": workstation_id,
+                    "error_type": type(e).__name__
+                }
+            )
             raise RepositoryError(f"Error retrieving last worked date: {error_msg}")
 
     def _to_domain(self, model: EmployeeModel) -> Employee:
@@ -463,18 +584,47 @@ class SqlAlchemyEmployeeRepository(BaseSqlAlchemyRepository[Employee, EmployeeMo
                 f"Retrieving employee by name: {name}",
                 employee_names=[name]
             )
-            self.logger.info(result.message)
+
+            self.logger.info(
+                result.message,
+                extra={
+                    "event_type": "employee_lookup",
+                    "lookup_type": "name",
+                    "redacted": True,
+                    "redacted_fields": result.redacted_fields
+                }
+            )
 
             employee_model = self._session.query(EmployeeModel).filter(EmployeeModel.name == name).first()
             if not employee_model:
-                self.logger.info(f"No employee found with name matching the provided value")
+                self.logger.info(
+                    "No employee found with name matching the provided value",
+                    extra={
+                        "event_type": "employee_lookup_failed",
+                        "lookup_type": "name"
+                    }
+                )
                 return None
 
-            self.logger.info(f"Found employee with ID: {employee_model.id}")
+            self.logger.info(
+                f"Found employee with ID: {employee_model.id}",
+                extra={
+                    "event_type": "employee_lookup_success",
+                    "lookup_type": "name",
+                    "employee_id": employee_model.id
+                }
+            )
             return employee_model.to_domain()
         except SQLAlchemyError as e:
             error_msg = sanitize_exception(e)
-            self.logger.error(f"Error retrieving employee by name: {error_msg}")
+            self.logger.error(
+                f"Error retrieving employee by name: {error_msg}",
+                extra={
+                    "event_type": "employee_lookup_error",
+                    "lookup_type": "name",
+                    "error_type": type(e).__name__
+                }
+            )
             raise RepositoryError(f"Error retrieving employee by name: {error_msg}")
 
     def get(self, id: int) -> Optional[Employee]:
@@ -490,11 +640,25 @@ class SqlAlchemyEmployeeRepository(BaseSqlAlchemyRepository[Employee, EmployeeMo
         NotFoundError: If employee with given ID doesn't exist.
     """
         try:
-            self.logger.info(f"Retrieving employee by ID: {id}")
+            self.logger.info(
+                f"Retrieving employee by ID: {id}",
+                extra={
+                    "event_type": "employee_lookup",
+                    "lookup_type": "id",
+                    "employee_id": id
+                }
+            )
 
             employee_model = self._session.query(EmployeeModel).filter(EmployeeModel.id == id).first()
             if not employee_model:
-                self.logger.info(f"No employee found with ID: {id}")
+                self.logger.info(
+                    f"No employee found with ID: {id}",
+                    extra={
+                        "event_type": "employee_lookup_failed",
+                        "lookup_type": "id",
+                        "employee_id": id
+                    }
+                )
                 return None
 
             # Log with redaction since the employee name is sensitive
@@ -502,10 +666,27 @@ class SqlAlchemyEmployeeRepository(BaseSqlAlchemyRepository[Employee, EmployeeMo
                 f"Found employee {employee_model.name} with ID: {id}",
                 employee_names=[employee_model.name]
             )
-            self.logger.info(result.message)
+            self.logger.info(
+                result.message,
+                extra={
+                    "event_type": "employee_lookup_success",
+                    "lookup_type": "id",
+                    "employee_id": id,
+                    "redacted": True,
+                    "redacted_fields": result.redacted_fields
+                }
+            )
 
             return employee_model.to_domain()
         except SQLAlchemyError as e:
             error_msg = sanitize_exception(e)
-            self.logger.error(f"Error retrieving employee by ID {id}: {error_msg}")
+            self.logger.error(
+                f"Error retrieving employee by ID {id}: {error_msg}",
+                extra={
+                    "event_type": "employee_lookup_error",
+                    "lookup_type": "id",
+                    "employee_id": id,
+                    "error_type": type(e).__name__
+                }
+            )
             raise RepositoryError(f"Error retrieving employee by ID: {error_msg}")

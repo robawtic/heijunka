@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String
+from sqlalchemy import Column, Integer, String, UniqueConstraint
 from sqlalchemy.orm import relationship
 
 from domain.models.Base import Base
@@ -8,7 +8,10 @@ class RoleModel(Base):
     __tablename__ = 'roles'
 
     id = Column(Integer, primary_key=True)
-    name = Column(String, unique=True, nullable=False)
+    name = Column(String, nullable=False)
+
+    # Add a unique constraint on the name column
+    __table_args__ = (UniqueConstraint('name', name='_role_name_uc'),)
 
     # Back-reference to TeamMember
     team_members = relationship('TeamMemberModel', secondary=team_member_roles, back_populates='roles')
@@ -17,13 +20,13 @@ class RoleModel(Base):
     @classmethod
     def role_exists(cls, role_name, session):
         """Checks if a role with the given name exists."""
-        return session.query(cls).filter_by(role_name=role_name).first() is not None
+        return session.query(cls).filter_by(name=role_name).first() is not None
 
     @classmethod
     def add_role(cls, role_name, session):
         """Adds a new role to the database if it doesn't already exist."""
         if not cls.role_exists(role_name, session):
-            new_role = cls(role_name=role_name)
+            new_role = cls(name=role_name)
             session.add(new_role)
             session.commit()
             print(f"RoleModel '{role_name}' has been added.")
@@ -33,7 +36,7 @@ class RoleModel(Base):
     @classmethod
     def edit_role(cls, old_role_name, new_role_name, session):
         """Edits the name of an existing role."""
-        role = session.query(cls).filter_by(role_name=old_role_name).first()
+        role = session.query(cls).filter_by(name=old_role_name).first()
         if role:
             if not cls.role_exists(new_role_name, session):
                 role.name = new_role_name
@@ -47,7 +50,7 @@ class RoleModel(Base):
     @classmethod
     def remove_role(cls, role_name, session):
         """Removes a role from the database."""
-        role = session.query(cls).filter_by(role_name=role_name).first()
+        role = session.query(cls).filter_by(name=role_name).first()
         if role:
             session.delete(role)
             session.commit()
@@ -60,4 +63,4 @@ class RoleModel(Base):
         return self.team_members if self.team_members else None
 
     def __repr__(self):
-        return f"<RoleModel(role_name={self.name})>"
+        return f"<RoleModel(name={self.name})>"

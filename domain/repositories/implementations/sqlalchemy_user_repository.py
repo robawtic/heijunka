@@ -4,7 +4,6 @@ from datetime import datetime
 from sqlalchemy import and_
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
-import logging
 
 from domain.entities.user import User
 from domain.models.UserModel import UserModel
@@ -13,6 +12,7 @@ from domain.repositories.interfaces.user_repository import UserRepositoryInterfa
 from domain.repositories.implementations.base_sqlalchemy_repository import BaseSqlAlchemyRepository
 from infrastructure.exceptions import RepositoryError
 from utilities.secure_logging import redact_log_message, sanitize_exception, log_audit_event
+from utilities.logging_factory import get_logger
 
 
 class SqlAlchemyUserRepository(BaseSqlAlchemyRepository[User, UserModel], UserRepositoryInterface):
@@ -23,7 +23,8 @@ class SqlAlchemyUserRepository(BaseSqlAlchemyRepository[User, UserModel], UserRe
     def __init__(self, session: Session):
         """Initialize with SQLAlchemy session."""
         super().__init__(session, UserModel, User)
-        self.logger = logging.getLogger("heijunka.repositories.user")
+        self.logger = get_logger("heijunka.repositories.user")
+        self.rate_limited_logger = get_logger("heijunka.repositories.user", rate_limit=True)
 
     @contextmanager
     def session_scope(self) -> Generator[Session, None, None]:
@@ -39,12 +40,26 @@ class SqlAlchemyUserRepository(BaseSqlAlchemyRepository[User, UserModel], UserRe
         except SQLAlchemyError as e:
             self._session.rollback()
             error_msg = sanitize_exception(e)
-            self.logger.error(f"Database operation failed: {error_msg}")
+            self.logger.error(
+                f"Database operation failed: {error_msg}",
+                extra={
+                    "event_type": "database_error",
+                    "error_type": type(e).__name__,
+                    "repository": "user"
+                }
+            )
             raise RepositoryError(f"Database error: {error_msg}")
         except Exception as e:
             self._session.rollback()
             error_msg = sanitize_exception(e)
-            self.logger.error(f"Unexpected error in user repository: {error_msg}")
+            self.logger.error(
+                f"Unexpected error in user repository: {error_msg}",
+                extra={
+                    "event_type": "unexpected_error",
+                    "error_type": type(e).__name__,
+                    "repository": "user"
+                }
+            )
             raise RepositoryError(f"Repository error: {error_msg}")
 
     def get_by_username(self, username: str) -> Optional[User]:
@@ -58,23 +73,50 @@ class SqlAlchemyUserRepository(BaseSqlAlchemyRepository[User, UserModel], UserRe
             The user if found, None otherwise.
         """
         try:
-            # Log with redaction since username is sensitive
             result = redact_log_message(
                 f"Retrieving user by username: {username}",
                 custom_data={"username": [username]}
             )
-            self.logger.info(result.message)
+            self.logger.info(
+                result.message,
+                extra={
+                    "event_type": "user_lookup",
+                    "lookup_type": "username",
+                    "redacted": True,
+                    "redacted_fields": result.redacted_fields
+                }
+            )
 
             model = self._session.query(UserModel).filter(UserModel.username == username).first()
             if model is None:
-                self.logger.info("No user found with the provided username")
+                self.logger.info(
+                    "No user found with the provided username",
+                    extra={
+                        "event_type": "user_lookup_failed",
+                        "lookup_type": "username"
+                    }
+                )
                 return None
 
-            self.logger.info(f"Found user with ID: {model.id}")
+            self.logger.info(
+                f"Found user with ID: {model.id}",
+                extra={
+                    "event_type": "user_lookup_success",
+                    "lookup_type": "username",
+                    "user_id": model.id
+                }
+            )
             return self._to_domain(model)
         except SQLAlchemyError as e:
             error_msg = sanitize_exception(e)
-            self.logger.error(f"Error retrieving user by username: {error_msg}")
+            self.logger.error(
+                f"Error retrieving user by username: {error_msg}",
+                extra={
+                    "event_type": "user_lookup_error",
+                    "lookup_type": "username",
+                    "error_type": type(e).__name__
+                }
+            )
             raise RepositoryError(f"Error retrieving user by username: {error_msg}")
 
     def get_by_email(self, email: str) -> Optional[User]:
@@ -88,23 +130,50 @@ class SqlAlchemyUserRepository(BaseSqlAlchemyRepository[User, UserModel], UserRe
             The user if found, None otherwise.
         """
         try:
-            # Log with redaction since email is sensitive
             result = redact_log_message(
                 f"Retrieving user by email: {email}",
                 custom_data={"email": [email]}
             )
-            self.logger.info(result.message)
+            self.logger.info(
+                result.message,
+                extra={
+                    "event_type": "user_lookup",
+                    "lookup_type": "email",
+                    "redacted": True,
+                    "redacted_fields": result.redacted_fields
+                }
+            )
 
             model = self._session.query(UserModel).filter(UserModel.email == email).first()
             if model is None:
-                self.logger.info("No user found with the provided email")
+                self.logger.info(
+                    "No user found with the provided email",
+                    extra={
+                        "event_type": "user_lookup_failed",
+                        "lookup_type": "email"
+                    }
+                )
                 return None
 
-            self.logger.info(f"Found user with ID: {model.id}")
+            self.logger.info(
+                f"Found user with ID: {model.id}",
+                extra={
+                    "event_type": "user_lookup_success",
+                    "lookup_type": "email",
+                    "user_id": model.id
+                }
+            )
             return self._to_domain(model)
         except SQLAlchemyError as e:
             error_msg = sanitize_exception(e)
-            self.logger.error(f"Error retrieving user by email: {error_msg}")
+            self.logger.error(
+                f"Error retrieving user by email: {error_msg}",
+                extra={
+                    "event_type": "user_lookup_error",
+                    "lookup_type": "email",
+                    "error_type": type(e).__name__
+                }
+            )
             raise RepositoryError(f"Error retrieving user by email: {error_msg}")
 
     def username_exists(self, username: str) -> bool:
@@ -118,20 +187,44 @@ class SqlAlchemyUserRepository(BaseSqlAlchemyRepository[User, UserModel], UserRe
             True if the username exists, False otherwise.
         """
         try:
-            # Log with redaction since username is sensitive
+            
             result = redact_log_message(
                 f"Checking if username exists: {username}",
                 custom_data={"username": [username]}
             )
-            self.logger.info(result.message)
+
+            
+            self.rate_limited_logger.info(
+                result.message,
+                event_type="username_check",
+                identifier=username,  
+                extra={
+                    "redacted": True,
+                    "redacted_fields": result.redacted_fields
+                }
+            )
 
             exists = self._session.query(UserModel).filter(UserModel.username == username).first() is not None
-            self.logger.info(f"Username exists: {exists}")
+
+            self.rate_limited_logger.info(
+                f"Username exists: {exists}",
+                event_type="username_check_result",
+                identifier=username,
+                extra={
+                    "exists": exists
+                }
+            )
             return exists
         except SQLAlchemyError as e:
             error_msg = sanitize_exception(e)
-            self.logger.error(f"Error checking if username exists: {error_msg}")
-            # Return False on error to be safe
+            self.logger.error(
+                f"Error checking if username exists: {error_msg}",
+                extra={
+                    "event_type": "username_check_error",
+                    "error_type": type(e).__name__
+                }
+            )
+            
             return False
 
     def email_exists(self, email: str) -> bool:
@@ -145,84 +238,187 @@ class SqlAlchemyUserRepository(BaseSqlAlchemyRepository[User, UserModel], UserRe
             True if the email exists, False otherwise.
         """
         try:
-            # Log with redaction since email is sensitive
+            
             result = redact_log_message(
                 f"Checking if email exists: {email}",
                 custom_data={"email": [email]}
             )
-            self.logger.info(result.message)
+
+            
+            self.rate_limited_logger.info(
+                result.message,
+                event_type="email_check",
+                identifier=email,  
+                extra={
+                    "redacted": True,
+                    "redacted_fields": result.redacted_fields
+                }
+            )
 
             exists = self._session.query(UserModel).filter(UserModel.email == email).first() is not None
-            self.logger.info(f"Email exists: {exists}")
+
+            self.rate_limited_logger.info(
+                f"Email exists: {exists}",
+                event_type="email_check_result",
+                identifier=email,
+                extra={
+                    "exists": exists
+                }
+            )
             return exists
         except SQLAlchemyError as e:
             error_msg = sanitize_exception(e)
-            self.logger.error(f"Error checking if email exists: {error_msg}")
-            # Return False on error to be safe
+            self.logger.error(
+                f"Error checking if email exists: {error_msg}",
+                extra={
+                    "event_type": "email_check_error",
+                    "error_type": type(e).__name__
+                }
+            )
+            
             return False
 
-    def update_last_login(self, user_id: int) -> bool:
+    def update_last_login(self, user_id: int, ip_address: str = None, user_agent: str = None) -> bool:
         """
         Update the last login timestamp for a user.
 
         Args:
             user_id: The ID of the user to update.
+            ip_address: Optional IP address of the client
+            user_agent: Optional user agent string
 
         Returns:
             True if the update was successful, False otherwise.
         """
-        self.logger.info(f"Updating last login timestamp for user ID: {user_id}")
+        self.logger.info(
+            "Updating last login timestamp",
+            extra={
+                "event_type": "user_login_update",
+                "user_id": user_id,
+                "operation": "update_last_login"
+            }
+        )
+
         try:
             with self.session_scope() as session:
                 user = session.query(UserModel).get(user_id)
                 if user is None:
-                    self.logger.warning(f"Failed to update last login - user not found with ID: {user_id}")
+                    self.logger.warning(
+                        "Failed to update last login - user not found",
+                        extra={
+                            "event_type": "user_login_update_failed",
+                            "user_id": user_id,
+                            "reason": "user_not_found"
+                        }
+                    )
                     return False
 
-                # Log with redaction since username is sensitive
+                
                 result = redact_log_message(
                     f"Updating last login for user {user.username} (ID: {user_id})",
                     custom_data={"username": [user.username]}
                 )
-                self.logger.info(result.message)
+                self.logger.info(
+                    result.message,
+                    extra={
+                        "event_type": "user_login_update_processing",
+                        "user_id": user_id,
+                        "redacted": True,
+                        "redacted_fields": result.redacted_fields
+                    }
+                )
 
                 user.last_login = datetime.utcnow()
-                self.logger.info(f"Successfully updated last login timestamp for user ID: {user_id}")
+
+                # Add IP and user agent if provided
+                context_data = {
+                    "event_type": "user_login_updated", 
+                    "user_id": user_id
+                }
+                if ip_address:
+                    context_data["ip_address"] = ip_address
+                if user_agent:
+                    context_data["user_agent"] = user_agent
+
+                self.logger.info(
+                    "Successfully updated last login timestamp",
+                    extra=context_data
+                )
                 return True
         except RepositoryError as e:
-            self.logger.error(f"Error updating last login for user ID {user_id}: {sanitize_exception(e)}")
+            error_msg = sanitize_exception(e)
+            self.logger.error(
+                f"Error updating last login: {error_msg}",
+                extra={
+                    "event_type": "user_login_update_error",
+                    "user_id": user_id,
+                    "error_type": type(e).__name__
+                }
+            )
             return False
 
-    def add_role(self, user_id: int, role_name: str) -> bool:
+    def add_role(self, user_id: int, role_name: str, source_ip: str = None, user_agent: str = None) -> bool:
         """
         Add a role to a user.
 
         Args:
             user_id: The ID of the user.
             role_name: The name of the role to add.
+            source_ip: Optional IP address of the client making the request
+            user_agent: Optional user agent of the client making the request
 
         Returns:
             True if the role was added successfully, False otherwise.
         """
-        self.logger.info(f"Adding role '{role_name}' to user ID: {user_id}")
+        self.logger.info(
+            f"Adding role to user",
+            extra={
+                "event_type": "role_assignment_request",
+                "user_id": user_id,
+                "role": role_name
+            }
+        )
         try:
             with self.session_scope() as session:
                 user = session.query(UserModel).get(user_id)
                 if user is None:
-                    self.logger.warning(f"Failed to add role - user not found with ID: {user_id}")
+                    self.logger.warning(
+                        "Failed to add role - user not found",
+                        extra={
+                            "event_type": "role_assignment_failed",
+                            "user_id": user_id,
+                            "role": role_name,
+                            "reason": "user_not_found"
+                        }
+                    )
                     return False
 
-                # Log with redaction since username is sensitive
+                
                 result = redact_log_message(
                     f"Adding role '{role_name}' to user {user.username} (ID: {user_id})",
                     custom_data={"username": [user.username]}
                 )
-                self.logger.info(result.message)
+                self.logger.info(
+                    result.message,
+                    extra={
+                        "event_type": "role_assignment_processing",
+                        "user_id": user_id,
+                        "role": role_name,
+                        "redacted": True,
+                        "redacted_fields": result.redacted_fields
+                    }
+                )
 
                 role = session.query(RoleModel).filter(RoleModel.name == role_name).first()
                 if role is None:
                     # Create the role if it doesn't exist
-                    self.logger.info(f"Role '{role_name}' not found, creating new role")
+                    self.logger.info(
+                        f"Role not found, creating new role",
+                        extra={
+                            "event_type": "role_creation",
+                            "role": role_name
+                        }
+                    )
                     role = RoleModel(name=role_name)
                     session.add(role)
                     session.flush()
@@ -230,68 +426,156 @@ class SqlAlchemyUserRepository(BaseSqlAlchemyRepository[User, UserModel], UserRe
                 if role not in user.roles:
                     user.roles.append(role)
 
-                    # Log audit event for this security-relevant operation
+                    
+                    audit_data = {"role": role_name, "username": user.username}
+                    if source_ip:
+                        audit_data["source_ip"] = source_ip
+                    if user_agent:
+                        audit_data["user_agent"] = user_agent
+
+                    
                     log_audit_event(
                         event_type="role_assignment",
                         message=f"Role assigned to user",
                         user_id=str(user_id),
-                        custom_data={"role": role_name, "username": user.username}
+                        custom_data=audit_data
                     )
 
-                    self.logger.info(f"Successfully added role '{role_name}' to user ID: {user_id}")
+                    self.logger.info(
+                        "Successfully added role to user",
+                        extra={
+                            "event_type": "role_assignment_success",
+                            "user_id": user_id,
+                            "role": role_name
+                        }
+                    )
                 else:
-                    self.logger.info(f"User ID {user_id} already has role '{role_name}'")
+                    self.logger.info(
+                        "User already has role",
+                        extra={
+                            "event_type": "role_assignment_skipped",
+                            "user_id": user_id,
+                            "role": role_name,
+                            "reason": "already_assigned"
+                        }
+                    )
 
                 return True
         except RepositoryError as e:
-            self.logger.error(f"Error adding role '{role_name}' to user ID {user_id}: {sanitize_exception(e)}")
+            error_msg = sanitize_exception(e)
+            self.logger.error(
+                f"Error adding role to user: {error_msg}",
+                extra={
+                    "event_type": "role_assignment_error",
+                    "user_id": user_id,
+                    "role": role_name,
+                    "error_type": type(e).__name__
+                }
+            )
             return False
 
-    def remove_role(self, user_id: int, role_name: str) -> bool:
+    def remove_role(self, user_id: int, role_name: str, source_ip: str = None, user_agent: str = None) -> bool:
         """
         Remove a role from a user.
 
         Args:
             user_id: The ID of the user.
             role_name: The name of the role to remove.
+            source_ip: Optional IP address of the client making the request
+            user_agent: Optional user agent of the client making the request
 
         Returns:
             True if the role was removed successfully, False otherwise.
         """
-        self.logger.info(f"Removing role '{role_name}' from user ID: {user_id}")
+        self.logger.info(
+            "Removing role from user",
+            extra={
+                "event_type": "role_removal_request",
+                "user_id": user_id,
+                "role": role_name
+            }
+        )
         try:
             with self.session_scope() as session:
                 user = session.query(UserModel).get(user_id)
                 if user is None:
-                    self.logger.warning(f"Failed to remove role - user not found with ID: {user_id}")
+                    self.logger.warning(
+                        "Failed to remove role - user not found",
+                        extra={
+                            "event_type": "role_removal_failed",
+                            "user_id": user_id,
+                            "role": role_name,
+                            "reason": "user_not_found"
+                        }
+                    )
                     return False
 
-                # Log with redaction since username is sensitive
+                
                 result = redact_log_message(
                     f"Removing role '{role_name}' from user {user.username} (ID: {user_id})",
                     custom_data={"username": [user.username]}
                 )
-                self.logger.info(result.message)
+                self.logger.info(
+                    result.message,
+                    extra={
+                        "event_type": "role_removal_processing",
+                        "user_id": user_id,
+                        "role": role_name,
+                        "redacted": True,
+                        "redacted_fields": result.redacted_fields
+                    }
+                )
 
                 role = session.query(RoleModel).filter(RoleModel.name == role_name).first()
                 if role is None or role not in user.roles:
-                    self.logger.info(f"Role '{role_name}' not found for user ID: {user_id}")
+                    self.logger.info(
+                        "Role not found for user",
+                        extra={
+                            "event_type": "role_removal_failed",
+                            "user_id": user_id,
+                            "role": role_name,
+                            "reason": "role_not_assigned"
+                        }
+                    )
                     return False
 
                 user.roles.remove(role)
 
-                # Log audit event for this security-relevant operation
+                
+                audit_data = {"role": role_name, "username": user.username}
+                if source_ip:
+                    audit_data["source_ip"] = source_ip
+                if user_agent:
+                    audit_data["user_agent"] = user_agent
+
+                
                 log_audit_event(
                     event_type="role_removal",
                     message=f"Role removed from user",
                     user_id=str(user_id),
-                    custom_data={"role": role_name, "username": user.username}
+                    custom_data=audit_data
                 )
 
-                self.logger.info(f"Successfully removed role '{role_name}' from user ID: {user_id}")
+                self.logger.info(
+                    "Successfully removed role from user",
+                    extra={
+                        "event_type": "role_removal_success",
+                        "user_id": user_id,
+                        "role": role_name
+                    }
+                )
                 return True
         except RepositoryError as e:
-            self.logger.error(f"Error removing role '{role_name}' from user ID {user_id}: {sanitize_exception(e)}")
+            error_msg = sanitize_exception(e)
+            self.logger.error(
+                f"Error removing role from user: {error_msg}",
+                extra={
+                    "event_type": "role_removal_error",
+                    "user_id": user_id,
+                    "role": role_name,
+                    "error_type": type(e).__name__
+                }
+            )
             return False
 
     def get_users_by_role(self, role_name: str) -> List[User]:
@@ -304,115 +588,244 @@ class SqlAlchemyUserRepository(BaseSqlAlchemyRepository[User, UserModel], UserRe
         Returns:
             A list of users with the specified role.
         """
-        self.logger.info(f"Retrieving users with role: {role_name}")
+        self.logger.info(
+            "Retrieving users with role",
+            extra={
+                "event_type": "users_by_role_lookup",
+                "role": role_name
+            }
+        )
         try:
             role = self._session.query(RoleModel).filter(RoleModel.name == role_name).first()
             if role is None:
-                self.logger.info(f"Role '{role_name}' not found")
+                self.logger.info(
+                    "Role not found",
+                    extra={
+                        "event_type": "users_by_role_lookup_failed",
+                        "role": role_name,
+                        "reason": "role_not_found"
+                    }
+                )
                 return []
 
             users = self._session.query(UserModel).filter(UserModel.roles.contains(role)).all()
             user_count = len(users)
 
             # Don't log usernames directly, just the count
-            self.logger.info(f"Found {user_count} users with role '{role_name}'")
+            self.logger.info(
+                f"Found users with role",
+                extra={
+                    "event_type": "users_by_role_lookup_success",
+                    "role": role_name,
+                    "user_count": user_count
+                }
+            )
 
             return [self._to_domain(user) for user in users]
         except SQLAlchemyError as e:
             error_msg = sanitize_exception(e)
-            self.logger.error(f"Error retrieving users by role '{role_name}': {error_msg}")
+            self.logger.error(
+                f"Error retrieving users by role: {error_msg}",
+                extra={
+                    "event_type": "users_by_role_lookup_error",
+                    "role": role_name,
+                    "error_type": type(e).__name__
+                }
+            )
             return []
 
-    def activate_user(self, user_id: int) -> bool:
+    def activate_user(self, user_id: int, source_ip: str = None, user_agent: str = None) -> bool:
         """
         Activate a user account.
 
         Args:
             user_id: The ID of the user to activate.
+            source_ip: Optional IP address of the client making the request
+            user_agent: Optional user agent of the client making the request
 
         Returns:
             True if the activation was successful, False otherwise.
         """
-        self.logger.info(f"Activating user account with ID: {user_id}")
+        self.logger.info(
+            "Activating user account",
+            extra={
+                "event_type": "account_activation_request",
+                "user_id": user_id
+            }
+        )
         try:
             with self.session_scope() as session:
                 user = session.query(UserModel).get(user_id)
                 if user is None:
-                    self.logger.warning(f"Failed to activate user - user not found with ID: {user_id}")
+                    self.logger.warning(
+                        "Failed to activate user - user not found",
+                        extra={
+                            "event_type": "account_activation_failed",
+                            "user_id": user_id,
+                            "reason": "user_not_found"
+                        }
+                    )
                     return False
 
-                # Log with redaction since username is sensitive
+                
                 result = redact_log_message(
                     f"Activating account for user {user.username} (ID: {user_id})",
                     custom_data={"username": [user.username]}
                 )
-                self.logger.info(result.message)
+                self.logger.info(
+                    result.message,
+                    extra={
+                        "event_type": "account_activation_processing",
+                        "user_id": user_id,
+                        "redacted": True,
+                        "redacted_fields": result.redacted_fields
+                    }
+                )
 
                 # Only activate if not already active
                 if user.is_active:
-                    self.logger.info(f"User account with ID {user_id} is already active")
+                    self.logger.info(
+                        "User account is already active",
+                        extra={
+                            "event_type": "account_activation_skipped",
+                            "user_id": user_id,
+                            "reason": "already_active"
+                        }
+                    )
                     return True
 
                 user.is_active = True
 
-                # Log audit event for this security-relevant operation
+                
+                audit_data = {"username": user.username}
+                if source_ip:
+                    audit_data["source_ip"] = source_ip
+                if user_agent:
+                    audit_data["user_agent"] = user_agent
+
+                
                 log_audit_event(
                     event_type="account_activation",
                     message=f"User account activated",
                     user_id=str(user_id),
-                    custom_data={"username": user.username}
+                    custom_data=audit_data
                 )
 
-                self.logger.info(f"Successfully activated user account with ID: {user_id}")
+                self.logger.info(
+                    "Successfully activated user account",
+                    extra={
+                        "event_type": "account_activation_success",
+                        "user_id": user_id
+                    }
+                )
                 return True
         except RepositoryError as e:
-            self.logger.error(f"Error activating user account with ID {user_id}: {sanitize_exception(e)}")
+            error_msg = sanitize_exception(e)
+            self.logger.error(
+                f"Error activating user account: {error_msg}",
+                extra={
+                    "event_type": "account_activation_error",
+                    "user_id": user_id,
+                    "error_type": type(e).__name__
+                }
+            )
             return False
 
-    def deactivate_user(self, user_id: int) -> bool:
+    def deactivate_user(self, user_id: int, source_ip: str = None, user_agent: str = None) -> bool:
         """
         Deactivate a user account.
 
         Args:
             user_id: The ID of the user to deactivate.
+            source_ip: Optional IP address of the client making the request
+            user_agent: Optional user agent of the client making the request
 
         Returns:
             True if the deactivation was successful, False otherwise.
         """
-        self.logger.info(f"Deactivating user account with ID: {user_id}")
+        self.logger.info(
+            "Deactivating user account",
+            extra={
+                "event_type": "account_deactivation_request",
+                "user_id": user_id
+            }
+        )
         try:
             with self.session_scope() as session:
                 user = session.query(UserModel).get(user_id)
                 if user is None:
-                    self.logger.warning(f"Failed to deactivate user - user not found with ID: {user_id}")
+                    self.logger.warning(
+                        "Failed to deactivate user - user not found",
+                        extra={
+                            "event_type": "account_deactivation_failed",
+                            "user_id": user_id,
+                            "reason": "user_not_found"
+                        }
+                    )
                     return False
 
-                # Log with redaction since username is sensitive
+                
                 result = redact_log_message(
                     f"Deactivating account for user {user.username} (ID: {user_id})",
                     custom_data={"username": [user.username]}
                 )
-                self.logger.info(result.message)
+                self.logger.info(
+                    result.message,
+                    extra={
+                        "event_type": "account_deactivation_processing",
+                        "user_id": user_id,
+                        "redacted": True,
+                        "redacted_fields": result.redacted_fields
+                    }
+                )
 
                 # Only deactivate if not already inactive
                 if not user.is_active:
-                    self.logger.info(f"User account with ID {user_id} is already inactive")
+                    self.logger.info(
+                        "User account is already inactive",
+                        extra={
+                            "event_type": "account_deactivation_skipped",
+                            "user_id": user_id,
+                            "reason": "already_inactive"
+                        }
+                    )
                     return True
 
                 user.is_active = False
 
-                # Log audit event for this security-relevant operation
+                
+                audit_data = {"username": user.username}
+                if source_ip:
+                    audit_data["source_ip"] = source_ip
+                if user_agent:
+                    audit_data["user_agent"] = user_agent
+
+                
                 log_audit_event(
                     event_type="account_deactivation",
                     message=f"User account deactivated",
                     user_id=str(user_id),
-                    custom_data={"username": user.username}
+                    custom_data=audit_data
                 )
 
-                self.logger.info(f"Successfully deactivated user account with ID: {user_id}")
+                self.logger.info(
+                    "Successfully deactivated user account",
+                    extra={
+                        "event_type": "account_deactivation_success",
+                        "user_id": user_id
+                    }
+                )
                 return True
         except RepositoryError as e:
-            self.logger.error(f"Error deactivating user account with ID {user_id}: {sanitize_exception(e)}")
+            error_msg = sanitize_exception(e)
+            self.logger.error(
+                f"Error deactivating user account: {error_msg}",
+                extra={
+                    "event_type": "account_deactivation_error",
+                    "user_id": user_id,
+                    "error_type": type(e).__name__
+                }
+            )
             return False
 
     def _to_domain(self, model: UserModel) -> User:
@@ -426,8 +839,14 @@ class SqlAlchemyUserRepository(BaseSqlAlchemyRepository[User, UserModel], UserRe
             The domain entity.
         """
         try:
-            # Log with minimal information to avoid exposing sensitive data
-            self.logger.debug(f"Converting user model to domain entity, ID: {model.id}")
+            
+            self.logger.debug(
+                "Converting user model to domain entity",
+                extra={
+                    "event_type": "model_to_domain_conversion",
+                    "user_id": model.id
+                }
+            )
 
             user = User(
                 id=model.id,
@@ -448,14 +867,29 @@ class SqlAlchemyUserRepository(BaseSqlAlchemyRepository[User, UserModel], UserRe
                 user._roles.append(role.name)
                 role_names.append(role.name)
 
-            # Log roles without exposing username or other sensitive data
+            
             if role_names:
-                self.logger.debug(f"User ID {model.id} has roles: {', '.join(role_names)}")
+                self.logger.debug(
+                    "User roles loaded",
+                    extra={
+                        "event_type": "user_roles_loaded",
+                        "user_id": model.id,
+                        "role_count": len(role_names),
+                        "roles": role_names
+                    }
+                )
 
             return user
         except Exception as e:
             error_msg = sanitize_exception(e)
-            self.logger.error(f"Error converting user model to domain entity: {error_msg}")
+            self.logger.error(
+                f"Error converting user model to domain entity: {error_msg}",
+                extra={
+                    "event_type": "model_to_domain_conversion_error",
+                    "user_id": model.id if model else None,
+                    "error_type": type(e).__name__
+                }
+            )
             raise
 
     def _to_model(self, entity: User) -> UserModel:
@@ -469,9 +903,15 @@ class SqlAlchemyUserRepository(BaseSqlAlchemyRepository[User, UserModel], UserRe
             The SQLAlchemy model.
         """
         try:
-            # Log with minimal information to avoid exposing sensitive data
+            
             user_id = entity.id if entity.id is not None else "new user"
-            self.logger.debug(f"Converting user domain entity to model, ID: {user_id}")
+            self.logger.debug(
+                "Converting user domain entity to model",
+                extra={
+                    "event_type": "domain_to_model_conversion",
+                    "user_id": user_id
+                }
+            )
 
             model = UserModel(
                 username=entity.username,
@@ -486,14 +926,29 @@ class SqlAlchemyUserRepository(BaseSqlAlchemyRepository[User, UserModel], UserRe
             if entity.id is not None:
                 model.id = entity.id
 
-            # Log roles without exposing username or other sensitive data
+            
             if entity.roles:
-                self.logger.debug(f"User has roles: {', '.join(entity.roles)}")
+                self.logger.debug(
+                    "User roles included in model",
+                    extra={
+                        "event_type": "user_roles_included",
+                        "user_id": user_id,
+                        "role_count": len(entity.roles),
+                        "roles": entity.roles
+                    }
+                )
 
             return model
         except Exception as e:
             error_msg = sanitize_exception(e)
-            self.logger.error(f"Error converting user domain entity to model: {error_msg}")
+            self.logger.error(
+                f"Error converting user domain entity to model: {error_msg}",
+                extra={
+                    "event_type": "domain_to_model_conversion_error",
+                    "user_id": entity.id if entity and hasattr(entity, 'id') else None,
+                    "error_type": type(e).__name__
+                }
+            )
             raise
 
     def _update_model(self, model: UserModel, entity: User) -> None:
@@ -505,31 +960,70 @@ class SqlAlchemyUserRepository(BaseSqlAlchemyRepository[User, UserModel], UserRe
             entity: The domain entity with updated values.
         """
         try:
-            # Log with minimal information to avoid exposing sensitive data
-            self.logger.debug(f"Updating user model from domain entity, ID: {model.id}")
+            
+            self.logger.debug(
+                "Updating user model from domain entity",
+                extra={
+                    "event_type": "user_model_update",
+                    "user_id": model.id
+                }
+            )
 
-            # Check if username is changing
+            
             if model.username != entity.username:
                 result = redact_log_message(
                     f"Changing username from {model.username} to {entity.username} for user ID: {model.id}",
                     custom_data={"username": [model.username, entity.username]}
                 )
-                self.logger.info(result.message)
+                self.logger.info(
+                    result.message,
+                    extra={
+                        "event_type": "username_change",
+                        "user_id": model.id,
+                        "redacted": True,
+                        "redacted_fields": result.redacted_fields
+                    }
+                )
 
-            # Check if email is changing
+            
             if model.email != entity.email:
                 result = redact_log_message(
                     f"Changing email from {model.email} to {entity.email} for user ID: {model.id}",
                     custom_data={"email": [model.email, entity.email]}
                 )
-                self.logger.info(result.message)
+                self.logger.info(
+                    result.message,
+                    extra={
+                        "event_type": "email_change",
+                        "user_id": model.id,
+                        "redacted": True,
+                        "redacted_fields": result.redacted_fields
+                    }
+                )
 
-            # Check if active status is changing
+            
+            if model.password_hash != entity._password_hash:
+                self.logger.info(
+                    "Password hash changed",
+                    extra={
+                        "event_type": "password_change",
+                        "user_id": model.id
+                    }
+                )
+
+            
             if model.is_active != entity.is_active:
                 new_status = "active" if entity.is_active else "inactive"
-                self.logger.info(f"Changing user status to {new_status} for user ID: {model.id}")
+                self.logger.info(
+                    "Changing user status",
+                    extra={
+                        "event_type": "status_change",
+                        "user_id": model.id,
+                        "new_status": new_status
+                    }
+                )
 
-            # Update the model
+            
             model.username = entity.username
             model.email = entity.email
             model.password_hash = entity._password_hash
@@ -537,7 +1031,7 @@ class SqlAlchemyUserRepository(BaseSqlAlchemyRepository[User, UserModel], UserRe
             model.updated_at = datetime.utcnow()
             model.last_login = entity.last_login
 
-            # Get current roles for comparison
+            
             current_roles = [role.name for role in model.roles]
             new_roles = entity.roles
 
@@ -546,25 +1040,57 @@ class SqlAlchemyUserRepository(BaseSqlAlchemyRepository[User, UserModel], UserRe
             removed_roles = [role for role in current_roles if role not in new_roles]
 
             if added_roles:
-                self.logger.info(f"Adding roles to user ID {model.id}: {', '.join(added_roles)}")
+                self.logger.info(
+                    "Adding roles to user",
+                    extra={
+                        "event_type": "roles_added",
+                        "user_id": model.id,
+                        "roles": added_roles
+                    }
+                )
 
             if removed_roles:
-                self.logger.info(f"Removing roles from user ID {model.id}: {', '.join(removed_roles)}")
+                self.logger.info(
+                    "Removing roles from user",
+                    extra={
+                        "event_type": "roles_removed",
+                        "user_id": model.id,
+                        "roles": removed_roles
+                    }
+                )
 
-            # Update roles
+            
             model.roles = []
             for role_name in entity.roles:
                 role = self._session.query(RoleModel).filter(RoleModel.name == role_name).first()
                 if role is None:
-                    self.logger.info(f"Creating new role: {role_name}")
+                    self.logger.info(
+                        "Creating new role",
+                        extra={
+                            "event_type": "role_creation",
+                            "role": role_name
+                        }
+                    )
                     role = RoleModel(name=role_name)
                     self._session.add(role)
                     self._session.flush()
-
                 model.roles.append(role)
 
-            self.logger.debug(f"Successfully updated user model for ID: {model.id}")
+            self.logger.debug(
+                "Successfully updated user model",
+                extra={
+                    "event_type": "user_model_update_success",
+                    "user_id": model.id
+                }
+            )
         except Exception as e:
             error_msg = sanitize_exception(e)
-            self.logger.error(f"Error updating user model: {error_msg}")
+            self.logger.error(
+                f"Error updating user model: {error_msg}",
+                extra={
+                    "event_type": "user_model_update_error",
+                    "user_id": model.id if model else None,
+                    "error_type": type(e).__name__
+                }
+            )
             raise

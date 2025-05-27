@@ -7,6 +7,20 @@ from itertools import cycle
 from domain.models.WatcherHeartbeat import WatcherHeartbeatModel
 from domain.models.Base import Base
 from domain.models.db import engine, Session
+import argparse
+import os
+import subprocess
+import sys
+import warnings
+
+
+# Display deprecation warning
+warnings.warn(
+    "This seed.py file is deprecated and will be removed in a future version. "
+    "Please use tmp_seeder_directory/seed_manager.py instead.",
+    DeprecationWarning, 
+    stacklevel=2
+)
 
 
 def get_test_date():
@@ -157,8 +171,15 @@ def seed_data(session):
             is_active=True
         )
         session.add(employee)
-        session.commit()  # Commit to get the employee id
-        employees[employee.name] = employee
+
+    # Commit once after adding all employees
+    session.commit()
+
+    # Retrieve the employees with their IDs
+    for employee_data in employees_data:
+        employee = session.query(EmployeeModel).filter_by(name=employee_data["name"]).first()
+        if employee:
+            employees[employee.name] = employee
 
     # Fetch the desired group for headsub team (for example, Short Block)
     group = session.query(GroupModel).filter_by(name="Short Block").first()
@@ -206,9 +227,20 @@ def seed_data(session):
 
     # Add workstations
     workstations = {}
+
+    # Get all line types at once to avoid multiple queries
+    line_types = {
+        line_type.name: line_type 
+        for line_type in session.query(LineTypeModel).all()
+    }
+
+    # Create all workstations
     for ws_data in workstations_data:
-        # Get the line type ID
-        line_type = session.query(LineTypeModel).filter_by(name=ws_data["line_type"]).first()
+        # Get the line type
+        line_type = line_types.get(ws_data["line_type"])
+        if not line_type:
+            print(f"Warning: Line type '{ws_data['line_type']}' not found. Skipping workstation '{ws_data['name']}'.")
+            continue
 
         workstation = WorkstationModel(
             name=ws_data["name"],
@@ -219,8 +251,15 @@ def seed_data(session):
             team_id=headsub_team.id  # Assign to headsub team
         )
         session.add(workstation)
-        session.commit()  # Commit to get the workstation id
-        workstations[ws_data["name"]] = workstation
+
+    # Commit once after adding all workstations
+    session.commit()
+
+    # Retrieve the workstations with their IDs
+    for ws_data in workstations_data:
+        workstation = session.query(WorkstationModel).filter_by(name=ws_data["name"]).first()
+        if workstation:
+            workstations[ws_data["name"]] = workstation
 
     # Create WatcherHeartbeat table if it doesn't exist
     from sqlalchemy import inspect
@@ -234,8 +273,13 @@ def seed_data(session):
     fake_dates = cycle([get_test_date() + timedelta(days=i) for i in range(5)])
 
     # Add EmployeeWorkstation entries using the universal test date
+    employee_workstation_count = 0
     for employee_data in employees_data:
-        employee = employees[employee_data["name"]]
+        employee = employees.get(employee_data["name"])
+        if not employee:
+            print(f"Warning: Employee '{employee_data['name']}' not found. Skipping workstation assignments.")
+            continue
+
         known_stations = employee_data.get("known_stations", "").split(',')
 
         if known_stations == ['']:
@@ -254,15 +298,104 @@ def seed_data(session):
                     last_worked_date=last_worked_date
                 )
                 session.add(employee_workstation)
+                employee_workstation_count += 1
+            else:
+                print(f"Warning: Workstation '{station_name}' not found for employee '{employee_data['name']}'. Skipping assignment.")
+
+    # Commit once after adding all employee-workstation relationships
     session.commit()
+    print(f"Added {employee_workstation_count} employee-workstation relationships.")
     print(f"Added {len(employees_data)} employees to the {headsub_team.name} team.")
 
 
+def use_seed_manager(department='all', reset_db=False, dry_run=False):
+    """
+    Use the new seed_manager.py script instead of this deprecated script.
+
+    Args:
+        department: Department to seed ('all', 'powertrain', etc.)
+        reset_db: Whether to reset the database before seeding
+        dry_run: If True, print commands but don't execute them
+
+    Returns:
+        True if successful, False otherwise
+    """
+    # Build command
+    cmd = [
+        sys.executable, os.path.join("tmp_seeder_directory", "seed_manager.py"),
+        "--department", department
+    ]
+
+    if reset_db:
+        cmd.append("--reset-db")
+
+    # Print command
+    print(f"Using seed_manager.py with command: {' '.join(cmd)}")
+
+    # Execute command if not a dry run
+    if not dry_run:
+        try:
+            result = subprocess.run(cmd, check=True)
+            print(f"Database seeding completed with exit code: {result.returncode}")
+            return True
+        except subprocess.CalledProcessError as e:
+            print(f"Error seeding database: {e}", file=sys.stderr)
+            return False
+
+    return True
+
+
+def parse_arguments():
+    """
+    Parse command line arguments.
+
+    Returns:
+        argparse.Namespace: The parsed arguments
+    """
+    parser = argparse.ArgumentParser(description='Seed the database with initial data')
+    parser.add_argument('--use-seed-manager', action='store_true', 
+                        help='Use the new seed_manager.py script instead (recommended)')
+    parser.add_argument('--department', type=str, 
+                        choices=['all', 'powertrain', 'trim', 'paint', 'body', 'materials', 'ipc'],
+                        default='all', help='Department to seed (only used with --use-seed-manager)')
+    parser.add_argument('--reset-db', action='store_true', help='Reset the database before seeding')
+    parser.add_argument('--dry-run', action='store_true', help='Print commands but do not execute them')
+
+    return parser.parse_args()
+
+
 if __name__ == "__main__":
-    # Reset and seed the database
-    reset_database()
+    # Parse arguments
+    args = parse_arguments()
+
+    # Check if we should use seed_manager.py
+    if args.use_seed_manager:
+        print("Using seed_manager.py as requested...")
+        success = use_seed_manager(
+            department=args.department,
+            reset_db=args.reset_db,
+            dry_run=args.dry_run
+        )
+        sys.exit(0 if success else 1)
+
+    # Display deprecation warning again
+    print("WARNING: This seed.py script is deprecated. Please use tmp_seeder_directory/seed_manager.py instead.")
+    print("You can use the --use-seed-manager flag to automatically use the new script.")
+    print()
+
+    # Reset the database if requested
+    if args.reset_db:
+        reset_database()
+
     # Create a session
     session = Session()
-    # Seed the database
-    seed_data(session)
-    print("Database seeding complete.")
+
+    try:
+        # Seed the database
+        seed_data(session)
+        print("Database seeding complete.")
+    except Exception as e:
+        print(f"Error seeding database: {e}", file=sys.stderr)
+        sys.exit(1)
+    finally:
+        session.close()

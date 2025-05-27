@@ -17,10 +17,9 @@ class EmployeeModel(Base):
     team_id = Column(Integer, nullable=False)
     is_active = Column(Boolean, default=True)
 
-    # Restore relationships
     workstations = relationship('EmployeeWorkstationModel', back_populates='employee')
     work_history = relationship('EmployeeWorkHistoryModel', back_populates='employee')
-    availability = relationship('EmployeeAvailabilityModel', back_populates='employee')  # Changed from EmployeeAvailability
+    availability = relationship('EmployeeAvailabilityModel', back_populates='employee')
     teams = relationship('TeamMemberModel', back_populates='employee')
     station_skills = relationship('EmployeeStationSkillModel', back_populates='employee')
 

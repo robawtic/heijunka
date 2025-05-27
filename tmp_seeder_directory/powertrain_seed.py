@@ -150,7 +150,7 @@ def seed_powertrain_data(session):
     workstation_objects = {}
 
     # Load workstation data for Shortblock group teams
-    shortblock_teams = ['shortblock', 'headsub', 'camsub']
+    shortblock_teams = ['shortblock', 'headsub', 'internal']
 
     for team_name in shortblock_teams:
         print(f"Loading workstation data for {team_name} team...")

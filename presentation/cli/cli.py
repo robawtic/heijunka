@@ -19,6 +19,10 @@ from domain.repositories.implementations.sqlalchemy_assignment_repository import
 from domain.repositories.implementations.sqlalchemy_employee_work_history_repository import SqlAlchemyEmployeeWorkHistoryRepository
 from domain.repositories.implementations.sqlalchemy_schedule_repository import SqlAlchemyScheduleRepository
 from domain.services.schedule_service import ScheduleService
+from utilities.logging_factory import get_logger
+
+# Create a logger for this module
+logger = get_logger("presentation.cli")
 
 
 
@@ -93,7 +97,7 @@ def parse_arguments():
     team_group.add_argument('--team', type=str, help='Team name')
     team_group.add_argument('--group', type=str, help='Group name (generates schedules for all teams in the group)')
     team_group.add_argument('--department', type=str, help='Department name (generates schedules for all teams in the department)')
-    generate_parser.add_argument('--start-date', type=str, default=date.today(), help='Start date for the schedule')
+    generate_parser.add_argument('--start-date', type=str, default=date.today().isoformat(), help='Start date for the schedule (YYYY-MM-DD)')
     generate_parser.add_argument('--periods', type=int, default=4, help='Number of periods per day')
     generate_parser.add_argument('--call-ins', type=str, nargs='*', help='Employees calling in')
     generate_parser.add_argument('--offline', type=str, nargs='*', help='Employees offline for specific periods in format "employee:periods" (e.g., "John:1,2")')
@@ -299,14 +303,17 @@ def handle_aro_assignment(args, session, aro_service=None, aro_graph_service=Non
         aro_service: Optional ARO service instance (if None, a new one will be created)
         aro_graph_service: Optional ARO graph service instance
     """
+    logger.info(f"Handling ARO {args.aro_command} command", event_type="aro_assignment", identifier=args.aro_command)
     try:
         # Setup repositories
+        logger.debug("Setting up repositories for ARO assignment", event_type="aro_assignment", identifier="setup")
         employee_repository = SqlAlchemyEmployeeRepository(session)
         team_repository = SqlAlchemyTeamRepository(session)
         workstation_repository = SqlAlchemyWorkstationRepository(session)
 
         # Use the provided ARO service or create a new one
         if aro_service is None:
+            logger.debug("Creating ARO service", event_type="aro_assignment", identifier="service_creation")
             from domain.repositories.implementations.sqlalchemy_aro_assignment_repository import SqlAlchemyAROAssignmentRepository
             aro_repository = SqlAlchemyAROAssignmentRepository(session)
             from domain.services.aro_service import AROService
@@ -314,8 +321,11 @@ def handle_aro_assignment(args, session, aro_service=None, aro_graph_service=Non
 
         # Handle ARO optimize command
         if args.aro_command == 'optimize':
+            logger.info("Handling ARO optimize command", event_type="aro_optimize", identifier="start")
+
             # Create ARO graph service if not provided
             if aro_graph_service is None:
+                logger.debug("Creating ARO graph service", event_type="aro_optimize", identifier="service_creation")
                 from domain.repositories.implementations.sqlalchemy_aro_assignment_repository import SqlAlchemyAROAssignmentRepository
                 aro_repository = SqlAlchemyAROAssignmentRepository(session)
                 from domain.services.aro_graph_service import AROGraphService
@@ -328,19 +338,28 @@ def handle_aro_assignment(args, session, aro_service=None, aro_graph_service=Non
                 )
 
             # Get team by name
+            logger.debug(f"Looking up team: {args.team}", event_type="aro_optimize", identifier="team_lookup")
             team = team_repository.get_by_name(args.team)
             if not team:
-                print(f"Error: Team '{args.team}' not found", file=sys.stderr)
+                error_msg = f"Error: Team '{args.team}' not found"
+                logger.error(error_msg, event_type="aro_optimize", identifier="team_lookup")
+                print(error_msg, file=sys.stderr)
                 return False
 
             # Parse date
+            logger.debug(f"Parsing date: {args.date}", event_type="aro_optimize", identifier="date_parsing")
             try:
                 assignment_date = datetime.strptime(args.date, "%Y-%m-%d").date()
             except ValueError:
-                print(f"Error: Invalid date format. Use YYYY-MM-DD", file=sys.stderr)
+                error_msg = f"Error: Invalid date format. Use YYYY-MM-DD"
+                logger.error(error_msg, event_type="aro_optimize", identifier="date_parsing")
+                print(error_msg, file=sys.stderr)
                 return False
 
             # Assign optimal AROs
+            logger.info(f"Assigning {args.count} optimal AROs to team {args.team}", 
+                       event_type="aro_optimize", identifier="assignment",
+                       extra={"team_id": team.id, "count": args.count, "date": str(assignment_date), "period": args.period})
             assignments = aro_graph_service.assign_optimal_aros(
                 understaffed_team_id=team.id,
                 needed_aros=args.count,
@@ -349,7 +368,10 @@ def handle_aro_assignment(args, session, aro_service=None, aro_graph_service=Non
             )
 
             if assignments:
-                print(f"Successfully assigned {len(assignments)} AROs to team {args.team}.")
+                success_msg = f"Successfully assigned {len(assignments)} AROs to team {args.team}."
+                logger.info(success_msg, event_type="aro_optimize", identifier="success", 
+                           extra={"assigned_count": len(assignments)})
+                print(success_msg)
 
                 # Display the assignments
                 for assignment in assignments:
@@ -362,90 +384,142 @@ def handle_aro_assignment(args, session, aro_service=None, aro_graph_service=Non
                     to_team_name = to_team.name if to_team else f"Team {assignment.to_team_id}"
 
                     period_str = f" for period {assignment.period}" if assignment.period else " for the full day"
-                    print(f"- {employee_name} from {from_team_name} to {to_team_name}{period_str}")
+                    assignment_detail = f"- {employee_name} from {from_team_name} to {to_team_name}{period_str}"
+                    logger.debug(assignment_detail, event_type="aro_optimize", identifier="assignment_detail",
+                                extra={"employee_id": assignment.employee_id, "from_team_id": assignment.from_team_id, 
+                                      "to_team_id": assignment.to_team_id, "period": assignment.period})
+                    print(assignment_detail)
 
                 return True
             else:
-                print(f"Could not find suitable AROs for team {args.team}.")
+                error_msg = f"Could not find suitable AROs for team {args.team}."
+                logger.warning(error_msg, event_type="aro_optimize", identifier="no_assignments")
+                print(error_msg)
                 return False
 
         # For other commands, we need an employee
         if args.aro_command != 'optimize':
+            logger.debug(f"Processing ARO {args.aro_command} command", event_type=f"aro_{args.aro_command}", identifier="start")
+
             # Get employee by name
+            logger.debug(f"Looking up employee: {args.employee}", event_type=f"aro_{args.aro_command}", identifier="employee_lookup")
             employee = employee_repository.get_by_name(args.employee)
             if not employee:
-                print(f"Error: Employee '{args.employee}' not found", file=sys.stderr)
+                error_msg = f"Error: Employee '{args.employee}' not found"
+                logger.error(error_msg, event_type=f"aro_{args.aro_command}", identifier="employee_lookup")
+                print(error_msg, file=sys.stderr)
                 return False
 
             # Parse date
+            logger.debug(f"Parsing date: {args.date}", event_type=f"aro_{args.aro_command}", identifier="date_parsing")
             try:
                 assignment_date = datetime.strptime(args.date, "%Y-%m-%d").date()
             except ValueError:
-                print(f"Error: Invalid date format. Use YYYY-MM-DD", file=sys.stderr)
+                error_msg = f"Error: Invalid date format. Use YYYY-MM-DD"
+                logger.error(error_msg, event_type=f"aro_{args.aro_command}", identifier="date_parsing")
+                print(error_msg, file=sys.stderr)
                 return False
 
         # Handle ARO assign command
         if args.aro_command == 'assign':
             # Get from team by name
+            logger.debug(f"Looking up from team: {args.from_team}", event_type="aro_assign", identifier="from_team_lookup")
             from_team = team_repository.get_by_name(args.from_team)
             if not from_team:
-                print(f"Error: Team '{args.from_team}' not found", file=sys.stderr)
+                error_msg = f"Error: Team '{args.from_team}' not found"
+                logger.error(error_msg, event_type="aro_assign", identifier="from_team_lookup")
+                print(error_msg, file=sys.stderr)
                 return False
 
             # Get to team by name
+            logger.debug(f"Looking up to team: {args.to_team}", event_type="aro_assign", identifier="to_team_lookup")
             to_team = team_repository.get_by_name(args.to_team)
             if not to_team:
-                print(f"Error: Team '{args.to_team}' not found", file=sys.stderr)
+                error_msg = f"Error: Team '{args.to_team}' not found"
+                logger.error(error_msg, event_type="aro_assign", identifier="to_team_lookup")
+                print(error_msg, file=sys.stderr)
                 return False
 
             # Verify employee belongs to from_team
+            logger.debug(f"Verifying employee {args.employee} belongs to team {args.from_team}", 
+                        event_type="aro_assign", identifier="team_membership")
             if employee.team_id != from_team.id:
-                print(f"Error: Employee '{args.employee}' does not belong to team '{args.from_team}'", file=sys.stderr)
+                error_msg = f"Error: Employee '{args.employee}' does not belong to team '{args.from_team}'"
+                logger.error(error_msg, event_type="aro_assign", identifier="team_membership")
+                print(error_msg, file=sys.stderr)
                 return False
 
             # Assign ARO
+            logger.info(f"Assigning {args.employee} as ARO from {args.from_team} to {args.to_team} on {args.date}", 
+                       event_type="aro_assign", identifier="assignment",
+                       extra={"employee_id": employee.id, "from_team_id": from_team.id, 
+                             "to_team_id": to_team.id, "date": str(assignment_date), "period": args.period})
             result = aro_service.assign_aro(employee.id, to_team.id, assignment_date, args.period)
 
             if result["status"] == "success":
                 period_str = f" for period {args.period}" if args.period else " for the full day"
-                print(f"Successfully assigned {args.employee} as ARO from {args.from_team} to {args.to_team} on {args.date}{period_str}")
+                success_msg = f"Successfully assigned {args.employee} as ARO from {args.from_team} to {args.to_team} on {args.date}{period_str}"
+                logger.info(success_msg, event_type="aro_assign", identifier="success")
+                print(success_msg)
                 return True
             else:
-                print(f"Error: {result['message']}", file=sys.stderr)
+                error_msg = f"Error: {result['message']}"
+                logger.error(error_msg, event_type="aro_assign", identifier="failure", 
+                            extra={"error_details": result.get("details", "")})
+                print(error_msg, file=sys.stderr)
                 return False
 
         # Handle ARO remove command
         elif args.aro_command == 'remove':
             # Find the ARO assignment
+            logger.debug(f"Finding ARO assignment for {args.employee} on {args.date}", 
+                        event_type="aro_remove", identifier="assignment_lookup")
             assignment = aro_service.find_aro_assignment(employee.id, assignment_date, args.period)
             if not assignment:
                 period_str = f" for period {args.period}" if args.period else " for the full day"
-                print(f"Error: No ARO assignment found for {args.employee} on {args.date}{period_str}", file=sys.stderr)
+                error_msg = f"Error: No ARO assignment found for {args.employee} on {args.date}{period_str}"
+                logger.error(error_msg, event_type="aro_remove", identifier="assignment_lookup")
+                print(error_msg, file=sys.stderr)
                 return False
 
             # Get the from and to teams for display
+            logger.debug("Getting team information for ARO assignment", event_type="aro_remove", identifier="team_lookup")
             from_team = team_repository.get(assignment.from_team_id)
             to_team = team_repository.get(assignment.to_team_id)
 
             # Remove the ARO assignment
+            logger.info(f"Removing ARO assignment for {args.employee} on {args.date}", 
+                       event_type="aro_remove", identifier="removal",
+                       extra={"assignment_id": assignment.id, "employee_id": employee.id, 
+                             "from_team_id": assignment.from_team_id, "to_team_id": assignment.to_team_id, 
+                             "date": str(assignment_date), "period": assignment.period})
             result = aro_service.remove_aro_assignment(assignment.id)
 
             if result["status"] == "success":
                 period_str = f" for period {args.period}" if args.period else " for the full day"
                 from_team_name = from_team.name if from_team else f"team {assignment.from_team_id}"
                 to_team_name = to_team.name if to_team else f"team {assignment.to_team_id}"
-                print(f"Successfully removed ARO assignment for {args.employee} from {from_team_name} to {to_team_name} on {args.date}{period_str}")
+                success_msg = f"Successfully removed ARO assignment for {args.employee} from {from_team_name} to {to_team_name} on {args.date}{period_str}"
+                logger.info(success_msg, event_type="aro_remove", identifier="success")
+                print(success_msg)
                 return True
             else:
-                print(f"Error: {result['message']}", file=sys.stderr)
+                error_msg = f"Error: {result['message']}"
+                logger.error(error_msg, event_type="aro_remove", identifier="failure", 
+                            extra={"error_details": result.get("details", "")})
+                print(error_msg, file=sys.stderr)
                 return False
 
         else:
-            print(f"Error: Unknown ARO command '{args.aro_command}'", file=sys.stderr)
+            error_msg = f"Error: Unknown ARO command '{args.aro_command}'"
+            logger.error(error_msg, event_type="aro_assignment", identifier="unknown_command")
+            print(error_msg, file=sys.stderr)
             return False
 
     except Exception as e:
-        print(f"Error handling ARO command: {e}", file=sys.stderr)
+        error_msg = f"Error handling ARO assignment: {e}"
+        logger.error(error_msg, event_type="aro_assignment", identifier="exception", extra={"exception": str(e)})
+        print(error_msg, file=sys.stderr)
         return False
 
 def handle_regression_test(args, session):
@@ -739,40 +813,57 @@ def handle_manual_assignment(args, session):
         args: Command line arguments
         session: Database session
     """
+    logger.info(f"Handling manual assignment: {args.employee} to {args.workstation} on {args.date} for period {args.period}", 
+               event_type="manual_assignment", identifier="start")
     try:
         # Setup repositories
+        logger.debug("Setting up repositories for manual assignment", event_type="manual_assignment", identifier="setup")
         employee_repository = SqlAlchemyEmployeeRepository(session)
         workstation_repository = SqlAlchemyWorkstationRepository(session)
         assignment_repository = SqlAlchemyAssignmentRepository(session)
 
         # Get employee by name
+        logger.debug(f"Looking up employee: {args.employee}", event_type="manual_assignment", identifier="employee_lookup")
         employee = employee_repository.get_by_name(args.employee)
         if not employee:
-            print(f"Error: Employee '{args.employee}' not found", file=sys.stderr)
+            error_msg = f"Error: Employee '{args.employee}' not found"
+            logger.error(error_msg, event_type="manual_assignment", identifier="employee_lookup")
+            print(error_msg, file=sys.stderr)
             return False
 
         # Get workstation by name
+        logger.debug(f"Looking up workstation: {args.workstation}", event_type="manual_assignment", identifier="workstation_lookup")
         workstation = workstation_repository.get_by_name(args.workstation)
         if not workstation:
-            print(f"Error: Workstation '{args.workstation}' not found", file=sys.stderr)
+            error_msg = f"Error: Workstation '{args.workstation}' not found"
+            logger.error(error_msg, event_type="manual_assignment", identifier="workstation_lookup")
+            print(error_msg, file=sys.stderr)
             return False
 
         # Parse date
+        logger.debug(f"Parsing date: {args.date}", event_type="manual_assignment", identifier="date_parsing")
         try:
             assignment_date = datetime.strptime(args.date, "%Y-%m-%d").date()
         except ValueError:
-            print(f"Error: Invalid date format. Use YYYY-MM-DD", file=sys.stderr)
+            error_msg = f"Error: Invalid date format. Use YYYY-MM-DD"
+            logger.error(error_msg, event_type="manual_assignment", identifier="date_parsing")
+            print(error_msg, file=sys.stderr)
             return False
 
         # Validate period
+        logger.debug(f"Validating period: {args.period}", event_type="manual_assignment", identifier="period_validation")
         if args.period < 1 or args.period > 4:
-            print(f"Error: Period must be between 1 and 4", file=sys.stderr)
+            error_msg = f"Error: Period must be between 1 and 4"
+            logger.error(error_msg, event_type="manual_assignment", identifier="period_validation")
+            print(error_msg, file=sys.stderr)
             return False
 
         # Create command handler
+        logger.debug("Creating command handler", event_type="manual_assignment", identifier="handler_creation")
         handler = CreateManualAssignmentHandler(assignment_repository)
 
         # Create command
+        logger.debug("Creating command", event_type="manual_assignment", identifier="command_creation")
         command = CreateManualAssignmentCommand(
             employee_id=employee.id,
             workstation_id=workstation.id,
@@ -782,32 +873,46 @@ def handle_manual_assignment(args, session):
         )
 
         # Handle command
+        logger.debug("Executing command", event_type="manual_assignment", identifier="command_execution")
         success = handler.handle(command)
 
         if success:
-            print(f"Successfully assigned {args.employee} to {args.workstation} on {args.date} for period {args.period}")
+            success_msg = f"Successfully assigned {args.employee} to {args.workstation} on {args.date} for period {args.period}"
+            logger.info(success_msg, event_type="manual_assignment", identifier="success", 
+                       extra={"employee_id": employee.id, "workstation_id": workstation.id, "date": str(assignment_date), "period": args.period})
+            print(success_msg)
             return True
         else:
-            print("Failed to create assignment", file=sys.stderr)
+            error_msg = "Failed to create assignment"
+            logger.error(error_msg, event_type="manual_assignment", identifier="failure")
+            print(error_msg, file=sys.stderr)
             return False
 
     except Exception as e:
-        print(f"Error creating manual assignment: {e}", file=sys.stderr)
+        error_msg = f"Error creating manual assignment: {e}"
+        logger.error(error_msg, event_type="manual_assignment", identifier="exception", extra={"exception": str(e)})
+        print(error_msg, file=sys.stderr)
         return False
 
 def main():
     """
     Main entry point for the CLI application.
     """
+    logger.info("Starting CLI application", event_type="application", identifier="startup")
     try:
         # Parse arguments
         args = parse_arguments()
+        logger.debug(f"Parsed arguments: {args}", event_type="arguments", identifier="parse")
 
         # Setup dependencies
+        logger.debug("Setting up dependencies", event_type="dependencies", identifier="setup")
         session, employee_repository, workstation_repository, team_repository, schedule_service, assignment_repository, work_history_repository, aro_repository, aro_service, aro_graph_service, schedule_repository = setup_dependencies()
 
         try:
+            logger.info(f"Executing command: {args.command}", event_type="command", identifier=args.command)
+
             if args.command == 'generate':
+                logger.debug("Creating GenerateScheduleHandler", event_type="handler", identifier="generate")
                 # Create handler
                 handler = GenerateScheduleHandler(
                     employee_repository=employee_repository,
@@ -838,21 +943,29 @@ def main():
                             raise ValueError(f"Team '{args.team}' not found")
                         teams = [team]
                     except ValueError as e:
-                        print(f"Error: {e}", file=sys.stderr)
+                        error_msg = f"Error: {e}"
+                        logger.error(error_msg, event_type="team_lookup", identifier=args.team)
+                        print(error_msg, file=sys.stderr)
                         sys.exit(1)
                 elif args.group:
                     # Get teams by group name
                     teams = team_repository.get_by_group_name(args.group)
                     if not teams:
-                        print(f"Error: No teams found in group '{args.group}'", file=sys.stderr)
+                        error_msg = f"Error: No teams found in group '{args.group}'"
+                        logger.error(error_msg, event_type="group_lookup", identifier=args.group)
+                        print(error_msg, file=sys.stderr)
                         sys.exit(1)
+                    logger.info(f"Generating schedules for {len(teams)} teams in group '{args.group}'", event_type="schedule_generation", identifier=args.group)
                     print(f"Generating schedules for {len(teams)} teams in group '{args.group}'")
                 elif args.department:
                     # Get teams by department name
                     teams = team_repository.get_by_department_name(args.department)
                     if not teams:
-                        print(f"Error: No teams found in department '{args.department}'", file=sys.stderr)
+                        error_msg = f"Error: No teams found in department '{args.department}'"
+                        logger.error(error_msg, event_type="department_lookup", identifier=args.department)
+                        print(error_msg, file=sys.stderr)
                         sys.exit(1)
+                    logger.info(f"Generating schedules for {len(teams)} teams in department '{args.department}'", event_type="schedule_generation", identifier=args.department)
                     print(f"Generating schedules for {len(teams)} teams in department '{args.department}'")
 
                 # Initialize assignments list
@@ -860,6 +973,7 @@ def main():
 
                 # Generate schedules for each team
                 for team in teams:
+                    logger.info(f"Generating schedule for team '{team.name}'", event_type="team_schedule", identifier=team.name)
                     print(f"\nGenerating schedule for team '{team.name}'...")
 
                     # Create command for this team
@@ -872,13 +986,18 @@ def main():
                         force_complete=args.force_complete
                     )
 
+                    logger.debug(f"Created GenerateScheduleCommand for team '{team.name}'", event_type="command_creation", identifier=team.name)
+
                     # Handle command
+                    logger.debug(f"Executing handler for team '{team.name}'", event_type="handler_execution", identifier=team.name)
                     team_assignments = handler.handle(command)
 
                     if team_assignments:
+                        logger.info(f"Generated {len(team_assignments)} assignments for team '{team.name}'", event_type="schedule_result", identifier=team.name)
                         print(f"Generated {len(team_assignments)} assignments for team '{team.name}'")
                         all_assignments.extend(team_assignments)
                     else:
+                        logger.warning(f"No assignments generated for team '{team.name}'", event_type="schedule_result", identifier=team.name)
                         print(f"No assignments generated for team '{team.name}'")
 
                 # Set assignments to all_assignments for display later
@@ -912,6 +1031,7 @@ def main():
 
                     # Verify assignments were saved to the database
                     try:
+                        logger.debug("Verifying assignments in database", event_type="verification", identifier="assignments")
                         # Get the start date from the first team's command
                         start_date = start_date  # We already have this from earlier
                         end_date = start_date  # For now, just verify the first day
@@ -919,6 +1039,7 @@ def main():
                         # Get work history entries for the date range
                         work_history_entries = work_history_repository.get_by_date_range(start_date, end_date)
                         saved_count = len(work_history_entries)
+                        logger.debug(f"Found {saved_count} work history entries for date range", event_type="verification", identifier="assignments")
 
                         # Count only the entries that were generated by the scheduler
                         generated_entries = [entry for entry in work_history_entries 
@@ -928,12 +1049,19 @@ def main():
                                                    entry.work_period == a.period.period
                                                    for a in assignments)]
 
-                        print(f"Verified {len(generated_entries)} of {len(assignments)} assignments in the database.")
+                        verification_msg = f"Verified {len(generated_entries)} of {len(assignments)} assignments in the database."
+                        logger.info(verification_msg, event_type="verification", identifier="assignments")
+                        print(verification_msg)
 
                         if len(generated_entries) != len(assignments):
-                            print("Warning: Not all assignments were saved to the database.")
+                            warning_msg = "Warning: Not all assignments were saved to the database."
+                            logger.warning(warning_msg, event_type="verification", identifier="assignments", 
+                                          extra={"expected": len(assignments), "actual": len(generated_entries)})
+                            print(warning_msg)
                     except Exception as e:
-                        print(f"Warning: Could not verify assignments in database: {e}")
+                        warning_msg = f"Warning: Could not verify assignments in database: {e}"
+                        logger.warning(warning_msg, event_type="verification", identifier="assignments", extra={"exception": str(e)})
+                        print(warning_msg)
 
                     # Group assignments by team and date
                     assignments_by_team_and_date = {}
@@ -973,17 +1101,25 @@ def main():
                                 print()  # Add some space between dates
 
         except Exception as e:
-            print(f"Error generating schedule: {e}", file=sys.stderr)
+            error_msg = f"Error generating schedule: {e}"
+            logger.error(error_msg, event_type="schedule_generation", identifier=str(args.command), extra={"exception": str(e)})
+            print(error_msg, file=sys.stderr)
             sys.exit(1)
         finally:
             session.close()
 
     except SQLAlchemyError as e:
-        print(f"Database error: {e}", file=sys.stderr)
+        error_msg = f"Database error: {e}"
+        logger.error(error_msg, event_type="database_error", identifier="sqlalchemy", extra={"exception": str(e)})
+        print(error_msg, file=sys.stderr)
         sys.exit(1)
     except Exception as e:
-        print(f"Unexpected error: {e}", file=sys.stderr)
+        error_msg = f"Unexpected error: {e}"
+        logger.error(error_msg, event_type="unexpected_error", identifier="main", extra={"exception": str(e)})
+        print(error_msg, file=sys.stderr)
         sys.exit(1)
+    finally:
+        logger.info("CLI application finished", event_type="application", identifier="shutdown")
 
 
 if __name__ == '__main__':

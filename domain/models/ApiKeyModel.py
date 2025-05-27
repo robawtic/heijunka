@@ -27,8 +27,6 @@ class ApiKeyModel(Base):
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
     last_used_at = Column(DateTime, nullable=True)
 
-    # Store lists as JSON for database compatibility
-    # Using JSON instead of ARRAY for better compatibility across different database backends
     scopes = Column(JSON, nullable=True, default=lambda: json.dumps([]))
     allowed_ips = Column(JSON, nullable=True, default=lambda: json.dumps([]))
     allowed_user_agents = Column(JSON, nullable=True, default=lambda: json.dumps([]))

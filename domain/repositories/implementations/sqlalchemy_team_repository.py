@@ -14,169 +14,822 @@ from domain.models.WorkstationModel import WorkstationModel
 from domain.repositories.interfaces.team_repository import TeamRepositoryInterface
 from domain.repositories.implementations.base_sqlalchemy_repository import BaseSqlAlchemyRepository
 from infrastructure.exceptions import RepositoryError
+from utilities.secure_logging import sanitize_exception
+from utilities.logging_factory import get_logger
 
 
 class SqlAlchemyTeamRepository(BaseSqlAlchemyRepository[Team, TeamModel], TeamRepositoryInterface):
+    """
+    SQLAlchemy implementation of the TeamRepository interface.
+
+    This class provides the actual implementation for accessing and manipulating
+    Team entities in the database using SQLAlchemy.
+    """
+
     def __init__(self, session: Session):
+        """
+        Initialize the repository with a SQLAlchemy session.
+
+        Args:
+            session: The SQLAlchemy session to use for database operations.
+        """
         super().__init__(session, TeamModel, Team)
+        self.logger = get_logger("heijunka.repositories.team")
+        self.rate_limited_logger = get_logger("heijunka.repositories.team", rate_limit=True)
 
     @contextmanager
     def session_scope(self) -> Generator[Session, None, None]:
-        """Provide a transactional scope around a series of operations."""
+        """
+        Provide a transactional scope around a series of operations.
+
+        Yields:
+            The SQLAlchemy session.
+        """
         try:
             yield self._session
             self._session.commit()
         except SQLAlchemyError as e:
             self._session.rollback()
-            raise RepositoryError(f"Database operation failed: {str(e)}")
+            error_msg = sanitize_exception(e)
+            self.logger.error(
+                f"Database operation failed: {error_msg}",
+                extra={
+                    "event_type": "database_error",
+                    "error_type": type(e).__name__,
+                    "repository": "team"
+                }
+            )
+            raise RepositoryError(f"Database error: {error_msg}")
         except Exception as e:
             self._session.rollback()
-            raise
+            error_msg = sanitize_exception(e)
+            self.logger.error(
+                f"Unexpected error in team repository: {error_msg}",
+                extra={
+                    "event_type": "unexpected_error",
+                    "error_type": type(e).__name__,
+                    "repository": "team"
+                }
+            )
+            raise RepositoryError(f"Repository error: {error_msg}")
 
     def get_by_name(self, name: str) -> Optional[Team]:
-        """Retrieve a team by its name."""
-        team_model = self._session.query(TeamModel).filter(
-            TeamModel.name == name
-        ).first()
-        if team_model is None:
-            return None
-        return self._to_domain(team_model)
+        """
+        Retrieve a team by its name.
+
+        Args:
+            name: The name of the team.
+
+        Returns:
+            The team if found, None otherwise.
+        """
+        try:
+            self.logger.info(
+                f"Retrieving team by name: {name}",
+                extra={
+                    "event_type": "team_lookup",
+                    "lookup_type": "name",
+                    "team_name": name
+                }
+            )
+
+            team_model = self._session.query(TeamModel).filter(
+                TeamModel.name == name
+            ).first()
+
+            if team_model is None:
+                self.logger.info(
+                    f"No team found with name: {name}",
+                    extra={
+                        "event_type": "team_lookup_failed",
+                        "lookup_type": "name",
+                        "team_name": name,
+                        "reason": "not_found"
+                    }
+                )
+                return None
+
+            self.logger.info(
+                f"Found team with name: {name}",
+                extra={
+                    "event_type": "team_lookup_success",
+                    "lookup_type": "name",
+                    "team_name": name,
+                    "team_id": team_model.id
+                }
+            )
+
+            return self._to_domain(team_model)
+        except SQLAlchemyError as e:
+            error_msg = sanitize_exception(e)
+            self.logger.error(
+                f"Error retrieving team by name: {error_msg}",
+                extra={
+                    "event_type": "team_lookup_error",
+                    "lookup_type": "name",
+                    "team_name": name,
+                    "error_type": type(e).__name__
+                }
+            )
+            raise RepositoryError(f"Failed to get team by name: {error_msg}")
 
     def add_member(self, team_id: int, employee: Employee) -> bool:
-        """Add an employee to a team."""
-        team = self._session.query(TeamModel).get(team_id)
-        employee_model = self._session.query(EmployeeModel).get(employee.id)
+        """
+        Add an employee to a team.
 
-        if not team or not employee_model:
-            return False
+        Args:
+            team_id: The ID of the team.
+            employee: The employee to add.
 
-        # Check if the employee is already a member of the team
-        for member in team.members:
-            if member.id == employee.id:
-                return True  # Already a member
+        Returns:
+            True if the employee was added successfully, False otherwise.
+        """
+        try:
+            self.logger.info(
+                f"Adding employee ID: {employee.id} to team ID: {team_id}",
+                extra={
+                    "event_type": "team_member_add",
+                    "team_id": team_id,
+                    "employee_id": employee.id,
+                    "employee_name": employee.name if hasattr(employee, 'name') else "Unknown"
+                }
+            )
 
-        # Add the employee to the team
-        team_member = TeamMemberModel(team_id=team_id, employee_id=employee.id)
-        self._session.add(team_member)
-        self._session.commit()
-        return True
+            with self.session_scope() as session:
+                team = session.query(TeamModel).get(team_id)
+                employee_model = session.query(EmployeeModel).get(employee.id)
+
+                if not team or not employee_model:
+                    self.logger.info(
+                        f"Failed to add employee to team: team or employee not found",
+                        extra={
+                            "event_type": "team_member_add_failed",
+                            "team_id": team_id,
+                            "employee_id": employee.id,
+                            "reason": "not_found",
+                            "team_exists": team is not None,
+                            "employee_exists": employee_model is not None
+                        }
+                    )
+                    return False
+
+                # Check if the employee is already a member of the team
+                for member in team.members:
+                    if member.employee_id == employee.id:
+                        self.logger.info(
+                            f"Employee ID: {employee.id} is already a member of team ID: {team_id}",
+                            extra={
+                                "event_type": "team_member_add_skipped",
+                                "team_id": team_id,
+                                "employee_id": employee.id,
+                                "reason": "already_member"
+                            }
+                        )
+                        return True  # Already a member
+
+                # Add the employee to the team
+                team_member = TeamMemberModel(team_id=team_id, employee_id=employee.id)
+                session.add(team_member)
+
+                self.logger.info(
+                    f"Successfully added employee ID: {employee.id} to team ID: {team_id}",
+                    extra={
+                        "event_type": "team_member_add_success",
+                        "team_id": team_id,
+                        "employee_id": employee.id,
+                        "employee_name": employee.name if hasattr(employee, 'name') else "Unknown"
+                    }
+                )
+                return True
+        except RepositoryError:
+            # This will be caught and logged by session_scope
+            raise
+        except Exception as e:
+            error_msg = sanitize_exception(e)
+            self.logger.error(
+                f"Error adding employee to team: {error_msg}",
+                extra={
+                    "event_type": "team_member_add_error",
+                    "team_id": team_id,
+                    "employee_id": employee.id,
+                    "error_type": type(e).__name__
+                }
+            )
+            raise RepositoryError(f"Failed to add employee to team: {error_msg}")
 
     def remove_member(self, team_id: int, employee_id: int) -> bool:
-        """Remove an employee from a team."""
-        team_member = self._session.query(TeamMemberModel).filter(
-            TeamMemberModel.team_id == team_id,
-            TeamMemberModel.employee_id == employee_id
-        ).first()
+        """
+        Remove an employee from a team.
 
-        if not team_member:
-            return False
+        Args:
+            team_id: The ID of the team.
+            employee_id: The ID of the employee to remove.
 
-        self._session.delete(team_member)
-        self._session.commit()
-        return True
+        Returns:
+            True if the employee was removed successfully, False otherwise.
+        """
+        try:
+            self.logger.info(
+                f"Removing employee ID: {employee_id} from team ID: {team_id}",
+                extra={
+                    "event_type": "team_member_remove",
+                    "team_id": team_id,
+                    "employee_id": employee_id
+                }
+            )
+
+            with self.session_scope() as session:
+                team_member = session.query(TeamMemberModel).filter(
+                    TeamMemberModel.team_id == team_id,
+                    TeamMemberModel.employee_id == employee_id
+                ).first()
+
+                if not team_member:
+                    self.logger.info(
+                        f"Failed to remove employee from team: team member not found",
+                        extra={
+                            "event_type": "team_member_remove_failed",
+                            "team_id": team_id,
+                            "employee_id": employee_id,
+                            "reason": "not_found"
+                        }
+                    )
+                    return False
+
+                session.delete(team_member)
+
+                self.logger.info(
+                    f"Successfully removed employee ID: {employee_id} from team ID: {team_id}",
+                    extra={
+                        "event_type": "team_member_remove_success",
+                        "team_id": team_id,
+                        "employee_id": employee_id
+                    }
+                )
+                return True
+        except RepositoryError:
+            # This will be caught and logged by session_scope
+            raise
+        except Exception as e:
+            error_msg = sanitize_exception(e)
+            self.logger.error(
+                f"Error removing employee from team: {error_msg}",
+                extra={
+                    "event_type": "team_member_remove_error",
+                    "team_id": team_id,
+                    "employee_id": employee_id,
+                    "error_type": type(e).__name__
+                }
+            )
+            raise RepositoryError(f"Failed to remove employee from team: {error_msg}")
 
     def add_workstation(self, team_id: int, workstation: Workstation) -> bool:
-        """Add a workstation to a team."""
-        team = self._session.query(TeamModel).get(team_id)
-        workstation_model = self._session.query(WorkstationModel).get(workstation.id)
+        """
+        Add a workstation to a team.
 
-        if not team or not workstation_model:
-            return False
+        Args:
+            team_id: The ID of the team.
+            workstation: The workstation to add.
 
-        # Check if the workstation is already assigned to the team
-        if workstation_model.team_id == team_id:
-            return True  # Already assigned
+        Returns:
+            True if the workstation was added successfully, False otherwise.
+        """
+        try:
+            self.logger.info(
+                f"Adding workstation ID: {workstation.id} to team ID: {team_id}",
+                extra={
+                    "event_type": "team_workstation_add",
+                    "team_id": team_id,
+                    "workstation_id": workstation.id,
+                    "workstation_name": workstation.name if hasattr(workstation, 'name') else "Unknown"
+                }
+            )
 
-        # Assign the workstation to the team
-        workstation_model.team_id = team_id
-        self._session.commit()
-        return True
+            with self.session_scope() as session:
+                team = session.query(TeamModel).get(team_id)
+                workstation_model = session.query(WorkstationModel).get(workstation.id)
+
+                if not team or not workstation_model:
+                    self.logger.info(
+                        f"Failed to add workstation to team: team or workstation not found",
+                        extra={
+                            "event_type": "team_workstation_add_failed",
+                            "team_id": team_id,
+                            "workstation_id": workstation.id,
+                            "reason": "not_found",
+                            "team_exists": team is not None,
+                            "workstation_exists": workstation_model is not None
+                        }
+                    )
+                    return False
+
+                # Check if the workstation is already assigned to the team
+                if workstation_model.team_id == team_id:
+                    self.logger.info(
+                        f"Workstation ID: {workstation.id} is already assigned to team ID: {team_id}",
+                        extra={
+                            "event_type": "team_workstation_add_skipped",
+                            "team_id": team_id,
+                            "workstation_id": workstation.id,
+                            "reason": "already_assigned"
+                        }
+                    )
+                    return True  # Already assigned
+
+                # Log the change if the workstation is already assigned to another team
+                if workstation_model.team_id is not None:
+                    self.logger.info(
+                        f"Reassigning workstation ID: {workstation.id} from team ID: {workstation_model.team_id} to team ID: {team_id}",
+                        extra={
+                            "event_type": "workstation_team_change",
+                            "workstation_id": workstation.id,
+                            "old_team_id": workstation_model.team_id,
+                            "new_team_id": team_id
+                        }
+                    )
+
+                # Assign the workstation to the team
+                workstation_model.team_id = team_id
+
+                self.logger.info(
+                    f"Successfully added workstation ID: {workstation.id} to team ID: {team_id}",
+                    extra={
+                        "event_type": "team_workstation_add_success",
+                        "team_id": team_id,
+                        "workstation_id": workstation.id,
+                        "workstation_name": workstation.name if hasattr(workstation, 'name') else "Unknown"
+                    }
+                )
+                return True
+        except RepositoryError:
+            # This will be caught and logged by session_scope
+            raise
+        except Exception as e:
+            error_msg = sanitize_exception(e)
+            self.logger.error(
+                f"Error adding workstation to team: {error_msg}",
+                extra={
+                    "event_type": "team_workstation_add_error",
+                    "team_id": team_id,
+                    "workstation_id": workstation.id,
+                    "error_type": type(e).__name__
+                }
+            )
+            raise RepositoryError(f"Failed to add workstation to team: {error_msg}")
 
     def remove_workstation(self, team_id: int, workstation_id: int) -> bool:
-        """Remove a workstation from a team."""
-        workstation = self._session.query(WorkstationModel).filter(
-            WorkstationModel.id == workstation_id,
-            WorkstationModel.team_id == team_id
-        ).first()
+        """
+        Remove a workstation from a team.
 
-        if not workstation:
-            return False
+        Args:
+            team_id: The ID of the team.
+            workstation_id: The ID of the workstation to remove.
 
-        # This is a bit tricky - we don't want to delete the workstation,
-        # just unassign it from the team. In a real system, you might set
-        # id to NULL or reassign it to a default team.
-        workstation.team_id = None
-        self._session.commit()
-        return True
+        Returns:
+            True if the workstation was removed successfully, False otherwise.
+        """
+        try:
+            self.logger.info(
+                f"Removing workstation ID: {workstation_id} from team ID: {team_id}",
+                extra={
+                    "event_type": "team_workstation_remove",
+                    "team_id": team_id,
+                    "workstation_id": workstation_id
+                }
+            )
+
+            with self.session_scope() as session:
+                workstation = session.query(WorkstationModel).filter(
+                    WorkstationModel.id == workstation_id,
+                    WorkstationModel.team_id == team_id
+                ).first()
+
+                if not workstation:
+                    self.logger.info(
+                        f"Failed to remove workstation from team: workstation not found or not assigned to team",
+                        extra={
+                            "event_type": "team_workstation_remove_failed",
+                            "team_id": team_id,
+                            "workstation_id": workstation_id,
+                            "reason": "not_found_or_not_assigned"
+                        }
+                    )
+                    return False
+
+                # This is a bit tricky - we don't want to delete the workstation,
+                # just unassign it from the team. In a real system, you might set
+                # id to NULL or reassign it to a default team.
+                workstation.team_id = None
+
+                self.logger.info(
+                    f"Successfully removed workstation ID: {workstation_id} from team ID: {team_id}",
+                    extra={
+                        "event_type": "team_workstation_remove_success",
+                        "team_id": team_id,
+                        "workstation_id": workstation_id,
+                        "workstation_name": workstation.name
+                    }
+                )
+                return True
+        except RepositoryError:
+            # This will be caught and logged by session_scope
+            raise
+        except Exception as e:
+            error_msg = sanitize_exception(e)
+            self.logger.error(
+                f"Error removing workstation from team: {error_msg}",
+                extra={
+                    "event_type": "team_workstation_remove_error",
+                    "team_id": team_id,
+                    "workstation_id": workstation_id,
+                    "error_type": type(e).__name__
+                }
+            )
+            raise RepositoryError(f"Failed to remove workstation from team: {error_msg}")
 
     def get_members(self, team_id: int) -> List[Employee]:
-        """Get all members of a team."""
-        team = self._session.query(TeamModel).get(team_id)
-        if not team:
-            return []
+        """
+        Get all members of a team.
 
-        return [member.employee.to_domain() for member in team.members]
+        Args:
+            team_id: The ID of the team.
+
+        Returns:
+            A list of employees that are members of the team.
+        """
+        try:
+            self.logger.info(
+                f"Retrieving members for team ID: {team_id}",
+                extra={
+                    "event_type": "team_members_lookup",
+                    "team_id": team_id
+                }
+            )
+
+            team = self._session.query(TeamModel).get(team_id)
+            if not team:
+                self.logger.info(
+                    f"No team found with ID: {team_id}",
+                    extra={
+                        "event_type": "team_members_lookup_failed",
+                        "team_id": team_id,
+                        "reason": "team_not_found"
+                    }
+                )
+                return []
+
+            members = [member.employee.to_domain() for member in team.members if member.employee]
+
+            member_count = len(members)
+            self.logger.info(
+                f"Retrieved {member_count} members for team ID: {team_id}",
+                extra={
+                    "event_type": "team_members_lookup_success",
+                    "team_id": team_id,
+                    "member_count": member_count
+                }
+            )
+
+            return members
+        except SQLAlchemyError as e:
+            error_msg = sanitize_exception(e)
+            self.logger.error(
+                f"Error retrieving team members: {error_msg}",
+                extra={
+                    "event_type": "team_members_lookup_error",
+                    "team_id": team_id,
+                    "error_type": type(e).__name__
+                }
+            )
+            raise RepositoryError(f"Failed to get team members: {error_msg}")
 
     def get_workstations(self, team_id: int) -> List[Workstation]:
-        """Get all workstations of a team."""
-        workstations = self._session.query(WorkstationModel).filter(
-            WorkstationModel.team_id == team_id
-        ).all()
+        """
+        Get all workstations of a team.
 
-        return [self._workstation_to_domain(ws) for ws in workstations]
+        Args:
+            team_id: The ID of the team.
+
+        Returns:
+            A list of workstations that belong to the team.
+        """
+        try:
+            self.logger.info(
+                f"Retrieving workstations for team ID: {team_id}",
+                extra={
+                    "event_type": "team_workstations_lookup",
+                    "team_id": team_id
+                }
+            )
+
+            workstations = self._session.query(WorkstationModel).filter(
+                WorkstationModel.team_id == team_id
+            ).all()
+
+            workstation_count = len(workstations)
+            self.logger.info(
+                f"Retrieved {workstation_count} workstations for team ID: {team_id}",
+                extra={
+                    "event_type": "team_workstations_lookup_success",
+                    "team_id": team_id,
+                    "workstation_count": workstation_count
+                }
+            )
+
+            return [self._workstation_to_domain(ws) for ws in workstations]
+        except SQLAlchemyError as e:
+            error_msg = sanitize_exception(e)
+            self.logger.error(
+                f"Error retrieving team workstations: {error_msg}",
+                extra={
+                    "event_type": "team_workstations_lookup_error",
+                    "team_id": team_id,
+                    "error_type": type(e).__name__
+                }
+            )
+            raise RepositoryError(f"Failed to get team workstations: {error_msg}")
 
     def get_with_counts(self, team_id: int) -> Optional[Dict]:
-        """Get a team with employee and workstation counts."""
-        result = self._session.query(
-            TeamModel,
-            func.count(distinct(EmployeeModel.id)).label('employee_count'),
-            func.count(distinct(WorkstationModel.id)).label('workstation_count')
-        ).outerjoin(
-            TeamMemberModel, TeamMemberModel.team_id == TeamModel.id
-        ).outerjoin(
-            EmployeeModel, EmployeeModel.id == TeamMemberModel.employee_id
-        ).outerjoin(
-            WorkstationModel, WorkstationModel.team_id == TeamModel.id
-        ).filter(
-            TeamModel.id == team_id
-        ).group_by(
-            TeamModel.id
-        ).first()
+        """
+        Get a team with employee and workstation counts.
 
-        if not result:
-            return None
+        Args:
+            team_id: The ID of the team.
 
-        team, employee_count, workstation_count = result
-        return {
-            'team': self._to_domain(team),
-            'employee_count': employee_count,
-            'workstation_count': workstation_count
-        }
+        Returns:
+            A dictionary containing the team and counts if found, None otherwise.
+            Example: {'team': team, 'employee_count': 10, 'workstation_count': 5}
+        """
+        try:
+            self.logger.info(
+                f"Retrieving team with counts for team ID: {team_id}",
+                extra={
+                    "event_type": "team_with_counts_lookup",
+                    "team_id": team_id
+                }
+            )
+
+            result = self._session.query(
+                TeamModel,
+                func.count(distinct(EmployeeModel.id)).label('employee_count'),
+                func.count(distinct(WorkstationModel.id)).label('workstation_count')
+            ).outerjoin(
+                TeamMemberModel, TeamMemberModel.team_id == TeamModel.id
+            ).outerjoin(
+                EmployeeModel, EmployeeModel.id == TeamMemberModel.employee_id
+            ).outerjoin(
+                WorkstationModel, WorkstationModel.team_id == TeamModel.id
+            ).filter(
+                TeamModel.id == team_id
+            ).group_by(
+                TeamModel.id
+            ).first()
+
+            if not result:
+                self.logger.info(
+                    f"No team found with ID: {team_id}",
+                    extra={
+                        "event_type": "team_with_counts_lookup_failed",
+                        "team_id": team_id,
+                        "reason": "team_not_found"
+                    }
+                )
+                return None
+
+            team, employee_count, workstation_count = result
+
+            self.logger.info(
+                f"Retrieved team with counts for team ID: {team_id}",
+                extra={
+                    "event_type": "team_with_counts_lookup_success",
+                    "team_id": team_id,
+                    "team_name": team.name,
+                    "employee_count": employee_count,
+                    "workstation_count": workstation_count
+                }
+            )
+
+            return {
+                'team': self._to_domain(team),
+                'employee_count': employee_count,
+                'workstation_count': workstation_count
+            }
+        except SQLAlchemyError as e:
+            error_msg = sanitize_exception(e)
+            self.logger.error(
+                f"Error retrieving team with counts: {error_msg}",
+                extra={
+                    "event_type": "team_with_counts_lookup_error",
+                    "team_id": team_id,
+                    "error_type": type(e).__name__
+                }
+            )
+            raise RepositoryError(f"Failed to get team with counts: {error_msg}")
 
     def _to_domain(self, model: TeamModel) -> Team:
-        """Convert a TeamModel to a Team domain entity using factory."""
-        from domain.factories.team_factory import TeamFactory
-        return TeamFactory.create_from_model(model)
+        """
+        Convert a SQLAlchemy model to a domain entity.
+
+        Args:
+            model: The SQLAlchemy model to convert.
+
+        Returns:
+            The domain entity.
+        """
+        try:
+            self.logger.debug(
+                "Converting team model to domain entity",
+                extra={
+                    "event_type": "model_to_domain_conversion",
+                    "entity_id": model.id,
+                    "entity_name": model.name
+                }
+            )
+
+            from domain.factories.team_factory import TeamFactory
+            team = TeamFactory.create_from_model(model)
+
+            self.logger.debug(
+                "Successfully converted team model to domain entity",
+                extra={
+                    "event_type": "model_to_domain_conversion_success",
+                    "entity_id": model.id
+                }
+            )
+
+            return team
+        except Exception as e:
+            error_msg = sanitize_exception(e)
+            self.logger.error(
+                f"Error converting team model to domain entity: {error_msg}",
+                extra={
+                    "event_type": "model_to_domain_conversion_error",
+                    "entity_id": model.id if model else None,
+                    "error_type": type(e).__name__
+                }
+            )
+            raise
 
     def _to_model(self, entity: Team) -> TeamModel:
-        """Convert a Team domain entity to a TeamModel."""
-        model = TeamModel(
-            id=entity.id,  # Changed from team_id to id to match TeamModel schema
-            name=entity.name,  # Changed from team_name to name to match TeamModel schema
-            description=entity.description
-        )
-        return model
+        """
+        Convert a domain entity to a SQLAlchemy model.
+
+        Args:
+            entity: The domain entity to convert.
+
+        Returns:
+            The SQLAlchemy model.
+        """
+        try:
+            self.logger.debug(
+                "Converting team domain entity to model",
+                extra={
+                    "event_type": "domain_to_model_conversion",
+                    "entity_id": entity.id,
+                    "entity_name": entity.name
+                }
+            )
+
+            model = TeamModel(
+                id=entity.id,
+                name=entity.name,
+                description=entity.description
+            )
+
+            self.logger.debug(
+                "Successfully converted team domain entity to model",
+                extra={
+                    "event_type": "domain_to_model_conversion_success",
+                    "entity_id": entity.id
+                }
+            )
+
+            return model
+        except Exception as e:
+            error_msg = sanitize_exception(e)
+            self.logger.error(
+                f"Error converting team domain entity to model: {error_msg}",
+                extra={
+                    "event_type": "domain_to_model_conversion_error",
+                    "entity_id": entity.id if entity and hasattr(entity, 'id') else None,
+                    "error_type": type(e).__name__
+                }
+            )
+            raise
 
     def _update_model(self, model: TeamModel, entity: Team) -> None:
-        """Update a TeamModel with values from a Team domain entity."""
-        model.name = entity.name
-        model.description = entity.description
-        # Members and workstations would need to be updated through their respective relationships
+        """
+        Update a SQLAlchemy model with values from a domain entity.
+
+        Args:
+            model: The SQLAlchemy model to update.
+            entity: The domain entity with updated values.
+        """
+        try:
+            self.logger.debug(
+                "Updating team model from domain entity",
+                extra={
+                    "event_type": "team_model_update",
+                    "entity_id": model.id,
+                    "entity_name": model.name
+                }
+            )
+
+            # Check for significant changes and log them
+            if model.name != entity.name:
+                self.logger.info(
+                    "Changing team name",
+                    extra={
+                        "event_type": "team_field_change",
+                        "entity_id": model.id,
+                        "field": "name",
+                        "old_value": model.name,
+                        "new_value": entity.name
+                    }
+                )
+
+            if model.description != entity.description:
+                self.logger.info(
+                    "Changing team description",
+                    extra={
+                        "event_type": "team_field_change",
+                        "entity_id": model.id,
+                        "field": "description",
+                        "old_value": model.description,
+                        "new_value": entity.description
+                    }
+                )
+
+            # Update the model
+            model.name = entity.name
+            model.description = entity.description
+            # Members and workstations would need to be updated through their respective relationships
+
+            self.logger.debug(
+                "Successfully updated team model",
+                extra={
+                    "event_type": "team_model_update_success",
+                    "entity_id": model.id
+                }
+            )
+        except Exception as e:
+            error_msg = sanitize_exception(e)
+            self.logger.error(
+                f"Error updating team model: {error_msg}",
+                extra={
+                    "event_type": "team_model_update_error",
+                    "entity_id": model.id if model else None,
+                    "error_type": type(e).__name__
+                }
+            )
+            raise
 
     def _workstation_to_domain(self, model: WorkstationModel) -> Workstation:
-        """Convert a WorkstationModel to a Workstation domain entity using factory."""
-        from domain.factories.workstation_factory import WorkstationFactory
-        return WorkstationFactory.create_from_model(model)
+        """
+        Convert a WorkstationModel to a Workstation domain entity using factory.
+
+        Args:
+            model: The WorkstationModel to convert.
+
+        Returns:
+            The Workstation domain entity.
+        """
+        try:
+            self.logger.debug(
+                "Converting workstation model to domain entity",
+                extra={
+                    "event_type": "model_to_domain_conversion",
+                    "entity_type": "workstation",
+                    "entity_id": model.id,
+                    "entity_name": model.name
+                }
+            )
+
+            from domain.factories.workstation_factory import WorkstationFactory
+            workstation = WorkstationFactory.create_from_model(model)
+
+            self.logger.debug(
+                "Successfully converted workstation model to domain entity",
+                extra={
+                    "event_type": "model_to_domain_conversion_success",
+                    "entity_type": "workstation",
+                    "entity_id": model.id
+                }
+            )
+
+            return workstation
+        except Exception as e:
+            error_msg = sanitize_exception(e)
+            self.logger.error(
+                f"Error converting workstation model to domain entity: {error_msg}",
+                extra={
+                    "event_type": "model_to_domain_conversion_error",
+                    "entity_type": "workstation",
+                    "entity_id": model.id if model else None,
+                    "error_type": type(e).__name__
+                }
+            )
+            raise
 
     def get_by_group_name(self, group_name: str) -> List[Team]:
         """
@@ -188,16 +841,56 @@ class SqlAlchemyTeamRepository(BaseSqlAlchemyRepository[Team, TeamModel], TeamRe
         Returns:
             A list of teams that belong to the group.
         """
-        from domain.models.GroupModel import GroupModel
+        try:
+            self.logger.info(
+                f"Retrieving teams by group name: {group_name}",
+                extra={
+                    "event_type": "teams_by_group_lookup",
+                    "group_name": group_name
+                }
+            )
 
-        # Find the group by name
-        group = self._session.query(GroupModel).filter(GroupModel.name == group_name).first()
-        if not group:
-            return []
+            from domain.models.GroupModel import GroupModel
 
-        # Get all teams that belong to this group
-        team_models = self._session.query(TeamModel).filter(TeamModel.group_id == group.id).all()
-        return [self._to_domain(team_model) for team_model in team_models]
+            # Find the group by name
+            group = self._session.query(GroupModel).filter(GroupModel.name == group_name).first()
+            if not group:
+                self.logger.info(
+                    f"No group found with name: {group_name}",
+                    extra={
+                        "event_type": "teams_by_group_lookup_failed",
+                        "group_name": group_name,
+                        "reason": "group_not_found"
+                    }
+                )
+                return []
+
+            # Get all teams that belong to this group
+            team_models = self._session.query(TeamModel).filter(TeamModel.group_id == group.id).all()
+
+            team_count = len(team_models)
+            self.logger.info(
+                f"Retrieved {team_count} teams for group name: {group_name}",
+                extra={
+                    "event_type": "teams_by_group_lookup_success",
+                    "group_name": group_name,
+                    "group_id": group.id,
+                    "team_count": team_count
+                }
+            )
+
+            return [self._to_domain(team_model) for team_model in team_models]
+        except SQLAlchemyError as e:
+            error_msg = sanitize_exception(e)
+            self.logger.error(
+                f"Error retrieving teams by group name: {error_msg}",
+                extra={
+                    "event_type": "teams_by_group_lookup_error",
+                    "group_name": group_name,
+                    "error_type": type(e).__name__
+                }
+            )
+            raise RepositoryError(f"Failed to get teams by group name: {error_msg}")
 
     def get_by_department_name(self, department_name: str) -> List[Team]:
         """
@@ -209,37 +902,128 @@ class SqlAlchemyTeamRepository(BaseSqlAlchemyRepository[Team, TeamModel], TeamRe
         Returns:
             A list of teams that belong to the department (directly or through groups).
         """
-        from domain.models.DepartmentModel import DepartmentModel
-        from domain.models.GroupModel import GroupModel
+        try:
+            self.logger.info(
+                f"Retrieving teams by department name: {department_name}",
+                extra={
+                    "event_type": "teams_by_department_lookup",
+                    "department_name": department_name
+                }
+            )
 
-        # Find the department by name
-        department = self._session.query(DepartmentModel).filter(DepartmentModel.name == department_name).first()
-        if not department:
-            return []
+            from domain.models.DepartmentModel import DepartmentModel
+            from domain.models.GroupModel import GroupModel
 
-        # Get all groups that belong to this department
-        groups = self._session.query(GroupModel).filter(GroupModel.department_id == department.id).all()
-        if not groups:
-            return []
+            # Find the department by name
+            department = self._session.query(DepartmentModel).filter(DepartmentModel.name == department_name).first()
+            if not department:
+                self.logger.info(
+                    f"No department found with name: {department_name}",
+                    extra={
+                        "event_type": "teams_by_department_lookup_failed",
+                        "department_name": department_name,
+                        "reason": "department_not_found"
+                    }
+                )
+                return []
 
-        # Get all teams that belong to any of these groups
-        group_ids = [group.id for group in groups]
-        team_models = self._session.query(TeamModel).filter(TeamModel.group_id.in_(group_ids)).all()
-        return [self._to_domain(team_model) for team_model in team_models]
+            # Get all groups that belong to this department
+            groups = self._session.query(GroupModel).filter(GroupModel.department_id == department.id).all()
+            if not groups:
+                self.logger.info(
+                    f"No groups found for department: {department_name}",
+                    extra={
+                        "event_type": "teams_by_department_lookup_failed",
+                        "department_name": department_name,
+                        "department_id": department.id,
+                        "reason": "no_groups"
+                    }
+                )
+                return []
 
-    def get(self, id):
-        """Retrieve an team by their ID.
+            # Get all teams that belong to any of these groups
+            group_ids = [group.id for group in groups]
+            team_models = self._session.query(TeamModel).filter(TeamModel.group_id.in_(group_ids)).all()
 
-    Args:
-        id: The unique identifier of the employee.
+            team_count = len(team_models)
+            group_count = len(groups)
+            self.logger.info(
+                f"Retrieved {team_count} teams from {group_count} groups for department: {department_name}",
+                extra={
+                    "event_type": "teams_by_department_lookup_success",
+                    "department_name": department_name,
+                    "department_id": department.id,
+                    "group_count": group_count,
+                    "team_count": team_count
+                }
+            )
 
-    Returns:
-        Team object if found, None otherwise.
+            return [self._to_domain(team_model) for team_model in team_models]
+        except SQLAlchemyError as e:
+            error_msg = sanitize_exception(e)
+            self.logger.error(
+                f"Error retrieving teams by department name: {error_msg}",
+                extra={
+                    "event_type": "teams_by_department_lookup_error",
+                    "department_name": department_name,
+                    "error_type": type(e).__name__
+                }
+            )
+            raise RepositoryError(f"Failed to get teams by department name: {error_msg}")
 
-    Raises:
-        NotFoundError: If team with given ID doesn't exist.
-    """
-        team_model = self._session.query(TeamModel).filter(TeamModel.id == id).first()
-        if not team_model:
-            return None
-        return team_model.to_domain()
+    def get(self, id: int) -> Optional[Team]:
+        """
+        Retrieve a team by its ID.
+
+        Args:
+            id: The unique identifier of the team.
+
+        Returns:
+            Team object if found, None otherwise.
+        """
+        try:
+            self.logger.info(
+                f"Retrieving team by ID: {id}",
+                extra={
+                    "event_type": "team_lookup",
+                    "lookup_type": "id",
+                    "team_id": id
+                }
+            )
+
+            team_model = self._session.query(TeamModel).filter(TeamModel.id == id).first()
+            if not team_model:
+                self.logger.info(
+                    f"No team found with ID: {id}",
+                    extra={
+                        "event_type": "team_lookup_failed",
+                        "lookup_type": "id",
+                        "team_id": id,
+                        "reason": "not_found"
+                    }
+                )
+                return None
+
+            self.logger.info(
+                f"Found team with ID: {id}",
+                extra={
+                    "event_type": "team_lookup_success",
+                    "lookup_type": "id",
+                    "team_id": id,
+                    "team_name": team_model.name
+                }
+            )
+
+            return team_model.to_domain()
+        except SQLAlchemyError as e:
+            error_msg = sanitize_exception(e)
+            self.logger.error(
+                f"Error retrieving team by ID: {error_msg}",
+                extra={
+                    "event_type": "team_lookup_error",
+                    "lookup_type": "id",
+                    "team_id": id,
+                    "error_type": type(e).__name__
+                }
+            )
+            raise RepositoryError(f"Failed to get team by ID: {error_msg}")
