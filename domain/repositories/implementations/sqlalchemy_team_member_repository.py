@@ -7,7 +7,7 @@ from domain.entities.team_member import TeamMember
 from domain.models.TeamMemberModel import TeamMemberModel
 from domain.models.RoleModel import RoleModel
 from domain.repositories.interfaces.team_member_repository import TeamMemberRepositoryInterface
-from domain.repositories.implementations.base_sqlalchemy_repository import BaseSqlAlchemyRepository
+from infrastructure.repositories.sqlalchemy.base_sqlalchemy_repository import BaseSqlAlchemyRepository
 from infrastructure.exceptions import RepositoryError
 from utilities.secure_logging import sanitize_exception
 from utilities.logging_factory import get_logger
@@ -477,7 +477,7 @@ class SqlAlchemyTeamMemberRepository(BaseSqlAlchemyRepository[TeamMember, TeamMe
                 team_member_id=model.id,
                 team_id=model.team_id,
                 employee_id=model.employee_id,
-                roles=[role.name for role in model.roles],
+                roles=[role.to_domain() for role in model.roles],
                 team=None,  # We don't load the full team object here
                 employee=None  # We don't load the full employee object here
             )
@@ -534,10 +534,10 @@ class SqlAlchemyTeamMemberRepository(BaseSqlAlchemyRepository[TeamMember, TeamMe
             # Add roles if they exist
             if entity.roles:
                 with self.session_scope() as session:
-                    for role_name in entity.roles:
-                        role = session.query(RoleModel).filter_by(name=role_name).first()
+                    for role_entity in entity.roles:
+                        role = session.query(RoleModel).filter_by(name=role_entity.name).first()
                         if not role:
-                            role = RoleModel(name=role_name)
+                            role = RoleModel(name=role_entity.name)
                             session.add(role)
                             session.flush()
                         model.roles.append(role)

@@ -3,10 +3,9 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, scoped_session
 from infrastructure.config.settings import settings
 import os
-from dotenv import load_dotenv
-
-# Load environment variables
-load_dotenv()
+# Environment variables are already loaded in settings.py
+# from dotenv import load_dotenv
+# load_dotenv()
 
 # Get database URL from settings with fallback
 DATABASE_URL = settings.database_url

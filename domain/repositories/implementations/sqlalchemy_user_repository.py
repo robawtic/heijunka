@@ -1,7 +1,6 @@
 from contextlib import contextmanager
-from typing import Optional, List, Dict, Generator, Any, Type
+from typing import Optional, List, Generator
 from datetime import datetime
-from sqlalchemy import and_
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
@@ -9,7 +8,7 @@ from domain.entities.user import User
 from domain.models.UserModel import UserModel
 from domain.models.RoleModel import RoleModel
 from domain.repositories.interfaces.user_repository import UserRepositoryInterface
-from domain.repositories.implementations.base_sqlalchemy_repository import BaseSqlAlchemyRepository
+from infrastructure.repositories.sqlalchemy.base_sqlalchemy_repository import BaseSqlAlchemyRepository
 from infrastructure.exceptions import RepositoryError
 from utilities.secure_logging import redact_log_message, sanitize_exception, log_audit_event
 from utilities.logging_factory import get_logger
@@ -187,13 +186,13 @@ class SqlAlchemyUserRepository(BaseSqlAlchemyRepository[User, UserModel], UserRe
             True if the username exists, False otherwise.
         """
         try:
-            
+
             result = redact_log_message(
                 f"Checking if username exists: {username}",
                 custom_data={"username": [username]}
             )
 
-            
+
             self.rate_limited_logger.info(
                 result.message,
                 event_type="username_check",
@@ -224,7 +223,7 @@ class SqlAlchemyUserRepository(BaseSqlAlchemyRepository[User, UserModel], UserRe
                     "error_type": type(e).__name__
                 }
             )
-            
+
             return False
 
     def email_exists(self, email: str) -> bool:
@@ -238,13 +237,13 @@ class SqlAlchemyUserRepository(BaseSqlAlchemyRepository[User, UserModel], UserRe
             True if the email exists, False otherwise.
         """
         try:
-            
+
             result = redact_log_message(
                 f"Checking if email exists: {email}",
                 custom_data={"email": [email]}
             )
 
-            
+
             self.rate_limited_logger.info(
                 result.message,
                 event_type="email_check",
@@ -275,7 +274,7 @@ class SqlAlchemyUserRepository(BaseSqlAlchemyRepository[User, UserModel], UserRe
                     "error_type": type(e).__name__
                 }
             )
-            
+
             return False
 
     def update_last_login(self, user_id: int, ip_address: str = None, user_agent: str = None) -> bool:
@@ -313,7 +312,7 @@ class SqlAlchemyUserRepository(BaseSqlAlchemyRepository[User, UserModel], UserRe
                     )
                     return False
 
-                
+
                 result = redact_log_message(
                     f"Updating last login for user {user.username} (ID: {user_id})",
                     custom_data={"username": [user.username]}
@@ -393,7 +392,7 @@ class SqlAlchemyUserRepository(BaseSqlAlchemyRepository[User, UserModel], UserRe
                     )
                     return False
 
-                
+
                 result = redact_log_message(
                     f"Adding role '{role_name}' to user {user.username} (ID: {user_id})",
                     custom_data={"username": [user.username]}
@@ -426,14 +425,14 @@ class SqlAlchemyUserRepository(BaseSqlAlchemyRepository[User, UserModel], UserRe
                 if role not in user.roles:
                     user.roles.append(role)
 
-                    
+
                     audit_data = {"role": role_name, "username": user.username}
                     if source_ip:
                         audit_data["source_ip"] = source_ip
                     if user_agent:
                         audit_data["user_agent"] = user_agent
 
-                    
+
                     log_audit_event(
                         event_type="role_assignment",
                         message=f"Role assigned to user",
@@ -510,7 +509,7 @@ class SqlAlchemyUserRepository(BaseSqlAlchemyRepository[User, UserModel], UserRe
                     )
                     return False
 
-                
+
                 result = redact_log_message(
                     f"Removing role '{role_name}' from user {user.username} (ID: {user_id})",
                     custom_data={"username": [user.username]}
@@ -541,14 +540,14 @@ class SqlAlchemyUserRepository(BaseSqlAlchemyRepository[User, UserModel], UserRe
 
                 user.roles.remove(role)
 
-                
+
                 audit_data = {"role": role_name, "username": user.username}
                 if source_ip:
                     audit_data["source_ip"] = source_ip
                 if user_agent:
                     audit_data["user_agent"] = user_agent
 
-                
+
                 log_audit_event(
                     event_type="role_removal",
                     message=f"Role removed from user",
@@ -667,7 +666,7 @@ class SqlAlchemyUserRepository(BaseSqlAlchemyRepository[User, UserModel], UserRe
                     )
                     return False
 
-                
+
                 result = redact_log_message(
                     f"Activating account for user {user.username} (ID: {user_id})",
                     custom_data={"username": [user.username]}
@@ -696,14 +695,14 @@ class SqlAlchemyUserRepository(BaseSqlAlchemyRepository[User, UserModel], UserRe
 
                 user.is_active = True
 
-                
+
                 audit_data = {"username": user.username}
                 if source_ip:
                     audit_data["source_ip"] = source_ip
                 if user_agent:
                     audit_data["user_agent"] = user_agent
 
-                
+
                 log_audit_event(
                     event_type="account_activation",
                     message=f"User account activated",
@@ -764,7 +763,7 @@ class SqlAlchemyUserRepository(BaseSqlAlchemyRepository[User, UserModel], UserRe
                     )
                     return False
 
-                
+
                 result = redact_log_message(
                     f"Deactivating account for user {user.username} (ID: {user_id})",
                     custom_data={"username": [user.username]}
@@ -793,14 +792,14 @@ class SqlAlchemyUserRepository(BaseSqlAlchemyRepository[User, UserModel], UserRe
 
                 user.is_active = False
 
-                
+
                 audit_data = {"username": user.username}
                 if source_ip:
                     audit_data["source_ip"] = source_ip
                 if user_agent:
                     audit_data["user_agent"] = user_agent
 
-                
+
                 log_audit_event(
                     event_type="account_deactivation",
                     message=f"User account deactivated",
@@ -839,7 +838,7 @@ class SqlAlchemyUserRepository(BaseSqlAlchemyRepository[User, UserModel], UserRe
             The domain entity.
         """
         try:
-            
+
             self.logger.debug(
                 "Converting user model to domain entity",
                 extra={
@@ -863,11 +862,12 @@ class SqlAlchemyUserRepository(BaseSqlAlchemyRepository[User, UserModel], UserRe
 
             # Add roles
             role_names = []
-            for role in model.roles:
-                user._roles.append(role.name)
+            for role_model in model.roles:
+                role = role_model.to_domain()
+                user._roles.append(role)
                 role_names.append(role.name)
 
-            
+
             if role_names:
                 self.logger.debug(
                     "User roles loaded",
@@ -903,7 +903,7 @@ class SqlAlchemyUserRepository(BaseSqlAlchemyRepository[User, UserModel], UserRe
             The SQLAlchemy model.
         """
         try:
-            
+
             user_id = entity.id if entity.id is not None else "new user"
             self.logger.debug(
                 "Converting user domain entity to model",
@@ -926,7 +926,7 @@ class SqlAlchemyUserRepository(BaseSqlAlchemyRepository[User, UserModel], UserRe
             if entity.id is not None:
                 model.id = entity.id
 
-            
+
             if entity.roles:
                 self.logger.debug(
                     "User roles included in model",
@@ -960,7 +960,7 @@ class SqlAlchemyUserRepository(BaseSqlAlchemyRepository[User, UserModel], UserRe
             entity: The domain entity with updated values.
         """
         try:
-            
+
             self.logger.debug(
                 "Updating user model from domain entity",
                 extra={
@@ -969,7 +969,7 @@ class SqlAlchemyUserRepository(BaseSqlAlchemyRepository[User, UserModel], UserRe
                 }
             )
 
-            
+
             if model.username != entity.username:
                 result = redact_log_message(
                     f"Changing username from {model.username} to {entity.username} for user ID: {model.id}",
@@ -985,7 +985,7 @@ class SqlAlchemyUserRepository(BaseSqlAlchemyRepository[User, UserModel], UserRe
                     }
                 )
 
-            
+
             if model.email != entity.email:
                 result = redact_log_message(
                     f"Changing email from {model.email} to {entity.email} for user ID: {model.id}",
@@ -1001,7 +1001,7 @@ class SqlAlchemyUserRepository(BaseSqlAlchemyRepository[User, UserModel], UserRe
                     }
                 )
 
-            
+
             if model.password_hash != entity._password_hash:
                 self.logger.info(
                     "Password hash changed",
@@ -1011,7 +1011,7 @@ class SqlAlchemyUserRepository(BaseSqlAlchemyRepository[User, UserModel], UserRe
                     }
                 )
 
-            
+
             if model.is_active != entity.is_active:
                 new_status = "active" if entity.is_active else "inactive"
                 self.logger.info(
@@ -1023,7 +1023,7 @@ class SqlAlchemyUserRepository(BaseSqlAlchemyRepository[User, UserModel], UserRe
                     }
                 )
 
-            
+
             model.username = entity.username
             model.email = entity.email
             model.password_hash = entity._password_hash
@@ -1031,13 +1031,13 @@ class SqlAlchemyUserRepository(BaseSqlAlchemyRepository[User, UserModel], UserRe
             model.updated_at = datetime.utcnow()
             model.last_login = entity.last_login
 
-            
-            current_roles = [role.name for role in model.roles]
-            new_roles = entity.roles
+
+            current_role_names = [role.name for role in model.roles]
+            new_role_names = [role.name for role in entity.roles]
 
             # Log role changes
-            added_roles = [role for role in new_roles if role not in current_roles]
-            removed_roles = [role for role in current_roles if role not in new_roles]
+            added_roles = [role_name for role_name in new_role_names if role_name not in current_role_names]
+            removed_roles = [role_name for role_name in current_role_names if role_name not in new_role_names]
 
             if added_roles:
                 self.logger.info(
@@ -1059,10 +1059,10 @@ class SqlAlchemyUserRepository(BaseSqlAlchemyRepository[User, UserModel], UserRe
                     }
                 )
 
-            
+
             model.roles = []
-            for role_name in entity.roles:
-                role = self._session.query(RoleModel).filter(RoleModel.name == role_name).first()
+            for role_entity in entity.roles:
+                role = self._session.query(RoleModel).filter(RoleModel.name == role_entity.name).first()
                 if role is None:
                     self.logger.info(
                         "Creating new role",

@@ -104,13 +104,15 @@ class UserService:
 
         return saved_user
 
-    def authenticate_user(self, username: str, password: str) -> Optional[User]:
+    def authenticate_user(self, username: str, password: str, ip_address: str = None, user_agent: str = None) -> Optional[User]:
         """
         Authenticate a user with username and password.
 
         Args:
             username: The username to authenticate
             password: The password to verify
+            ip_address: Optional IP address of the client making the request
+            user_agent: Optional user agent of the client making the request
 
         Returns:
             The authenticated user if successful, None otherwise
@@ -124,8 +126,8 @@ class UserService:
         if not user.verify_password(password):
             return None
 
-        # Update last login time
-        self.update_last_login(user.id)
+        # Update last login time with client information
+        self.update_last_login(user.id, ip_address, user_agent)
 
         return user
 
@@ -309,14 +311,16 @@ class UserService:
         """
         return self._user_repository.delete(user_id)
 
-    def update_last_login(self, user_id: int) -> bool:
+    def update_last_login(self, user_id: int, ip_address: str = None, user_agent: str = None) -> bool:
         """
         Update the last login timestamp for a user.
 
         Args:
             user_id: The ID of the user to update
+            ip_address: Optional IP address of the client making the request
+            user_agent: Optional user agent of the client making the request
 
         Returns:
             True if the update was successful, False otherwise
         """
-        return self._user_repository.update_last_login(user_id)
+        return self._user_repository.update_last_login(user_id, ip_address, user_agent)

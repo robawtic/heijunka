@@ -12,7 +12,7 @@ from domain.models.TeamModel import TeamModel
 from domain.models.EmployeeModel import EmployeeModel
 from domain.models.WorkstationModel import WorkstationModel
 from domain.repositories.interfaces.team_repository import TeamRepositoryInterface
-from domain.repositories.implementations.base_sqlalchemy_repository import BaseSqlAlchemyRepository
+from infrastructure.repositories.sqlalchemy.base_sqlalchemy_repository import BaseSqlAlchemyRepository
 from infrastructure.exceptions import RepositoryError
 from utilities.secure_logging import sanitize_exception
 from utilities.logging_factory import get_logger
@@ -94,7 +94,7 @@ class SqlAlchemyTeamRepository(BaseSqlAlchemyRepository[Team, TeamModel], TeamRe
             )
 
             team_model = self._session.query(TeamModel).filter(
-                TeamModel.name == name
+                func.lower(TeamModel.name) == func.lower(name)
             ).first()
 
             if team_model is None:
@@ -852,8 +852,8 @@ class SqlAlchemyTeamRepository(BaseSqlAlchemyRepository[Team, TeamModel], TeamRe
 
             from domain.models.GroupModel import GroupModel
 
-            # Find the group by name
-            group = self._session.query(GroupModel).filter(GroupModel.name == group_name).first()
+            # Find the group by name (case-insensitive)
+            group = self._session.query(GroupModel).filter(func.lower(GroupModel.name) == func.lower(group_name)).first()
             if not group:
                 self.logger.info(
                     f"No group found with name: {group_name}",
@@ -914,8 +914,8 @@ class SqlAlchemyTeamRepository(BaseSqlAlchemyRepository[Team, TeamModel], TeamRe
             from domain.models.DepartmentModel import DepartmentModel
             from domain.models.GroupModel import GroupModel
 
-            # Find the department by name
-            department = self._session.query(DepartmentModel).filter(DepartmentModel.name == department_name).first()
+            # Find the department by name (case-insensitive)
+            department = self._session.query(DepartmentModel).filter(func.lower(DepartmentModel.name) == func.lower(department_name)).first()
             if not department:
                 self.logger.info(
                     f"No department found with name: {department_name}",

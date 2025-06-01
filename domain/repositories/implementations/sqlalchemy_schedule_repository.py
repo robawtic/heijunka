@@ -1,4 +1,4 @@
-from typing import List, Optional, Dict, Any, Generator
+from typing import List, Optional, Generator
 from datetime import date
 from contextlib import contextmanager
 from sqlalchemy.orm import Session, joinedload
@@ -7,13 +7,8 @@ from sqlalchemy.exc import SQLAlchemyError
 from domain.entities.schedule import Schedule
 from domain.models.ScheduleModel import ScheduleModel
 from domain.models.EmployeeWorkHistoryModel import EmployeeWorkHistoryModel
-from domain.models.EmployeeModel import EmployeeModel
-from domain.models.WorkstationModel import WorkstationModel
-from domain.models.TeamModel import TeamModel
-from domain.value_objects.schedule_period import SchedulePeriod
-from domain.value_objects.work_assignment import WorkAssignment
 from domain.repositories.interfaces.schedule_repository_interface import ScheduleRepositoryInterface
-from domain.repositories.implementations.base_sqlalchemy_repository import BaseSqlAlchemyRepository
+from infrastructure.repositories.sqlalchemy.base_sqlalchemy_repository import BaseSqlAlchemyRepository
 from infrastructure.exceptions import RepositoryError
 from utilities.secure_logging import sanitize_exception
 from utilities.logging_factory import get_logger

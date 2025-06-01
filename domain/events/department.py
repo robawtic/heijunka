@@ -7,6 +7,7 @@ class DepartmentCreated(DomainEvent):
     """Event raised when a new department is created"""
     department_id: int
     name: str
+    description: Optional[str] = None
 
     def __post_init__(self):
         super().__post_init__()
@@ -14,6 +15,8 @@ class DepartmentCreated(DomainEvent):
             raise ValueError("department_id must be a positive integer")
         if not isinstance(self.name, str) or not self.name:
             raise ValueError("name must be a non-empty string")
+        if self.description is not None and not isinstance(self.description, str):
+            raise ValueError("description must be a string or None")
 
 @dataclass
 class DepartmentUpdated(DomainEvent):

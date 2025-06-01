@@ -1,5 +1,5 @@
 from contextlib import contextmanager
-from typing import Optional, List, Dict, Tuple, Generator, Any
+from typing import Optional, List, Dict, Tuple, Generator
 from datetime import date
 from sqlalchemy import and_
 from sqlalchemy.exc import SQLAlchemyError
@@ -12,7 +12,7 @@ from domain.models.RoleModel import RoleModel
 from domain.models.TeamModel import TeamModel
 from domain.models.WorkstationModel import WorkstationModel
 from domain.repositories.interfaces.employee_repository import EmployeeRepositoryInterface
-from domain.repositories.implementations.base_sqlalchemy_repository import BaseSqlAlchemyRepository
+from infrastructure.repositories.sqlalchemy.base_sqlalchemy_repository import BaseSqlAlchemyRepository
 from infrastructure.exceptions import RepositoryError
 from utilities.secure_logging import redact_log_message, sanitize_exception, log_audit_event
 from utilities.logging_factory import get_logger

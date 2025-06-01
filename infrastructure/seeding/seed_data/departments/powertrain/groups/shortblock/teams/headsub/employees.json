@@ -1,0 +1,65 @@
+{
+  "employees": [
+    {
+      "name": "Taylor",
+      "role": "Team Leader",
+      "known_stations": []
+    },
+    {
+      "name": "Ray",
+      "role": "Associate",
+      "known_stations": ["H010", "H080/H090", "H100", "H110/H120", "BW070", "H170", "M050"]
+    },
+    {
+      "name": "Antonio",
+      "role": "Associate",
+      "known_stations": ["Parts Wash", "H010", "H080/H090", "H100", "H110/H120", "H170", "BW010", "BW070", "M050", "M090"]
+    },
+    {
+      "name": "Brian",
+      "role": "Associate",
+
+      "known_stations": ["H010", "H080/H090", "H100", "H110/H120", "H170", "BW010", "BW070", "M050", "M090"]
+    },
+    {
+      "name": "Rachael",
+      "role": "Associate",
+      "known_stations": ["H010", "H080/H090", "H100", "H110/H120", "H170", "BW010", "BW070", "M050"]
+    },
+    {
+      "name": "Matt",
+      "role": "Associate",
+      "known_stations": ["Parts Wash", "H010", "H080/H090", "H100", "H110/H120", "H170", "BW010", "BW070", "M050", "M090"]
+    },
+    {
+      "name": "Kaden",
+      "role": "Associate",
+      "known_stations": ["H010", "H080/H090", "H100", "H110/H120", "H170", "BW010", "BW070", "M050", "M090"]
+    },
+    {
+      "name": "Aaron",
+      "role": "Associate",
+      "known_stations": ["Parts Wash", "H010", "H080/H090", "H100", "H110/H120", "H170", "BW010", "BW070", "M050", "M090"]
+    },
+    {
+      "name": "Luke",
+      "role": "Backup",
+      "known_stations": ["H010", "H080/H090", "H100", "H110/H120", "H170", "BW010", "BW070", "M050", "M090"]
+    },
+    {
+      "name": "Taje",
+      "role": "Associate",
+      "known_stations": ["H010", "H080/H090", "H100", "H110/H120", "H170", "BW010", "BW070", "M050", "M090"]
+    },
+    {
+      "name": "Chyla",
+      "role": "Associate",
+      "known_stations": ["H010", "H080/H090", "H100", "H110/H120", "H170", "BW010", "M050", "M090"]
+    },
+    {
+      "name": "Fab",
+      "role": "Associate",
+      "known_stations": ["H010", "H080/H090", "H100", "H110/H120", "H170", "BW010", "BW070", "M050", "M090"]
+    }
+  ]
+}

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, Enum, ForeignKey
+from sqlalchemy import Column, Integer, String, Boolean, Enum, ForeignKey, UniqueConstraint
 from sqlalchemy.orm import relationship
 
 from domain.models.EmployeeWorkstationModel import EmployeeWorkstationModel
@@ -8,11 +8,13 @@ from domain.models.EmployeeWorkHistoryModel import EmployeeWorkHistoryModel  # I
 
 class WorkstationModel(Base):
     __tablename__ = 'workstations'
-    __table_args__ = {'extend_existing': True}
-
+    __table_args__ = (
+        UniqueConstraint('name', 'team_id', name='uq_workstations_name_team_id'),
+        {'extend_existing': True}
+    )
 
     id = Column(Integer, primary_key=True)
-    name = Column(String, unique=True, nullable=False)
+    name = Column(String, nullable=False)
     line_type_id = Column(Integer, ForeignKey('line_types.id'), nullable=False)
     is_loading_job = Column(Boolean, nullable=False, default=False)
     is_heavy_job = Column(Boolean, nullable=False, default=False)

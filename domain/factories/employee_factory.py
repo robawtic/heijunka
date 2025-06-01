@@ -163,7 +163,7 @@ class EmployeeFactory:
             for membership in team_memberships:
                 # Add each role from the membership to the employee for the specific team
                 for role in membership.roles:
-                    employee.add_team_role(role, membership.team_id)
+                    employee.add_team_role(role.name, membership.team_id)
 
         return employee
 

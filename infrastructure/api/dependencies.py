@@ -1,3 +1,4 @@
+#infrastructure/api/dependencies.py
 from fastapi import Depends
 from sqlalchemy.orm import Session
 from domain.repositories.implementations.sqlalchemy_employee_repository import SqlAlchemyEmployeeRepository
@@ -7,9 +8,10 @@ from domain.repositories.implementations.sqlalchemy_assignment_repository import
 from domain.repositories.implementations.sqlalchemy_employee_work_history_repository import SqlAlchemyEmployeeWorkHistoryRepository
 from domain.repositories.implementations.sqlalchemy_schedule_repository import SqlAlchemyScheduleRepository
 from domain.repositories.implementations.sqlalchemy_aro_assignment_repository import SqlAlchemyAROAssignmentRepository
-from domain.repositories.implementations.sqlalchemy_user_repository import SqlAlchemyUserRepository
-from domain.repositories.implementations.sqlalchemy_refresh_token_repository import SqlAlchemyRefreshTokenRepository
-from domain.repositories.implementations.sqlalchemy_api_key_repository import SqlAlchemyApiKeyRepository
+from infrastructure.repositories.sqlalchemy.sqlalchemy_user_repository import SqlAlchemyUserRepository
+from infrastructure.repositories.sqlalchemy.sqlalchemy_refresh_token_repository import SqlAlchemyRefreshTokenRepository
+from infrastructure.repositories.sqlalchemy.sqlalchemy_api_key_repository import SqlAlchemyApiKeyRepository
+from infrastructure.repositories.sqlalchemy.sqlalchemy_role_repository import SqlAlchemyRoleRepository
 from domain.services.schedule_service import ScheduleService
 from domain.contexts.user_management.services.user_service import UserService
 from domain.events.publisher import DomainEventPublisher
@@ -33,7 +35,8 @@ def get_repositories(db: Session):
         "work_history_repository": SqlAlchemyEmployeeWorkHistoryRepository(db),
         "schedule_repository": SqlAlchemyScheduleRepository(db),
         "aro_assignment_repository": SqlAlchemyAROAssignmentRepository(db),
-        "user_repository": SqlAlchemyUserRepository(db)
+        "user_repository": SqlAlchemyUserRepository(db),
+        "role_repository": SqlAlchemyRoleRepository(db)
     }
 
 def get_user_service(db: Session = Depends(get_db)):

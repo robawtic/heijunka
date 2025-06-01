@@ -3,9 +3,6 @@
 import pkgutil
 import importlib
 import inspect
-import functools
-from pathlib import Path
-from typing import Callable, List, Dict, Any, Optional, Union
 
 from domain.rules.context import adapt_rule, RuleContext, HeadsubRuleContext
 from domain.rules.hard import (
@@ -16,15 +13,9 @@ from domain.rules.hard import (
     # ...add other hard rules here
 )
 from domain.rules.soft import (
-    add_rotation_penalties,
-    add_repeat_station_penalties,
-    add_workload_deviation,
-    add_compound_fatigue_penalty_daylevel,
-    add_compound_fatigue_repetition_penalty,
-    add_consecutive_day_combo_penalties,
-    add_cross_day_repeat_penalties,
-    add_historical_station_fairness,
-    # ...add other soft rules here
+    add_same_day_repeat_penalties,
+    add_lookback_any_period_penalties,
+    add_lookback_same_period_penalties,
 )
 
 # All rules should take a single argument: ctx (RuleContext)
@@ -39,15 +30,9 @@ COMMON_HARD_RULES = [
 ]
 
 COMMON_SOFT_RULES = [
-    add_rotation_penalties,
-    add_repeat_station_penalties,
-    add_workload_deviation,
-    add_compound_fatigue_penalty_daylevel,
-    add_compound_fatigue_repetition_penalty,
-    add_consecutive_day_combo_penalties,
-    add_cross_day_repeat_penalties,
-    add_historical_station_fairness,
-    # limit_station_once_per_day,
+    add_same_day_repeat_penalties,
+    add_lookback_any_period_penalties,
+    add_lookback_same_period_penalties,
     # ...add more
 ]
 

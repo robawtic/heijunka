@@ -386,14 +386,13 @@ class Schedule:
 
         # Define weights for different rule types
         rule_weights = {
-            "add_rotation_penalties": 1000,
-            "add_repeat_station_penalties": 100,
-            "add_workload_deviation": 200,
-            "add_compound_fatigue_penalty_daylevel": 2000,
-            "add_compound_fatigue_repetition_penalty": 5000,
-            "add_cross_day_repeat_penalties": 500,
-            "add_consecutive_day_combo_penalties": 100,
-            "add_historical_station_fairness": 10000
+            # Current soft rules
+            "add_same_day_repeat_penalties": 100,
+            "add_lookback_any_period_penalties": 1000,
+            "add_lookback_same_period_penalties": 500,
+
+            # Backward compatibility
+            "add_rotation_penalties": 1000
         }
 
         for rule in rules:

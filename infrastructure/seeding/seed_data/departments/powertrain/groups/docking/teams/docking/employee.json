@@ -1,0 +1,49 @@
+{
+  "employees": [
+    {
+      "name": "Carlos",
+      "role": "Team Leader",
+      "known_stations": []
+    },
+    {
+      "name": "Michaela",
+      "role": "Backup",
+      "known_stations": [
+        "DOC849",
+        "DOC371"
+      ]
+    },
+    {
+      "name": "Andrew",
+      "role": "Associate",
+      "known_stations": [
+        "DOC849",
+        "DOC371"
+      ]
+    },
+    {
+      "name": "James",
+      "role": "Associate",
+      "known_stations": [
+        "DOC371",
+        "DOC849"
+      ]
+    },
+    {
+      "name": "Randy",
+      "role": "Associate",
+      "known_stations": [
+        "DOC849",
+        "DOC371"
+      ]
+    },
+    {
+      "name": "Tracy",
+      "role": "Associate",
+      "known_stations": [
+        "DOC849",
+        "DOC371"
+      ]
+    }
+  ]
+}

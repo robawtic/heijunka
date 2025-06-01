@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from domain.entities.workstation import Workstation
 from domain.models.WorkstationModel import WorkstationModel
 from domain.repositories.interfaces.workstation_repository import WorkstationRepositoryInterface
-from domain.repositories.implementations.base_sqlalchemy_repository import BaseSqlAlchemyRepository
+from infrastructure.repositories.sqlalchemy.base_sqlalchemy_repository import BaseSqlAlchemyRepository
 from infrastructure.exceptions import RepositoryError
 from utilities.secure_logging import sanitize_exception
 from utilities.logging_factory import get_logger

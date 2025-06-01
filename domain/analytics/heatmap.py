@@ -184,11 +184,11 @@ class WorkloadAnalysis:
 
         # Query total assignments per employee per week
         query = self.session.query(
-            func.strftime('%Y-%W', EmployeeWorkHistoryModel.worked_date).label('week'),
+            func.to_char(EmployeeWorkHistoryModel.worked_date, 'YYYY-IW').label('week'),
             EmployeeModel.name,
             func.count(EmployeeWorkHistoryModel.id).label('count')
         ).join(EmployeeModel).filter(
-            func.strftime('%Y', EmployeeWorkHistoryModel.worked_date) == str(year)
+            func.to_char(EmployeeWorkHistoryModel.worked_date, 'YYYY') == str(year)
         ).group_by('week', EmployeeModel.name).all()
 
         # Convert to DataFrame for easier manipulation
@@ -386,13 +386,18 @@ class WorkloadAnalysis:
             EmployeeWorkHistoryModel.worked_date,
             func.count(EmployeeWorkHistoryModel.id)
         ).filter(
-            func.strftime('%Y', EmployeeWorkHistoryModel.worked_date) == str(year)
+            func.to_char(EmployeeWorkHistoryModel.worked_date, 'YYYY') == str(year)
         ).group_by(EmployeeWorkHistoryModel.worked_date).all()
 
         # Convert to pandas Series
         if query:
             dates, counts = zip(*query)
             series = pd.Series(counts, index=pd.DatetimeIndex(dates))
+
+            # Create a complete date range for the year
+            date_range = pd.date_range(start=f'{year}-01-01', end=f'{year}-12-31', freq='D')
+            # Reindex the series to include all days, filling missing values with 0
+            series = series.reindex(date_range, fill_value=0)
 
             # Plot
             plt.figure(figsize=(16, 10))
@@ -402,8 +407,9 @@ class WorkloadAnalysis:
 
             path = f"{output_dir}/calendar_heatmap_{year}.png"
             plt.savefig(path)
-            print(redact_log_message(f"Saved {path}", file_paths=[path]))
+            print(f"Saved calendar heatmap to {path}")
             return path
+
         else:
             print(redact_log_message(f"No data available for calendar heatmap for year {year}", dates=[str(year)]))
             return None

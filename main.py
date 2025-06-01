@@ -8,7 +8,7 @@ from sqlalchemy.engine.url import make_url
 from utilities.logging_factory import get_logger
 
 # Create a logger for this module
-logger = get_logger("main")
+logger = get_logger("main", rate_limit=True)
 
 def get_masked_db_url(db_url):
     """Return a database URL with sensitive information masked."""

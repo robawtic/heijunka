@@ -1,0 +1,49 @@
+{
+  "employees": [
+    {
+      "name": "Rebecca",
+      "role": "Team Leader",
+      "known_stations": []
+    },
+    {
+      "name": "Frank",
+      "role": "Backup",
+      "known_stations": [
+        "FIN942",
+        "FIN128"
+      ]
+    },
+    {
+      "name": "Melissa",
+      "role": "Associate",
+      "known_stations": [
+        "FIN942",
+        "FIN128"
+      ]
+    },
+    {
+      "name": "Michael",
+      "role": "Associate",
+      "known_stations": [
+        "FIN128",
+        "FIN942"
+      ]
+    },
+    {
+      "name": "Scott",
+      "role": "Associate",
+      "known_stations": [
+        "FIN942",
+        "FIN128"
+      ]
+    },
+    {
+      "name": "Vickie",
+      "role": "Associate",
+      "known_stations": [
+        "FIN942",
+        "FIN128"
+      ]
+    }
+  ]
+}

@@ -29,6 +29,7 @@ class EmployeeModel(Base):
         return EmployeeFactory.create_from_model(self)
 
     def _get_roles(self) -> List[str]:
+        """Get a list of role names for this employee across all teams."""
         return [role.name
                 for team_member in self.teams
                 for role in team_member.roles]

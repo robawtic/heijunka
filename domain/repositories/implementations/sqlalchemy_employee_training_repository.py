@@ -9,7 +9,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from domain.value_objects.employee_training import EmployeeTraining
 from domain.models.EmployeeTrainingModel import EmployeeTrainingModel
 from domain.repositories.interfaces.employee_training_repository import EmployeeTrainingRepositoryInterface
-from domain.repositories.implementations.base_sqlalchemy_repository import BaseSqlAlchemyRepository
+from infrastructure.repositories.sqlalchemy.base_sqlalchemy_repository import BaseSqlAlchemyRepository
 from infrastructure.exceptions import RepositoryError
 from utilities.secure_logging import sanitize_exception
 from utilities.logging_factory import get_logger

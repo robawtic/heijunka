@@ -1,0 +1,69 @@
+{
+  "employees": [
+    {
+      "name": "Jennifer",
+      "role": "Team Leader",
+      "known_stations": []
+    },
+    {
+      "name": "Robert",
+      "role": "Backup",
+      "known_stations": ["CS010", "CS020", "CS030", "CS040" , "CS050", "CS060", "CS070" ,"CS080", "CS090", "CS100"]
+    },
+    {
+      "name": "Maria",
+      "role": "Associate",
+      "known_stations": ["CS010", "CS020", "CS030", "CS040" , "CS050", "CS060", "CS070" ,"CS080", "CS090", "CS100"]
+    },
+    {
+      "name": "James",
+      "role": "Associate",
+      "known_stations": ["CS030", "CS040" , "CS050", "CS060", "CS070" ,"CS080", "CS090"]
+    },
+    {
+      "name": "Alicia",
+      "role": "Associate",
+      "known_stations": ["CS010", "CS020", "CS030", "CS040" , "CS050", "CS060", "CS070" ,"CS080", "CS090", "CS100"]
+    },
+    {
+      "name": "Marcus",
+      "role": "Associate",
+      "known_stations": ["CS010", "CS020", "CS030", "CS040" , "CS050", "CS060", "CS070" ,"CS080", "CS090", "CS100"]
+    },
+    {
+      "name": "Emily",
+      "role": "Associate",
+      "known_stations": ["CS010", "CS020", "CS030", "CS040" , "CS050", "CS060", "CS070" ,"CS080", "CS090", "CS100"]
+    },
+    {
+      "name": "Daniel",
+      "role": "Associate",
+      "known_stations": ["CS010", "CS020", "CS030", "CS040" , "CS050", "CS060", "CS070" ,"CS080", "CS090", "CS100"]
+    },
+    {
+      "name": "Sophia",
+      "role": "Associate",
+      "known_stations": ["CS060", "CS070" ,"CS080", "CS090", "CS100"]
+    },
+    {
+      "name": "Noah",
+      "role": "Associate",
+      "known_stations": ["CS010", "CS020", "CS030"]
+    },
+    {
+      "name": "Olivia",
+      "role": "Associate",
+      "known_stations": ["CS010", "CS020", "CS030", "CS040", "CS070" ,"CS080", "CS090", "CS100"]
+    },
+    {
+      "name": "Liam",
+      "role": "Associate",
+      "known_stations": ["CS010", "CS020", "CS030", "CS040" , "CS050", "CS060", "CS070" ,"CS080", "CS090", "CS100"]
+    },
+    {
+      "name": "Ava",
+      "role": "Associate",
+      "known_stations": ["CS010", "CS020", "CS030", "CS040" , "CS050", "CS060", "CS070" ,"CS080", "CS090", "CS100"]
+    }
+  ]
+}

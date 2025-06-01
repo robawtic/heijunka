@@ -1,5 +1,5 @@
 # domain/repositories/implementations/__init__.py
-from domain.repositories.implementations.base_sqlalchemy_repository import BaseSqlAlchemyRepository
+from infrastructure.repositories.sqlalchemy.base_sqlalchemy_repository import BaseSqlAlchemyRepository
 from domain.repositories.implementations.sqlalchemy_employee_repository import SqlAlchemyEmployeeRepository
 from domain.repositories.implementations.sqlalchemy_group_repository import SqlAlchemyGroupRepository
 from domain.repositories.implementations.sqlalchemy_department_repository import SqlAlchemyDepartmentRepository

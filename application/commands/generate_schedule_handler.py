@@ -52,7 +52,9 @@ class GenerateScheduleHandler:
             schedule_repository=self.schedule_repository
         )
 
-        # Save assignments
-        self.assignment_repository.save_all(assignments)
+        # Save assignments and check if all were saved successfully
+        save_success = self.assignment_repository.save_all(assignments)
+        if not save_success:
+            print(f"WARNING: Not all assignments were saved to the database. Some assignments may be missing.")
 
         return assignments

@@ -1,15 +1,15 @@
 # heijunka/domain/repositories/implementations/sqlalchemy_employee_work_history_repository.py
-from typing import List, Optional, Tuple, Generator
+from typing import List, Optional, Tuple, Generator, Set, Dict
 from datetime import date
 from contextlib import contextmanager
-from sqlalchemy import and_, or_
+from sqlalchemy import and_, or_, func
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 
 from domain.value_objects.work_history_entry import WorkHistoryEntry
 from domain.models.EmployeeWorkHistoryModel import EmployeeWorkHistoryModel
 from domain.repositories.interfaces.employee_work_history_repository import EmployeeWorkHistoryRepositoryInterface
-from domain.repositories.implementations.base_sqlalchemy_repository import BaseSqlAlchemyRepository
+from infrastructure.repositories.sqlalchemy.base_sqlalchemy_repository import BaseSqlAlchemyRepository
 from infrastructure.exceptions import RepositoryError
 from utilities.secure_logging import sanitize_exception
 from utilities.logging_factory import get_logger
@@ -1251,3 +1251,208 @@ class SqlAlchemyEmployeeWorkHistoryRepository(BaseSqlAlchemyRepository[WorkHisto
                 }
             )
             raise RepositoryError(f"Failed to get filtered work history entries: {error_msg}")
+
+    def get_distinct_stations(
+        self, employee_id: int, since: date, until: date
+    ) -> Set[int]:
+        """
+        Get all station IDs the employee worked at any period between since (inclusive) and until (exclusive).
+
+        Args:
+            employee_id: The ID of the employee
+            since: The start date (inclusive)
+            until: The end date (exclusive)
+
+        Returns:
+            A set of station IDs the employee worked at in the date range
+        """
+        try:
+            self.logger.info(
+                "Retrieving distinct stations for employee in date range",
+                extra={
+                    "event_type": "distinct_stations_lookup",
+                    "employee_id": employee_id,
+                    "since_date": since.isoformat() if hasattr(since, 'isoformat') else str(since),
+                    "until_date": until.isoformat() if hasattr(until, 'isoformat') else str(until)
+                }
+            )
+
+            # Use a single optimized query with distinct to get all unique station_ids
+            distinct_stations = (
+                self._session.query(EmployeeWorkHistoryModel.station_id)
+                .filter(
+                    EmployeeWorkHistoryModel.employee_id == employee_id,
+                    EmployeeWorkHistoryModel.worked_date >= since,
+                    EmployeeWorkHistoryModel.worked_date < until
+                )
+                .distinct()
+                .all()
+            )
+
+            # Convert the result to a set of station IDs
+            result = {station_id for (station_id,) in distinct_stations}
+
+            self.logger.info(
+                f"Found {len(result)} distinct stations for employee in date range",
+                extra={
+                    "event_type": "distinct_stations_lookup_success",
+                    "employee_id": employee_id,
+                    "station_count": len(result)
+                }
+            )
+
+            return result
+
+        except SQLAlchemyError as e:
+            error_msg = sanitize_exception(e)
+            self.logger.error(
+                f"Error retrieving distinct stations: {error_msg}",
+                extra={
+                    "event_type": "distinct_stations_lookup_error",
+                    "employee_id": employee_id,
+                    "error_type": type(e).__name__
+                }
+            )
+            raise RepositoryError(f"Failed to get distinct stations: {error_msg}")
+
+    def get_distinct_station_periods(
+        self, employee_id: int, since: date, until: date
+    ) -> Set[Tuple[int, int]]:
+        """
+        Get all (station_id, work_period) pairs for that employee in the window.
+
+        Args:
+            employee_id: The ID of the employee
+            since: The start date (inclusive)
+            until: The end date (exclusive)
+
+        Returns:
+            A set of (station_id, work_period) tuples the employee worked in the date range
+        """
+        try:
+            self.logger.info(
+                "Retrieving distinct station-period pairs for employee in date range",
+                extra={
+                    "event_type": "distinct_station_periods_lookup",
+                    "employee_id": employee_id,
+                    "since_date": since.isoformat() if hasattr(since, 'isoformat') else str(since),
+                    "until_date": until.isoformat() if hasattr(until, 'isoformat') else str(until)
+                }
+            )
+
+            # Use a single optimized query with distinct to get all unique (station_id, work_period) pairs
+            distinct_pairs = (
+                self._session.query(
+                    EmployeeWorkHistoryModel.station_id,
+                    EmployeeWorkHistoryModel.work_period
+                )
+                .filter(
+                    EmployeeWorkHistoryModel.employee_id == employee_id,
+                    EmployeeWorkHistoryModel.worked_date >= since,
+                    EmployeeWorkHistoryModel.worked_date < until
+                )
+                .distinct()
+                .all()
+            )
+
+            # Convert the result to a set of (station_id, work_period) tuples
+            # Convert 1-based period to 0-based for the domain logic
+            result = {(station_id, work_period - 1) for station_id, work_period in distinct_pairs}
+
+            self.logger.info(
+                f"Found {len(result)} distinct station-period pairs for employee in date range",
+                extra={
+                    "event_type": "distinct_station_periods_lookup_success",
+                    "employee_id": employee_id,
+                    "pair_count": len(result)
+                }
+            )
+
+            return result
+
+        except SQLAlchemyError as e:
+            error_msg = sanitize_exception(e)
+            self.logger.error(
+                f"Error retrieving distinct station-period pairs: {error_msg}",
+                extra={
+                    "event_type": "distinct_station_periods_lookup_error",
+                    "employee_id": employee_id,
+                    "error_type": type(e).__name__
+                }
+            )
+            raise RepositoryError(f"Failed to get distinct station-period pairs: {error_msg}")
+
+    def get_station_period_counts(
+        self, employee_id: int, since: date, until: date
+    ) -> Dict[int, Dict[int, int]]:
+        """
+        Get mapping station_id → {period_index: count} over the date range.
+
+        Args:
+            employee_id: The ID of the employee
+            since: The start date (inclusive)
+            until: The end date (exclusive)
+
+        Returns:
+            A dictionary mapping station_id to a dictionary of period_index to count
+        """
+        try:
+            self.logger.info(
+                "Retrieving station-period counts for employee in date range",
+                extra={
+                    "event_type": "station_period_counts_lookup",
+                    "employee_id": employee_id,
+                    "since_date": since.isoformat() if hasattr(since, 'isoformat') else str(since),
+                    "until_date": until.isoformat() if hasattr(until, 'isoformat') else str(until)
+                }
+            )
+
+            # Use a single optimized query with aggregation to count occurrences
+            counts = (
+                self._session.query(
+                    EmployeeWorkHistoryModel.station_id,
+                    EmployeeWorkHistoryModel.work_period,
+                    func.count().label("count")
+                )
+                .filter(
+                    EmployeeWorkHistoryModel.employee_id == employee_id,
+                    EmployeeWorkHistoryModel.worked_date >= since,
+                    EmployeeWorkHistoryModel.worked_date < until
+                )
+                .group_by(
+                    EmployeeWorkHistoryModel.station_id,
+                    EmployeeWorkHistoryModel.work_period
+                )
+                .all()
+            )
+
+            # Convert the result to the required dictionary structure
+            # Convert 1-based period to 0-based for the domain logic
+            result = {}
+            for station_id, work_period, count in counts:
+                if station_id not in result:
+                    result[station_id] = {}
+                result[station_id][work_period - 1] = count
+
+            self.logger.info(
+                f"Found counts for {len(result)} stations for employee in date range",
+                extra={
+                    "event_type": "station_period_counts_lookup_success",
+                    "employee_id": employee_id,
+                    "station_count": len(result)
+                }
+            )
+
+            return result
+
+        except SQLAlchemyError as e:
+            error_msg = sanitize_exception(e)
+            self.logger.error(
+                f"Error retrieving station-period counts: {error_msg}",
+                extra={
+                    "event_type": "station_period_counts_lookup_error",
+                    "employee_id": employee_id,
+                    "error_type": type(e).__name__
+                }
+            )
+            raise RepositoryError(f"Failed to get station-period counts: {error_msg}")

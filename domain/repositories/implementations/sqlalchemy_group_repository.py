@@ -1,14 +1,14 @@
 from contextlib import contextmanager
-from typing import Optional, List, Generator
+from typing import Optional, Generator
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from domain.entities.group import Group
 from domain.models.GroupModel import GroupModel
 from domain.repositories.interfaces.group_repository import GroupRepositoryInterface
-from domain.repositories.implementations.base_sqlalchemy_repository import BaseSqlAlchemyRepository
+from infrastructure.repositories.sqlalchemy.base_sqlalchemy_repository import BaseSqlAlchemyRepository
 from infrastructure.exceptions import RepositoryError
-from utilities.secure_logging import redact_log_message, sanitize_exception
+from utilities.secure_logging import sanitize_exception
 from utilities.logging_factory import get_logger
 
 

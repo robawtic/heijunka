@@ -1,0 +1,178 @@
+{
+  "employees": [
+    {
+      "name": "Erica",
+      "role": "Team Leader",
+      "known_stations": []
+    },
+    {
+      "name": "Brandy",
+      "role": "Backup",
+      "known_stations": [
+        "SB040",
+        "SB050",
+        "SB060",
+        "SB120",
+        "SB160",
+        "SB180",
+        "SB210",
+        "SB220",
+        "SB280",
+        "SB300"
+      ]
+    },
+    {
+      "name": "Valerie",
+      "role": "Associate",
+      "known_stations": [
+        "SB060",
+        "SB220",
+        "SB160",
+        "SB280",
+        "SB120",
+        "SB300"
+      ]
+    },
+    {
+      "name": "Charles",
+      "role": "Associate",
+      "known_stations": [
+        "SB120",
+        "SB220",
+        "SB050",
+        "SB040",
+        "SB300",
+        "SB210",
+        "SB180",
+        "SB060"
+      ]
+    },
+    {
+      "name": "Samantha",
+      "role": "Associate",
+      "known_stations": [
+        "SB060",
+        "SB160",
+        "SB040",
+        "SB180",
+        "SB050",
+        "SB210",
+        "SB220",
+        "SB300"
+      ]
+    },
+    {
+      "name": "Sean",
+      "role": "Associate",
+      "known_stations": [
+        "SB040",
+        "SB180",
+        "SB220",
+        "SB120",
+        "SB060",
+        "SB050",
+        "SB160",
+        "SB300",
+        "SB210"
+      ]
+    },
+    {
+      "name": "Kimberly",
+      "role": "Associate",
+      "known_stations": [
+        "SB160",
+        "SB120",
+        "SB040",
+        "SB210"
+      ]
+    },
+    {
+      "name": "Frances",
+      "role": "Associate",
+      "known_stations": [
+        "SB160",
+        "SB120",
+        "SB040",
+        "SB180"
+      ]
+    },
+    {
+      "name": "Stephanie",
+      "role": "Associate",
+      "known_stations": [
+        "SB220",
+        "SB160",
+        "SB120",
+        "SB210",
+        "SB180",
+        "SB280",
+        "SB060"
+      ]
+    },
+    {
+      "name": "Lisa",
+      "role": "Associate",
+      "known_stations": [
+        "SB180",
+        "SB210",
+        "SB060",
+        "SB040",
+        "SB050",
+        "SB220",
+        "SB160",
+        "SB300",
+        "SB120",
+        "SB280"
+      ]
+    },
+    {
+      "name": "Dana",
+      "role": "Associate",
+      "known_stations": [
+        "SB180",
+        "SB120",
+        "SB160",
+        "SB050",
+        "SB210",
+        "SB060",
+        "SB220",
+        "SB300",
+        "SB280"
+      ]
+    },
+    {
+      "name": "Anthony",
+      "role": "Associate",
+      "known_stations": [
+        "SB300",
+        "SB120",
+        "SB210",
+        "SB220"
+      ]
+    },
+    {
+      "name": "John",
+      "role": "Associate",
+      "known_stations": [
+        "SB280",
+        "SB210",
+        "SB300",
+        "SB040"
+      ]
+    },
+    {
+      "name": "James",
+      "role": "Associate",
+      "known_stations": [
+        "SB210",
+        "SB300",
+        "SB040",
+        "SB160",
+        "SB060",
+        "SB180",
+        "SB050",
+        "SB220"
+      ]
+    }
+  ]
+}

@@ -50,7 +50,9 @@ def create_access_token(
 
     # Add roles to token if provided
     if roles:
-        to_encode.update({"roles": roles})
+        # Convert Role objects to role names if needed
+        role_names = [role.name if hasattr(role, 'name') else role for role in roles]
+        to_encode.update({"roles": role_names})
 
     # Add token type
     to_encode.update({"token_type": "access"})

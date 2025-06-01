@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from domain.entities.employee import Employee
 from domain.entities.workstation import Workstation
+from domain.repositories.interfaces.employee_work_history_repository import EmployeeWorkHistoryRepositoryInterface
 
 @dataclass
 class RuleContext:
@@ -30,6 +31,7 @@ class RuleContext:
     team_name: Optional[str] = None
     call_ins: Optional[List[str]] = None  # List of employee names who called in (unavailable)
     employee_offline_periods: Optional[Dict[str, Set[int]]] = None  # Dict of employee name -> set of periods when offline
+    employee_history_repo: Optional[EmployeeWorkHistoryRepositoryInterface] = None  # Repository for employee work history
 
     def __post_init__(self):
         """Initialize any collections that might be None."""
@@ -110,6 +112,7 @@ def adapt_rule(rule_func: Callable) -> Callable[[RuleContext], Any]:
             'team_name': ctx.team_name,
             'call_ins': ctx.call_ins,
             'employee_offline_periods': ctx.employee_offline_periods,
+            'employee_history_repo': ctx.employee_history_repo,
             # Add more mappings as needed
         }
 

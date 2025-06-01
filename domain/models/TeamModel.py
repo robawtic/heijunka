@@ -37,7 +37,7 @@ class TeamModel(Base):
                 team_id=self.id,
                 employee_id=member_model.employee_id,
                 employee=employee,
-                roles=[role.name for role in member_model.roles] if hasattr(member_model, 'roles') else []
+                roles=[role.to_domain() for role in member_model.roles] if hasattr(member_model, 'roles') else []
             )
             team_members.append(team_member)
 

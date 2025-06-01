@@ -1,13 +1,12 @@
 from contextlib import contextmanager
 from typing import Optional, List, Generator
-from datetime import datetime
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from domain.entities.department import Department
 from domain.models.DepartmentModel import DepartmentModel
 from domain.repositories.interfaces.department_repository import DepartmentRepositoryInterface
-from domain.repositories.implementations.base_sqlalchemy_repository import BaseSqlAlchemyRepository
+from infrastructure.repositories.sqlalchemy.base_sqlalchemy_repository import BaseSqlAlchemyRepository
 from infrastructure.exceptions import RepositoryError
 from utilities.secure_logging import sanitize_exception
 from utilities.logging_factory import get_logger
@@ -85,8 +84,9 @@ class SqlAlchemyDepartmentRepository(BaseSqlAlchemyRepository[Department, Depart
                 }
             )
 
+            from sqlalchemy import func
             department_model = self._session.query(DepartmentModel).filter(
-                DepartmentModel.name == department_name
+                func.lower(DepartmentModel.name) == func.lower(department_name)
             ).first()
 
             if department_model is None:
@@ -227,6 +227,31 @@ class SqlAlchemyDepartmentRepository(BaseSqlAlchemyRepository[Department, Depart
                 name=model.name,
                 description=model.description
             )
+
+            # Load groups if they exist
+            if hasattr(model, 'groups') and model.groups:
+                from domain.entities.group import Group
+                for group_model in model.groups:
+                    # Create Group entity from GroupModel
+                    group = Group(
+                        id=group_model.id,
+                        name=group_model.name,
+                        department_id=group_model.department_id
+                    )
+                    # Add group to department
+                    department.add_group(group)
+
+                    self.rate_limited_logger.debug(
+                        f"Added group {group.name} to department {department.name}",
+                        event_type="group_added_to_department",
+                        identifier=str(group.id),
+                        extra={
+                            "group_id": group.id,
+                            "group_name": group.name,
+                            "department_id": department.id,
+                            "department_name": department.name
+                        }
+                    )
 
             self.logger.debug(
                 "Successfully converted department model to domain entity",

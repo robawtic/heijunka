@@ -1,14 +1,19 @@
-from sqlalchemy import Column, Integer, String, UniqueConstraint
+from sqlalchemy import Column, Integer, String, UniqueConstraint, DateTime
 from sqlalchemy.orm import relationship
+from sqlalchemy.sql import func
 
 from domain.models.Base import Base
 from domain.models.team_member_roles import team_member_roles
+from domain.entities.role import Role
 
 class RoleModel(Base):
     __tablename__ = 'roles'
 
     id = Column(Integer, primary_key=True)
     name = Column(String, nullable=False)
+    description = Column(String, nullable=True)
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
 
     # Add a unique constraint on the name column
     __table_args__ = (UniqueConstraint('name', name='_role_name_uc'),)
@@ -61,6 +66,18 @@ class RoleModel(Base):
     def get_team_members(self):
         """Returns a list of all team members assigned to this role."""
         return self.team_members if self.team_members else None
+
+    def to_domain(self) -> Role:
+        """
+        Converts the RoleModel instance to a domain Role entity.
+        """
+        return Role(
+            id=self.id,
+            name=self.name,
+            description=self.description,
+            created_at=self.created_at,
+            updated_at=self.updated_at
+        )
 
     def __repr__(self):
         return f"<RoleModel(name={self.name})>"

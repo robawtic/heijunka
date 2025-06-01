@@ -1,0 +1,53 @@
+{
+  "workstations": [
+    {
+      "name": "Parts Wash",
+      "line_type": "Sub-Assembly"
+    },
+    {
+      "name": "H010",
+      "line_type": "Sub-Assembly",
+      "is_loading_job": true
+    },
+    {
+      "name": "H080/H090",
+      "line_type": "Sub-Assembly"
+    },
+    {
+      "name": "H100",
+      "line_type": "Sub-Assembly"
+    },
+    {
+      "name": "H110/H120",
+      "line_type": "Sub-Assembly"
+    },
+    {
+      "name": "H170",
+      "line_type": "Sub-Assembly",
+      "is_loading_job": true,
+      "is_heavy_job": true
+    },
+    {
+      "name": "BW010",
+      "line_type": "Mainline",
+      "is_loading_job": true,
+      "is_heavy_job": true
+    },
+    {
+      "name": "BW070",
+      "line_type": "Mainline"
+    },
+    {
+      "name": "M050",
+      "line_type": "Mainline",
+      "is_loading_job": true,
+      "is_heavy_job": true
+    },
+    {
+      "name": "M090",
+      "line_type": "Mainline",
+      "is_loading_job": true,
+      "is_heavy_job": true
+    }
+  ]
+}

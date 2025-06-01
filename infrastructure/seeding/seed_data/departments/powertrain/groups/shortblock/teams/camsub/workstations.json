@@ -1,0 +1,44 @@
+{
+  "workstations": [
+    {
+      "name": "CS010",
+      "line_type": "Sub-Assembly"
+    },
+    {
+      "name": "CS020",
+      "line_type": "Sub-Assembly"
+    },
+    {
+      "name": "CS030",
+      "line_type": "Sub-Assembly"
+    },
+    {
+      "name": "CS040",
+      "line_type": "Sub-Assembly"
+    },
+    {
+      "name": "CS050",
+      "line_type": "Sub-Assembly"
+    },
+    {
+      "name": "CS060",
+      "line_type": "Sub-Assembly"
+    },
+    {
+      "name": "CS070",
+      "line_type": "Main Line"
+    },
+    {
+      "name": "CS080",
+      "line_type": "Main Line"
+    },
+    {
+      "name": "CS090",
+      "line_type": "Main Line"
+    },
+    {
+      "name": "CS100",
+      "line_type": "Main Line"
+    }
+  ]
+}

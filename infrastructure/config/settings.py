@@ -2,6 +2,10 @@ from pydantic_settings import BaseSettings
 from pydantic import Field
 from typing import List, Optional
 import os
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 class Settings(BaseSettings):
     """
@@ -15,7 +19,7 @@ class Settings(BaseSettings):
     debug: bool = Field(False, env="DEBUG")
 
     # Security settings
-    jwt_secret_key: str = Field(..., env="JWT_SECRET_KEY")
+    jwt_secret_key: str = Field(default=os.environ.get("JWT_SECRET_KEY", "default-secret-key"), env="JWT_SECRET_KEY")
     jwt_algorithm: str = "HS256"
     jwt_expiration_minutes: int = Field(30, env="JWT_EXPIRATION_MINUTES")
 
@@ -39,8 +43,7 @@ class Settings(BaseSettings):
         return [origin.strip() for origin in self.allowed_origins.split(",") if origin.strip()]
 
     # Database settings
-    database_url: str = Field("sqlite:///schedule.db", env="DATABASE_URL")
-
+    database_url: str = Field(default=os.environ.get("DATABASE_URL", "postgresql+psycopg://postgres:Brownie12-@localhost/heijunka"), env="DATABASE_URL")
     # Scheduler settings
     periods: int = Field(4, env="PERIODS")
     max_solve_time: int = Field(60, env="MAX_SOLVE_TIME")
@@ -66,8 +69,11 @@ class Settings(BaseSettings):
         env_file = ".env"
         env_file_encoding = "utf-8"
 
-        # Allow case-insensitive environment variables
-        case_sensitive = False
+        # Use case-sensitive environment variables to match .env file
+        case_sensitive = True
+
+        # Allow environment variables to be read
+        extra = "ignore"
 
 # Create a global settings instance
 settings = Settings()

@@ -99,7 +99,7 @@ def seed_database(department='all', reset_db=False, dry_run=False):
     # Build command
     import sys
     cmd = [
-        sys.executable, os.path.join("tmp_seeder_directory", "seed_manager.py"),
+        sys.executable, os.path.join("infrastructure", "seeding", "seed_data", "seed_manager.py"),
         "--department", department
     ]
 

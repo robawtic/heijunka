@@ -70,8 +70,17 @@ async def login_for_access_token(
             detail="Username and password are required",
         )
 
-    # Authenticate user
-    user = user_service.authenticate_user(form_data.username, form_data.password)
+    # Get device information for device-bound session management
+    user_agent = request.headers.get("user-agent", "unknown")
+    ip_address = request.client.host if request.client else "unknown"
+
+    # Authenticate user with client information
+    user = user_service.authenticate_user(
+        form_data.username, 
+        form_data.password,
+        ip_address=ip_address,
+        user_agent=user_agent
+    )
     if not user:
         logger.warning(f"Failed login attempt for user: {form_data.username}")
         raise HTTPException(
@@ -92,9 +101,7 @@ async def login_for_access_token(
             expires_delta=access_token_expires
         )
 
-        # Get device information for device-bound session management
-        user_agent = request.headers.get("user-agent", "unknown")
-        ip_address = request.client.host if request.client else "unknown"
+        # Device information already retrieved above
 
         # Create refresh token and store it in the database
         refresh_token_expires = timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)

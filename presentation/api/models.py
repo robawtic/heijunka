@@ -14,6 +14,14 @@ class UserBase(BaseModel):
         None, 
         description="Email address"
     )
+    first_name: Optional[str] = Field(
+        None,
+        description="User's first name"
+    )
+    last_name: Optional[str] = Field(
+        None,
+        description="User's last name"
+    )
 
     # Validate username to prevent injection attacks
     @validator('username')
@@ -30,6 +38,10 @@ class UserCreate(UserBase):
     roles: List[str] = Field(
         default_factory=list,
         description="User roles"
+    )
+    is_verified: bool = Field(
+        False,
+        description="Whether the user's email is verified"
     )
 
     # Validate password strength
@@ -58,6 +70,9 @@ class UserUpdate(BaseModel):
     password: Optional[constr(min_length=8, max_length=64)] = None
     is_active: Optional[bool] = None
     roles: Optional[List[str]] = None
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    is_verified: Optional[bool] = None
 
     # Reuse password validator if password is provided
     @validator('password')
@@ -85,10 +100,11 @@ class UserUpdate(BaseModel):
 class UserResponse(BaseResponse, UserBase):
     id: int
     is_active: bool
+    is_verified: bool
     roles: List[str]
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
-    last_login: Optional[datetime] = None
+    last_login_at: Optional[datetime] = None
 
     class Config:
         json_schema_extra = {
@@ -96,11 +112,14 @@ class UserResponse(BaseResponse, UserBase):
                 "id": 1,
                 "username": "johndoe",
                 "email": "john.doe@example.com",
+                "first_name": "John",
+                "last_name": "Doe",
                 "is_active": True,
+                "is_verified": True,
                 "roles": ["operator", "viewer"],
                 "created_at": "2023-01-15T10:30:00",
                 "updated_at": "2023-01-15T10:30:00",
-                "last_login": "2023-01-15T10:30:00"
+                "last_login_at": "2023-01-15T10:30:00"
             }
         }
 
@@ -108,9 +127,12 @@ class UserMeResponse(BaseModel):
     id: int
     username: str
     email: Optional[str]
+    first_name: Optional[str]
+    last_name: Optional[str]
     roles: List[str]
     is_active: bool
-    last_login: Optional[datetime]
+    is_verified: bool
+    last_login_at: Optional[datetime]
 
     class Config:
         json_schema_extra = {
@@ -118,9 +140,12 @@ class UserMeResponse(BaseModel):
                 "id": 1,
                 "username": "johndoe",
                 "email": "john.doe@example.com",
+                "first_name": "John",
+                "last_name": "Doe",
                 "is_active": True,
+                "is_verified": True,
                 "roles": ["operator", "viewer"],
-                "last_login": "2023-01-15T10:30:00"
+                "last_login_at": "2023-01-15T10:30:00"
             }
         }
 

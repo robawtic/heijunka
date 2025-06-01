@@ -1,6 +1,6 @@
 # heijunka/domain/repositories/interfaces/employee_work_history_repository.py
 from abc import abstractmethod
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Set, Dict
 from datetime import date
 
 from domain.value_objects.work_history_entry import WorkHistoryEntry
@@ -121,5 +121,56 @@ class EmployeeWorkHistoryRepositoryInterface(BaseRepository[WorkHistoryEntry]):
 
         Returns:
             A tuple containing a list of work history entries and the total count
+        """
+        pass
+
+    @abstractmethod
+    def get_distinct_stations(
+        self, employee_id: int, since: date, until: date
+    ) -> Set[int]:
+        """
+        Get all station IDs the employee worked at any period between since (inclusive) and until (exclusive).
+
+        Args:
+            employee_id: The ID of the employee
+            since: The start date (inclusive)
+            until: The end date (exclusive)
+
+        Returns:
+            A set of station IDs the employee worked at in the date range
+        """
+        pass
+
+    @abstractmethod
+    def get_distinct_station_periods(
+        self, employee_id: int, since: date, until: date
+    ) -> Set[Tuple[int, int]]:
+        """
+        Get all (station_id, work_period) pairs for that employee in the window.
+
+        Args:
+            employee_id: The ID of the employee
+            since: The start date (inclusive)
+            until: The end date (exclusive)
+
+        Returns:
+            A set of (station_id, work_period) tuples the employee worked in the date range
+        """
+        pass
+
+    @abstractmethod
+    def get_station_period_counts(
+        self, employee_id: int, since: date, until: date
+    ) -> Dict[int, Dict[int, int]]:
+        """
+        Get mapping station_id → {period_index: count} over the date range.
+
+        Args:
+            employee_id: The ID of the employee
+            since: The start date (inclusive)
+            until: The end date (exclusive)
+
+        Returns:
+            A dictionary mapping station_id to a dictionary of period_index to count
         """
         pass

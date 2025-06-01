@@ -1,5 +1,5 @@
 from typing import List, Optional, Generator
-from datetime import date, datetime
+from datetime import date
 from contextlib import contextmanager
 from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session
@@ -8,7 +8,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from domain.value_objects.aro_assignment import AROAssignment
 from domain.models.AROAssignmentModel import AROAssignmentModel
 from domain.repositories.interfaces.aro_assignment_repository import AROAssignmentRepositoryInterface
-from domain.repositories.implementations.base_sqlalchemy_repository import BaseSqlAlchemyRepository
+from infrastructure.repositories.sqlalchemy.base_sqlalchemy_repository import BaseSqlAlchemyRepository
 from infrastructure.exceptions import RepositoryError
 from utilities.secure_logging import sanitize_exception
 from utilities.logging_factory import get_logger

@@ -8,7 +8,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from domain.entities.refresh_token import RefreshToken
 from domain.models.RefreshTokenModel import RefreshTokenModel
 from domain.repositories.interfaces.refresh_token_repository import RefreshTokenRepositoryInterface
-from domain.repositories.implementations.base_sqlalchemy_repository import BaseSqlAlchemyRepository
+from infrastructure.repositories.sqlalchemy.base_sqlalchemy_repository import BaseSqlAlchemyRepository
 from infrastructure.exceptions import RepositoryError
 from utilities.secure_logging import redact_log_message, sanitize_exception, log_audit_event
 from utilities.logging_factory import get_logger
