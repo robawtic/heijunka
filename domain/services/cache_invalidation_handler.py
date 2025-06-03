@@ -9,7 +9,7 @@ from domain.events import (
     WorkstationAddedToTeam, WorkstationRemovedFromTeam,
     QualificationAdded, QualificationRemoved
 )
-from domain.services.aro_graph_service import AROGraphService
+from domain.contexts.assignment.services.aro_graph_service import AROGraphService
 
 # Configure logging
 logger = logging.getLogger("heijunka.cache")

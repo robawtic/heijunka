@@ -560,11 +560,12 @@ class AROGraphService:
         """
         # Implementation depends on the database being used
         # For PostgreSQL, you might use:
-        query = """
+        from sqlalchemy import text
+        query = text("""
         SELECT 1 FROM aro_assignments 
         WHERE assignment_date = :date AND (period = :period OR period IS NULL)
         FOR UPDATE
-        """
+        """)
         self._session.execute(query, {"date": assignment_date, "period": period})
 
     def assign_optimal_aros(self, 

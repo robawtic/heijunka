@@ -5,6 +5,7 @@ from sqlalchemy.orm import relationship
 from .Base import Base
 from .RoleModel import RoleModel
 from .TeamMemberModel import TeamMemberModel
+from domain.entities.group import Group
 
 class GroupModel(Base):
     __tablename__ = 'groups'

@@ -1,48 +1,136 @@
 {
   "employees": [
     {
-      "name": "Douglas",
+      "name": "Tim",
       "role": "Team Leader",
       "known_stations": []
     },
     {
-      "name": "Larry",
+      "name": "Kathy",
       "role": "Backup",
       "known_stations": [
-        "HAR854",
-        "HAR655"
+        "HAR030",
+        "HAR040",
+        "HAR080",
+        "HAR090",
+        "HAR100",
+        "HAR110",
+        "HAR220",
+        "HAR230"
       ]
     },
     {
-      "name": "Michelle",
+      "name": "Steven",
       "role": "Associate",
       "known_stations": [
-        "HAR854",
-        "HAR655"
+        "HAR090",
+        "HAR220",
+        "HAR230",
+        "HAR100",
+        "HAR030",
+        "HAR080",
+        "HAR110"
       ]
     },
     {
-      "name": "Audrey",
+      "name": "Cassie",
       "role": "Associate",
       "known_stations": [
-        "HAR854",
-        "HAR655"
+        "HAR090",
+        "HAR110",
+        "HAR030"
       ]
     },
     {
-      "name": "Ryan",
+      "name": "Cynthia",
       "role": "Associate",
       "known_stations": [
-        "HAR854",
-        "HAR655"
+        "HAR100",
+        "HAR110",
+        "HAR230",
+        "HAR080"
       ]
     },
     {
-      "name": "Tanya",
+      "name": "Nicole",
       "role": "Associate",
       "known_stations": [
-        "HAR854",
-        "HAR655"
+        "HAR220",
+        "HAR090",
+        "HAR030",
+        "HAR110",
+        "HAR040",
+        "HAR080"
+      ]
+    },
+    {
+      "name": "Jesse",
+      "role": "Associate",
+      "known_stations": [
+        "HAR100",
+        "HAR110",
+        "HAR080",
+        "HAR030",
+        "HAR040",
+        "HAR220",
+        "HAR090"
+      ]
+    },
+    {
+      "name": "Robert",
+      "role": "Associate",
+      "known_stations": [
+        "HAR110",
+        "HAR230",
+        "HAR030",
+        "HAR040",
+        "HAR080",
+        "HAR220",
+        "HAR090",
+        "HAR100"
+      ]
+    },
+    {
+      "name": "David",
+      "role": "Associate",
+      "known_stations": [
+        "HAR030",
+        "HAR100",
+        "HAR220",
+        "HAR040",
+        "HAR090",
+        "HAR110"
+      ]
+    },
+    {
+      "name": "Ian",
+      "role": "Associate",
+      "known_stations": [
+        "HAR110",
+        "HAR030",
+        "HAR220"
+      ]
+    },
+    {
+      "name": "Dustin",
+      "role": "Associate",
+      "known_stations": [
+        "HAR090",
+        "HAR220",
+        "HAR080",
+        "HAR040",
+        "HAR100"
+      ]
+    },
+    {
+      "name": "Kyle",
+      "role": "Associate",
+      "known_stations": [
+        "HAR080",
+        "HAR100",
+        "HAR230",
+        "HAR220",
+        "HAR110"
       ]
     }
   ]

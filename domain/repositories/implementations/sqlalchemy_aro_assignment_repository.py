@@ -5,7 +5,7 @@ from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 
-from domain.value_objects.aro_assignment import AROAssignment
+from domain.contexts.assignment.aro_assignment import AROAssignment
 from domain.models.AROAssignmentModel import AROAssignmentModel
 from domain.repositories.interfaces.aro_assignment_repository import AROAssignmentRepositoryInterface
 from infrastructure.repositories.sqlalchemy.base_sqlalchemy_repository import BaseSqlAlchemyRepository
@@ -502,6 +502,7 @@ class SqlAlchemyAROAssignmentRepository(BaseSqlAlchemyRepository[AROAssignment, 
             )
 
             return AROAssignment(
+                id=model.id,
                 employee_id=model.employee_id,
                 from_team_id=model.from_team_id,
                 to_team_id=model.to_team_id,

@@ -1,10 +1,40 @@
 {
   "workstations": [
     {
-      "name": "OPU314"
+      "name": "OPU010"
     },
     {
-      "name": "OPU057"
+      "name": "OPU030"
+    },
+    {
+      "name": "OPU110"
+    },
+    {
+      "name": "OPU120"
+    },
+    {
+      "name": "OPU140"
+    },
+    {
+      "name": "OPU150"
+    },
+    {
+      "name": "OPU200"
+    },
+    {
+      "name": "OPU210"
+    },
+    {
+      "name": "OPU220"
+    },
+    {
+      "name": "OPU240"
+    },
+    {
+      "name": "OPU250"
+    },
+    {
+      "name": "OPU300"
     }
   ]
 }

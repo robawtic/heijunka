@@ -40,3 +40,16 @@ class WorkstationRepositoryInterface(BaseRepository[Workstation]):
             A list of workstations that match the filters
         """
         pass
+
+    @abstractmethod
+    def get_by_team_ids(self, team_ids: List[int]) -> List[Workstation]:
+        """
+        Retrieve all workstations for multiple teams in a single query.
+
+        Args:
+            team_ids: List of team IDs to fetch workstations for.
+
+        Returns:
+            A list of workstations belonging to any of the specified teams.
+        """
+        pass

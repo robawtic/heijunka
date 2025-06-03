@@ -1,48 +1,202 @@
 {
   "employees": [
     {
-      "name": "Carlos",
+      "name": "Christopher",
       "role": "Team Leader",
       "known_stations": []
     },
     {
-      "name": "Michaela",
+      "name": "Nancy",
       "role": "Backup",
       "known_stations": [
-        "DOC849",
-        "DOC371"
+        "DOC010",
+        "DOC060",
+        "DOC070",
+        "DOC110",
+        "DOC150",
+        "DOC170",
+        "DOC200",
+        "DOC220",
+        "DOC250",
+        "DOC270",
+        "DOC300"
       ]
     },
     {
-      "name": "Andrew",
+      "name": "Robert",
       "role": "Associate",
       "known_stations": [
-        "DOC849",
-        "DOC371"
+        "DOC060",
+        "DOC300",
+        "DOC170",
+        "DOC270",
+        "DOC110",
+        "DOC010",
+        "DOC250"
       ]
     },
     {
-      "name": "James",
+      "name": "Kerri",
       "role": "Associate",
       "known_stations": [
-        "DOC371",
-        "DOC849"
+        "DOC010",
+        "DOC150",
+        "DOC070",
+        "DOC170",
+        "DOC220",
+        "DOC300",
+        "DOC270",
+        "DOC110",
+        "DOC200"
       ]
     },
     {
-      "name": "Randy",
+      "name": "Jason",
       "role": "Associate",
       "known_stations": [
-        "DOC849",
-        "DOC371"
+        "DOC150",
+        "DOC170",
+        "DOC060",
+        "DOC070"
       ]
     },
     {
-      "name": "Tracy",
+      "name": "Susan",
       "role": "Associate",
       "known_stations": [
-        "DOC849",
-        "DOC371"
+        "DOC250",
+        "DOC060",
+        "DOC300",
+        "DOC070",
+        "DOC150",
+        "DOC220",
+        "DOC110",
+        "DOC010",
+        "DOC200",
+        "DOC270",
+        "DOC170"
+      ]
+    },
+    {
+      "name": "Antonio",
+      "role": "Associate",
+      "known_stations": [
+        "DOC060",
+        "DOC300",
+        "DOC010",
+        "DOC070",
+        "DOC220",
+        "DOC250",
+        "DOC270",
+        "DOC150",
+        "DOC170",
+        "DOC200"
+      ]
+    },
+    {
+      "name": "Taylor",
+      "role": "Associate",
+      "known_stations": [
+        "DOC300",
+        "DOC270",
+        "DOC010",
+        "DOC060",
+        "DOC220",
+        "DOC170",
+        "DOC250",
+        "DOC150",
+        "DOC070",
+        "DOC200",
+        "DOC110"
+      ]
+    },
+    {
+      "name": "Gregg",
+      "role": "Associate",
+      "known_stations": [
+        "DOC200",
+        "DOC110",
+        "DOC070"
+      ]
+    },
+    {
+      "name": "Michael",
+      "role": "Associate",
+      "known_stations": [
+        "DOC270",
+        "DOC010",
+        "DOC220",
+        "DOC150",
+        "DOC200",
+        "DOC070"
+      ]
+    },
+    {
+      "name": "Erin",
+      "role": "Associate",
+      "known_stations": [
+        "DOC110",
+        "DOC300",
+        "DOC150",
+        "DOC060",
+        "DOC200",
+        "DOC270",
+        "DOC170",
+        "DOC250"
+      ]
+    },
+    {
+      "name": "Robert",
+      "role": "Associate",
+      "known_stations": [
+        "DOC150",
+        "DOC300",
+        "DOC200"
+      ]
+    },
+    {
+      "name": "Billy",
+      "role": "Associate",
+      "known_stations": [
+        "DOC270",
+        "DOC070",
+        "DOC010",
+        "DOC060",
+        "DOC220",
+        "DOC250",
+        "DOC200",
+        "DOC110",
+        "DOC300",
+        "DOC150"
+      ]
+    },
+    {
+      "name": "Emily",
+      "role": "Associate",
+      "known_stations": [
+        "DOC200",
+        "DOC300",
+        "DOC060",
+        "DOC170",
+        "DOC070",
+        "DOC270",
+        "DOC110",
+        "DOC220"
+      ]
+    },
+    {
+      "name": "Shawn",
+      "role": "Associate",
+      "known_stations": [
+        "DOC270",
+        "DOC200",
+        "DOC070",
+        "DOC110",
+        "DOC220",
+        "DOC010",
+        "DOC300",
+        "DOC060",
+        "DOC170"
       ]
     }
   ]

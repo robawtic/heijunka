@@ -9,13 +9,14 @@ from domain.rules.hard import (
     forbid_unavailable,
     forbid_unknown_stations,
     add_one_station_per_employee,
-    add_exactly_one_per_station,
+    add_at_most_one_per_station,
     # ...add other hard rules here
 )
 from domain.rules.soft import (
     add_same_day_repeat_penalties,
     add_lookback_any_period_penalties,
     add_lookback_same_period_penalties,
+    add_aro_reassignment_penalties,
 )
 
 # All rules should take a single argument: ctx (RuleContext)
@@ -24,7 +25,7 @@ COMMON_HARD_RULES = [
     forbid_unavailable,
     forbid_unknown_stations,
     add_one_station_per_employee,
-    add_exactly_one_per_station,
+    add_at_most_one_per_station,
 
     # ...add more
 ]
@@ -33,6 +34,7 @@ COMMON_SOFT_RULES = [
     add_same_day_repeat_penalties,
     add_lookback_any_period_penalties,
     add_lookback_same_period_penalties,
+    add_aro_reassignment_penalties,
     # ...add more
 ]
 

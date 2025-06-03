@@ -116,6 +116,56 @@ class SqlAlchemyWorkstationRepository(BaseSqlAlchemyRepository[Workstation, Work
             )
             raise RepositoryError(f"Failed to get workstations by team ID: {error_msg}")
 
+    def get_by_team_ids(self, team_ids: List[int]) -> List[Workstation]:
+        """
+        Retrieve all workstations for multiple teams in a single query.
+
+        Args:
+            team_ids: List of team IDs to fetch workstations for.
+
+        Returns:
+            A list of workstations belonging to any of the specified teams.
+        """
+        if not team_ids:
+            return []
+
+        try:
+            self.logger.info(
+                f"Retrieving workstations for {len(team_ids)} teams",
+                extra={
+                    "event_type": "bulk_workstations_lookup",
+                    "team_count": len(team_ids)
+                }
+            )
+
+            # Use SQLAlchemy's in_() for efficient bulk fetching
+            workstation_models = self._session.query(WorkstationModel).filter(
+                WorkstationModel.team_id.in_(team_ids)
+            ).all()
+
+            workstation_count = len(workstation_models)
+            self.logger.info(
+                f"Found {workstation_count} workstations for {len(team_ids)} teams",
+                extra={
+                    "event_type": "bulk_workstations_lookup_success",
+                    "team_count": len(team_ids),
+                    "workstation_count": workstation_count
+                }
+            )
+
+            return [self._to_domain(model) for model in workstation_models]
+        except SQLAlchemyError as e:
+            error_msg = sanitize_exception(e)
+            self.logger.error(
+                f"Error retrieving workstations for multiple teams: {error_msg}",
+                extra={
+                    "event_type": "bulk_workstations_lookup_error",
+                    "team_count": len(team_ids),
+                    "error_type": type(e).__name__
+                }
+            )
+            raise RepositoryError(f"Failed to get workstations for multiple teams: {error_msg}")
+
     def get_all(self, team_id: Optional[int] = None, is_active: Optional[bool] = None,
                 required_qualification: Optional[str] = None, skip: int = 0, limit: int = 100) -> List[Workstation]:
         """

@@ -264,7 +264,8 @@ class ScheduleService:
                           start_date: date, periods_per_day: int,
                           team_name: str, call_ins: List[str] = None, offline: List[str] = None,
                           force_complete: bool = False, session: Any = None, team_repository: Optional[Any] = None,
-                          aro_assignment_repository: Optional[Any] = None, schedule_repository: Optional[Any] = None) -> WorkAssignments:
+                          aro_assignment_repository: Optional[Any] = None, schedule_repository: Optional[Any] = None,
+                          aro_service: Optional[Any] = None, aro_graph_service: Optional[Any] = None) -> WorkAssignments:
         """
         Generate a schedule for the given employees, workstations, and time period
 
@@ -287,6 +288,8 @@ class ScheduleService:
             team_repository: Optional repository for retrieving team information (optional for testing/offline use)
             aro_assignment_repository: Optional repository for retrieving ARO assignments (optional for testing/offline use)
             schedule_repository: Optional repository for creating/retrieving schedules (optional for testing/offline use)
+            aro_service: Optional ARO service for finding and assigning AROs
+            aro_graph_service: Optional ARO graph service for optimizing ARO assignments
 
         Returns:
             List of work assignments
@@ -309,8 +312,14 @@ class ScheduleService:
         )
 
         # Generate assignments using the Schedule entity
-        success = schedule.generate_assignments(available_employees, workstations, session=session,
-                                                team_repository=team_repository)
+        success = schedule.generate_assignments(
+            available_employees, 
+            workstations, 
+            session=session,
+            team_repository=team_repository,
+            aro_service=aro_service,
+            aro_graph_service=aro_graph_service
+        )
 
         # Update schedule status based on generation result
         if schedule_repository:

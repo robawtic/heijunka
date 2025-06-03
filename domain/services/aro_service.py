@@ -2,7 +2,7 @@ from typing import List, Optional, Dict, Callable, Any
 from datetime import date
 
 from domain.entities.employee import Employee
-from domain.aggregates.aro_assignment import AROAssignment
+from domain.contexts.assignment.aro_assignment import AROAssignment
 from domain.repositories.interfaces.aro_assignment_repository import AROAssignmentRepositoryInterface
 from domain.repositories.interfaces.employee_repository import EmployeeRepositoryInterface
 from domain.repositories.interfaces.team_repository import TeamRepositoryInterface

@@ -89,6 +89,48 @@ class SqlAlchemyEmployeeRepository(BaseSqlAlchemyRepository[Employee, EmployeeMo
             )
             raise RepositoryError(f"Error retrieving employees for team: {error_msg}")
 
+    def get_by_team_ids(self, team_ids: List[int]) -> List[Employee]:
+        """Retrieve all employees for multiple teams in a single query."""
+        if not team_ids:
+            return []
+
+        self.logger.info(
+            f"Retrieving employees for {len(team_ids)} teams",
+            extra={
+                "event_type": "bulk_employees_lookup",
+                "team_count": len(team_ids)
+            }
+        )
+
+        try:
+            # Use SQLAlchemy's in_() for efficient bulk fetching
+            employee_models = self._session.query(EmployeeModel).filter(
+                EmployeeModel.team_id.in_(team_ids)
+            ).all()
+
+            employee_count = len(employee_models)
+            self.logger.info(
+                f"Found {employee_count} employees for {len(team_ids)} teams",
+                extra={
+                    "event_type": "bulk_employees_lookup_success",
+                    "team_count": len(team_ids),
+                    "employee_count": employee_count
+                }
+            )
+
+            return [model.to_domain() for model in employee_models]
+        except SQLAlchemyError as e:
+            error_msg = sanitize_exception(e)
+            self.logger.error(
+                f"Error retrieving employees for multiple teams: {error_msg}",
+                extra={
+                    "event_type": "bulk_employees_lookup_error",
+                    "team_count": len(team_ids),
+                    "error_type": type(e).__name__
+                }
+            )
+            raise RepositoryError(f"Error retrieving employees for multiple teams: {error_msg}")
+
     def is_available(self, employee_id: int, date_obj: date, period: Optional[int] = None) -> bool:
         """Check if employee is available on the given date and period."""
         try:

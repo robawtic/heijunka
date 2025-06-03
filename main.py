@@ -6,6 +6,7 @@ from infrastructure.config.settings import settings
 from presentation.cli.cli import main
 from sqlalchemy.engine.url import make_url
 from utilities.logging_factory import get_logger
+from infrastructure.logging.config import configure_logging
 
 # Create a logger for this module
 logger = get_logger("main", rate_limit=True)
@@ -63,6 +64,7 @@ def validate_environment():
     print("Environment configuration validated successfully.")
 
 if __name__ == '__main__':
+    configure_logging()
     logger.info("Starting Heijunka application", event_type="application", identifier="startup")
     try:
         validate_environment()

@@ -7,9 +7,9 @@ from sqlalchemy.exc import OperationalError
 from domain.entities.employee import Employee
 from domain.entities.team import Team
 from domain.entities.workstation import Workstation
-from domain.services.aro_graph_service import AROGraphService
+from domain.contexts.assignment.services.aro_graph_service import AROGraphService
 from domain.services.aro_service import AROService
-from domain.value_objects.aro_assignment import AROAssignment
+from domain.contexts.assignment.aro_assignment import AROAssignment
 
 class TestAROGraphService(unittest.TestCase):
     def setUp(self):
@@ -21,12 +21,15 @@ class TestAROGraphService(unittest.TestCase):
         self.aro_service = MagicMock(spec=AROService)
 
         # Create the service
+        from domain.events.publisher import DomainEventPublisher
+        self.event_publisher = MagicMock(spec=DomainEventPublisher)
         self.aro_graph_service = AROGraphService(
             aro_service=self.aro_service,
             aro_repository=self.aro_repository,
             employee_repository=self.employee_repository,
             team_repository=self.team_repository,
-            workstation_repository=self.workstation_repository
+            workstation_repository=self.workstation_repository,
+            event_publisher=self.event_publisher
         )
 
         # Create test data
@@ -166,6 +169,7 @@ class TestAROGraphService(unittest.TestCase):
 
         # Mock aro_service.find_aro_assignment to return a mock assignment
         mock_assignment = AROAssignment(
+            id=1,
             employee_id=5,
             from_team_id=3,
             to_team_id=1,
@@ -220,6 +224,7 @@ class TestAROGraphService(unittest.TestCase):
         def mock_find_aro_assignment(employee_id, assignment_date, period):
             if employee_id == 5:  # First hop: C1 -> B
                 return AROAssignment(
+                    id=1,
                     employee_id=5,
                     from_team_id=3,
                     to_team_id=2,
@@ -228,6 +233,7 @@ class TestAROGraphService(unittest.TestCase):
                 )
             elif employee_id == 3:  # Second hop: B1 -> A
                 return AROAssignment(
+                    id=2,
                     employee_id=3,
                     from_team_id=2,
                     to_team_id=1,
@@ -407,6 +413,7 @@ class TestAROGraphService(unittest.TestCase):
         # Mock repository methods
         self.aro_repository.get_by_employee_id.return_value = [
             AROAssignment(
+                id=1,
                 employee_id=5,
                 from_team_id=3,
                 to_team_id=1,

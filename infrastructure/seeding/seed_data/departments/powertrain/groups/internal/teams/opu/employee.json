@@ -1,48 +1,210 @@
 {
   "employees": [
     {
-      "name": "Erica",
+      "name": "Megan",
       "role": "Team Leader",
       "known_stations": []
     },
     {
-      "name": "Samuel",
+      "name": "James",
       "role": "Backup",
       "known_stations": [
-        "OPU314",
-        "OPU057"
+        "OPU010",
+        "OPU030",
+        "OPU110",
+        "OPU120",
+        "OPU140",
+        "OPU150",
+        "OPU200",
+        "OPU210",
+        "OPU220",
+        "OPU240",
+        "OPU250",
+        "OPU300"
       ]
     },
     {
-      "name": "Frederick",
+      "name": "Lance",
       "role": "Associate",
       "known_stations": [
-        "OPU314",
-        "OPU057"
+        "OPU010",
+        "OPU220",
+        "OPU300",
+        "OPU120",
+        "OPU150",
+        "OPU030",
+        "OPU210",
+        "OPU240",
+        "OPU250",
+        "OPU200"
       ]
     },
     {
-      "name": "Stacy",
+      "name": "Thomas",
       "role": "Associate",
       "known_stations": [
-        "OPU057",
-        "OPU314"
+        "OPU240",
+        "OPU010",
+        "OPU250",
+        "OPU140",
+        "OPU220",
+        "OPU200"
       ]
     },
     {
-      "name": "Dawn",
+      "name": "Steven",
       "role": "Associate",
       "known_stations": [
-        "OPU314",
-        "OPU057"
+        "OPU110",
+        "OPU120",
+        "OPU030",
+        "OPU240",
+        "OPU140",
+        "OPU150",
+        "OPU220"
       ]
     },
     {
-      "name": "Brenda",
+      "name": "Jerry",
       "role": "Associate",
       "known_stations": [
-        "OPU314",
-        "OPU057"
+        "OPU210",
+        "OPU220",
+        "OPU140",
+        "OPU010",
+        "OPU300"
+      ]
+    },
+    {
+      "name": "Michelle",
+      "role": "Associate",
+      "known_stations": [
+        "OPU010",
+        "OPU110",
+        "OPU210",
+        "OPU150",
+        "OPU220",
+        "OPU120",
+        "OPU250",
+        "OPU300",
+        "OPU140",
+        "OPU240",
+        "OPU030",
+        "OPU200"
+      ]
+    },
+    {
+      "name": "Daniel",
+      "role": "Associate",
+      "known_stations": [
+        "OPU110",
+        "OPU010",
+        "OPU120",
+        "OPU250",
+        "OPU150",
+        "OPU220",
+        "OPU140",
+        "OPU030"
+      ]
+    },
+    {
+      "name": "Edwin",
+      "role": "Associate",
+      "known_stations": [
+        "OPU200",
+        "OPU210",
+        "OPU250",
+        "OPU300",
+        "OPU110"
+      ]
+    },
+    {
+      "name": "Vanessa",
+      "role": "Associate",
+      "known_stations": [
+        "OPU250",
+        "OPU030",
+        "OPU200",
+        "OPU010"
+      ]
+    },
+    {
+      "name": "Robert",
+      "role": "Associate",
+      "known_stations": [
+        "OPU220",
+        "OPU210",
+        "OPU150",
+        "OPU240",
+        "OPU300",
+        "OPU250"
+      ]
+    },
+    {
+      "name": "Jason",
+      "role": "Associate",
+      "known_stations": [
+        "OPU110",
+        "OPU150",
+        "OPU200"
+      ]
+    },
+    {
+      "name": "Jessica",
+      "role": "Associate",
+      "known_stations": [
+        "OPU200",
+        "OPU030",
+        "OPU250",
+        "OPU010",
+        "OPU220",
+        "OPU110",
+        "OPU150",
+        "OPU120",
+        "OPU300",
+        "OPU210"
+      ]
+    },
+    {
+      "name": "Crystal",
+      "role": "Associate",
+      "known_stations": [
+        "OPU120",
+        "OPU300",
+        "OPU240",
+        "OPU220",
+        "OPU030"
+      ]
+    },
+    {
+      "name": "Amy",
+      "role": "Associate",
+      "known_stations": [
+        "OPU030",
+        "OPU010",
+        "OPU250",
+        "OPU300",
+        "OPU240",
+        "OPU120",
+        "OPU200"
+      ]
+    },
+    {
+      "name": "John",
+      "role": "Associate",
+      "known_stations": [
+        "OPU300",
+        "OPU030",
+        "OPU150",
+        "OPU010",
+        "OPU240",
+        "OPU120",
+        "OPU140",
+        "OPU210",
+        "OPU200",
+        "OPU220",
+        "OPU110",
+        "OPU250"
       ]
     }
   ]

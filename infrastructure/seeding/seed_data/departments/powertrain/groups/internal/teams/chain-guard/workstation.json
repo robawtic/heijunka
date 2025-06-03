@@ -1,10 +1,40 @@
 {
   "workstations": [
     {
-      "name": "CHA763"
+      "name": "CHA020"
     },
     {
-      "name": "CHA838"
+      "name": "CHA030"
+    },
+    {
+      "name": "CHA060"
+    },
+    {
+      "name": "CHA090"
+    },
+    {
+      "name": "CHA120"
+    },
+    {
+      "name": "CHA130"
+    },
+    {
+      "name": "CHA140"
+    },
+    {
+      "name": "CHA150"
+    },
+    {
+      "name": "CHA200"
+    },
+    {
+      "name": "CHA210"
+    },
+    {
+      "name": "CHA250"
+    },
+    {
+      "name": "CHA270"
     }
   ]
 }

@@ -178,19 +178,26 @@ class Employee:
             True if the employee is available, False otherwise
         """
         # By default, employees are available unless there's a record indicating unavailability
+        is_aro = False
+
         for av in self._available_periods:
             if av.date != date_obj:
                 continue
 
-            # Full day unavailability (CALL_IN or ARO)
-            if av.status in (AvailabilityStatus.CALL_IN, AvailabilityStatus.ARO):
+            # Full day unavailability (CALL_IN only - ARO is now considered available)
+            if av.status == AvailabilityStatus.CALL_IN:
                 return False
+
+            # Track if employee is an ARO
+            if av.status == AvailabilityStatus.ARO:
+                is_aro = True
 
             # Period-specific unavailability
             if period is not None and av.period == period:
                 if av.status in (AvailabilityStatus.PARTIAL, AvailabilityStatus.OFFLINE):
                     return False
 
+        # ARO employees are considered available
         return True
 
     def add_availability(self, availability: EmployeeAvailability) -> bool:

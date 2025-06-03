@@ -11,7 +11,7 @@ from domain.rules.hard import (
     forbid_unavailable,
     forbid_unknown_stations,
     add_one_station_per_employee,
-    add_exactly_one_per_station
+    add_at_most_one_per_station
 )
 
 
@@ -95,10 +95,10 @@ class TestHardRules(unittest.TestCase):
         # Verify that the model has constraints that limit assignments
         self.assertTrue(self.model.Proto().constraints)
 
-    def test_add_exactly_one_per_station(self):
-        """Test that add_exactly_one_per_station rule is correctly implemented."""
+    def test_add_at_most_one_per_station(self):
+        """Test that add_at_most_one_per_station rule is correctly implemented."""
         # Apply the rule
-        add_exactly_one_per_station(self.ctx)
+        add_at_most_one_per_station(self.ctx)
 
         # Verify that the model has constraints that limit assignments
         self.assertTrue(self.model.Proto().constraints)

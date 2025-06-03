@@ -1,53 +1,43 @@
 {
   "workstations": [
     {
-      "name": "Parts Wash",
-      "line_type": "Sub-Assembly"
+      "name": "HEA080"
     },
     {
-      "name": "H010",
-      "line_type": "Sub-Assembly",
-      "is_loading_job": true
+      "name": "HEA090"
     },
     {
-      "name": "H080/H090",
-      "line_type": "Sub-Assembly"
+      "name": "HEA100"
     },
     {
-      "name": "H100",
-      "line_type": "Sub-Assembly"
+      "name": "HEA120"
     },
     {
-      "name": "H110/H120",
-      "line_type": "Sub-Assembly"
+      "name": "HEA130"
     },
     {
-      "name": "H170",
-      "line_type": "Sub-Assembly",
-      "is_loading_job": true,
-      "is_heavy_job": true
+      "name": "HEA180"
     },
     {
-      "name": "BW010",
-      "line_type": "Mainline",
-      "is_loading_job": true,
-      "is_heavy_job": true
+      "name": "HEA190"
     },
     {
-      "name": "BW070",
-      "line_type": "Mainline"
+      "name": "HEA200"
     },
     {
-      "name": "M050",
-      "line_type": "Mainline",
-      "is_loading_job": true,
-      "is_heavy_job": true
+      "name": "HEA240"
     },
     {
-      "name": "M090",
-      "line_type": "Mainline",
-      "is_loading_job": true,
-      "is_heavy_job": true
+      "name": "HEA250"
+    },
+    {
+      "name": "HEA260"
+    },
+    {
+      "name": "HEA290"
+    },
+    {
+      "name": "HEA300"
     }
   ]
 }

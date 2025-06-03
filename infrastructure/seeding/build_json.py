@@ -90,18 +90,10 @@ if __name__ == "__main__":
 
                 # 4a. Generate workstation.json first (overwrite if exists)
                 abbr = make_abbreviation(team_name)
-                # For shortblock: between 7 and 13 jobs, codes from 010–300 (step 10)
-                if team_name.lower() == "shortblock":
-                    count = random.randint(7, 13)
-                    choices = random.sample(list(range(10, 301, 10)), count)
-                    choices.sort()
-                    workstations = [{"name": f"{abbr}{num:03}"} for num in choices]
-                else:
-                    # Default: generate 2 dummy workstations
-                    workstations = []
-                    for idx in range(2):
-                        code = random.randint(1, 999)
-                        workstations.append({"name": f"{abbr}{code:03}"})
+                count = random.randint(7, 13)
+                choices = random.sample(list(range(10, 301, 10)), count)
+                choices.sort()
+                workstations = [{"name": f"{abbr}{num:03}"} for num in choices]
 
                 workstation_json = {"workstations": workstations}
                 write_json(team_path / "workstation.json", workstation_json)

@@ -5,9 +5,12 @@ import os
 from datetime import datetime, date
 
 from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy import event
+from sqlalchemy.engine import Engine
 from tabulate import tabulate
 import colorama
 from colorama import Fore, Back, Style
+import time
 
 # Initialize colorama to handle ANSI color codes in Windows
 colorama.init()
@@ -28,6 +31,15 @@ from utilities.logging_factory import get_logger
 
 # Create a logger for this module
 logger = get_logger("presentation.cli", rate_limit=True)
+
+# Global counter for queries
+query_count = 0
+
+@event.listens_for(Engine, "before_cursor_execute")
+def count_queries(conn, cursor, statement, parameters, context, executemany):
+    """Event listener that counts SQL queries."""
+    global query_count
+    query_count += 1
 
 
 
@@ -55,19 +67,22 @@ def setup_dependencies():
     # Create and register the schedule recalculation handler
     from domain.services.aro_service import AROService
     from domain.services.schedule_recalculation_handler import ScheduleRecalculationHandler
-    from domain.services.aro_graph_service import AROGraphService
+    from domain.contexts.assignment.services.aro_graph_service import AROGraphService
     from domain.services.cache_invalidation_handler import CacheInvalidationHandler
 
     aro_service = AROService(aro_repository, employee_repository, team_repository)
-    schedule_recalculation_handler = ScheduleRecalculationHandler(team_repository, schedule_service)
+    schedule_recalculation_handler = ScheduleRecalculationHandler(team_repository, employee_repository, workstation_repository, schedule_service)
 
     # Create the ARO graph service
+    from domain.events.publisher import DomainEventPublisher
+    event_publisher = DomainEventPublisher()
     aro_graph_service = AROGraphService(
         aro_service=aro_service,
         aro_repository=aro_repository,
         employee_repository=employee_repository,
         team_repository=team_repository,
-        workstation_repository=workstation_repository
+        workstation_repository=workstation_repository,
+        event_publisher=event_publisher
     )
 
     # Create the cache invalidation handler
@@ -324,13 +339,16 @@ def handle_aro_assignment(args, session, aro_service=None, aro_graph_service=Non
                 logger.debug("Creating ARO graph service", event_type="aro_optimize", identifier="service_creation")
                 from domain.repositories.implementations.sqlalchemy_aro_assignment_repository import SqlAlchemyAROAssignmentRepository
                 aro_repository = SqlAlchemyAROAssignmentRepository(session)
-                from domain.services.aro_graph_service import AROGraphService
+                from domain.contexts.assignment.services.aro_graph_service import AROGraphService
+                from domain.events.publisher import DomainEventPublisher
+                event_publisher = DomainEventPublisher()
                 aro_graph_service = AROGraphService(
                     aro_service=aro_service,
                     aro_repository=aro_repository,
                     employee_repository=employee_repository,
                     team_repository=team_repository,
-                    workstation_repository=workstation_repository
+                    workstation_repository=workstation_repository,
+                    event_publisher=event_publisher
                 )
 
             # Get team by name
@@ -353,7 +371,7 @@ def handle_aro_assignment(args, session, aro_service=None, aro_graph_service=Non
                 return False
 
             # Assign optimal AROs
-            logger.info(f"Assigning {args.count} optimal AROs to team {args.team}", 
+            logger.info(f"Assigning {args.count} optimal AROs to team {args.team}",
                        event_type="aro_optimize", identifier="assignment",
                        extra={"team_id": team.id, "count": args.count, "date": str(assignment_date), "period": args.period})
             assignments = aro_graph_service.assign_optimal_aros(
@@ -365,7 +383,7 @@ def handle_aro_assignment(args, session, aro_service=None, aro_graph_service=Non
 
             if assignments:
                 success_msg = f"Successfully assigned {len(assignments)} AROs to team {args.team}."
-                logger.info(success_msg, event_type="aro_optimize", identifier="success", 
+                logger.info(success_msg, event_type="aro_optimize", identifier="success",
                            extra={"assigned_count": len(assignments)})
                 print(success_msg)
 
@@ -382,7 +400,7 @@ def handle_aro_assignment(args, session, aro_service=None, aro_graph_service=Non
                     period_str = f" for period {assignment.period}" if assignment.period else " for the full day"
                     assignment_detail = f"- {employee_name} from {from_team_name} to {to_team_name}{period_str}"
                     logger.debug(assignment_detail, event_type="aro_optimize", identifier="assignment_detail",
-                                extra={"employee_id": assignment.employee_id, "from_team_id": assignment.from_team_id, 
+                                extra={"employee_id": assignment.employee_id, "from_team_id": assignment.from_team_id,
                                       "to_team_id": assignment.to_team_id, "period": assignment.period})
                     print(assignment_detail)
 
@@ -437,7 +455,7 @@ def handle_aro_assignment(args, session, aro_service=None, aro_graph_service=Non
                 return False
 
             # Verify employee belongs to from_team
-            logger.debug(f"Verifying employee {args.employee} belongs to team {args.from_team}", 
+            logger.debug(f"Verifying employee {args.employee} belongs to team {args.from_team}",
                         event_type="aro_assign", identifier="team_membership")
             if employee.team_id != from_team.id:
                 error_msg = f"Error: Employee '{args.employee}' does not belong to team '{args.from_team}'"
@@ -446,9 +464,9 @@ def handle_aro_assignment(args, session, aro_service=None, aro_graph_service=Non
                 return False
 
             # Assign ARO
-            logger.info(f"Assigning {args.employee} as ARO from {args.from_team} to {args.to_team} on {args.date}", 
+            logger.info(f"Assigning {args.employee} as ARO from {args.from_team} to {args.to_team} on {args.date}",
                        event_type="aro_assign", identifier="assignment",
-                       extra={"employee_id": employee.id, "from_team_id": from_team.id, 
+                       extra={"employee_id": employee.id, "from_team_id": from_team.id,
                              "to_team_id": to_team.id, "date": str(assignment_date), "period": args.period})
             result = aro_service.assign_aro(employee.id, to_team.id, assignment_date, args.period)
 
@@ -460,7 +478,7 @@ def handle_aro_assignment(args, session, aro_service=None, aro_graph_service=Non
                 return True
             else:
                 error_msg = f"Error: {result['message']}"
-                logger.error(error_msg, event_type="aro_assign", identifier="failure", 
+                logger.error(error_msg, event_type="aro_assign", identifier="failure",
                             extra={"error_details": result.get("details", "")})
                 print(error_msg, file=sys.stderr)
                 return False
@@ -468,7 +486,7 @@ def handle_aro_assignment(args, session, aro_service=None, aro_graph_service=Non
         # Handle ARO remove command
         elif args.aro_command == 'remove':
             # Find the ARO assignment
-            logger.debug(f"Finding ARO assignment for {args.employee} on {args.date}", 
+            logger.debug(f"Finding ARO assignment for {args.employee} on {args.date}",
                         event_type="aro_remove", identifier="assignment_lookup")
             assignment = aro_service.find_aro_assignment(employee.id, assignment_date, args.period)
             if not assignment:
@@ -484,10 +502,10 @@ def handle_aro_assignment(args, session, aro_service=None, aro_graph_service=Non
             to_team = team_repository.get(assignment.to_team_id)
 
             # Remove the ARO assignment
-            logger.info(f"Removing ARO assignment for {args.employee} on {args.date}", 
+            logger.info(f"Removing ARO assignment for {args.employee} on {args.date}",
                        event_type="aro_remove", identifier="removal",
-                       extra={"assignment_id": assignment.id, "employee_id": employee.id, 
-                             "from_team_id": assignment.from_team_id, "to_team_id": assignment.to_team_id, 
+                       extra={"assignment_id": assignment.id, "employee_id": employee.id,
+                             "from_team_id": assignment.from_team_id, "to_team_id": assignment.to_team_id,
                              "date": str(assignment_date), "period": assignment.period})
             result = aro_service.remove_aro_assignment(assignment.id)
 
@@ -501,7 +519,7 @@ def handle_aro_assignment(args, session, aro_service=None, aro_graph_service=Non
                 return True
             else:
                 error_msg = f"Error: {result['message']}"
-                logger.error(error_msg, event_type="aro_remove", identifier="failure", 
+                logger.error(error_msg, event_type="aro_remove", identifier="failure",
                             extra={"error_details": result.get("details", "")})
                 print(error_msg, file=sys.stderr)
                 return False
@@ -791,8 +809,8 @@ def handle_simulation(args, session):
         summary_cols = ['Scenario', 'Total Assignments']
         if 'Min Employee Assignments' in comparison_df.columns:
             summary_cols.extend(['Min Employee Assignments', 'Max Employee Assignments', 'Avg Employee Assignments'])
-        print(tabulate(comparison_df[summary_cols].values.tolist(), 
-                      headers=summary_cols, 
+        print(tabulate(comparison_df[summary_cols].values.tolist(),
+                      headers=summary_cols,
                       tablefmt="grid"))
 
         return True
@@ -809,7 +827,7 @@ def handle_manual_assignment(args, session):
         args: Command line arguments
         session: Database session
     """
-    logger.info(f"Handling manual assignment: {args.employee} to {args.workstation} on {args.date} for period {args.period}", 
+    logger.info(f"Handling manual assignment: {args.employee} to {args.workstation} on {args.date} for period {args.period}",
                event_type="manual_assignment", identifier="start")
     try:
         # Setup repositories
@@ -874,7 +892,7 @@ def handle_manual_assignment(args, session):
 
         if success:
             success_msg = f"Successfully assigned {args.employee} to {args.workstation} on {args.date} for period {args.period}"
-            logger.info(success_msg, event_type="manual_assignment", identifier="success", 
+            logger.info(success_msg, event_type="manual_assignment", identifier="success",
                        extra={"employee_id": employee.id, "workstation_id": workstation.id, "date": str(assignment_date), "period": args.period})
             print(success_msg)
             return True
@@ -917,7 +935,9 @@ def main():
                     assignment_repository=assignment_repository,
                     schedule_service=schedule_service,
                     schedule_repository=schedule_repository,
-                    session=session
+                    session=session,
+                    aro_service=aro_service,
+                    aro_graph_service=aro_graph_service
                 )
 
                 # Parse start_date if it's a string
@@ -967,7 +987,48 @@ def main():
                 # Initialize assignments list
                 all_assignments = []
 
-                # Generate schedules for each team
+                # Reset query counter and start timer for performance measurement
+                global query_count
+                query_count = 0
+                start_time = time.time()
+
+                logger.info(f"Starting performance measurement", event_type="performance_measurement", identifier="start")
+
+                # Prefetch all employees and workstations for all teams in the department/group
+                team_ids = [team.id for team in teams]
+
+                logger.info(f"Prefetching data for {len(team_ids)} teams", event_type="bulk_data_fetch", identifier="start")
+
+                # Batch fetch all employees and workstations
+                all_employees = employee_repository.get_by_team_ids(team_ids)
+                all_workstations = workstation_repository.get_by_team_ids(team_ids)
+
+                logger.info(
+                    f"Prefetched {len(all_employees)} employees and {len(all_workstations)} workstations for {len(team_ids)} teams",
+                    event_type="bulk_data_fetch", 
+                    identifier="complete",
+                    extra={
+                        "employee_count": len(all_employees),
+                        "workstation_count": len(all_workstations),
+                        "team_count": len(team_ids)
+                    }
+                )
+
+                # Create lookup dictionaries for quick access
+                employees_by_team = {}
+                workstations_by_team = {}
+
+                for employee in all_employees:
+                    if employee.team_id not in employees_by_team:
+                        employees_by_team[employee.team_id] = []
+                    employees_by_team[employee.team_id].append(employee)
+
+                for workstation in all_workstations:
+                    if workstation.team_id not in workstations_by_team:
+                        workstations_by_team[workstation.team_id] = []
+                    workstations_by_team[workstation.team_id].append(workstation)
+
+                # Generate schedules for each team using prefetched data
                 for team in teams:
                     logger.info(f"Generating schedule for team '{team.name}'", event_type="team_schedule", identifier=team.name)
                     print(f"\nGenerating schedule for team '{team.name}'...")
@@ -982,19 +1043,50 @@ def main():
                         force_complete=args.force_complete
                     )
 
-                    logger.debug(f"Created GenerateScheduleCommand for team '{team.name}'", event_type="command_creation", identifier=team.name)
+                    # Use prefetched data instead of making new queries
+                    team_employees = employees_by_team.get(team.id, [])
+                    team_workstations = workstations_by_team.get(team.id, [])
 
-                    # Handle command
-                    logger.debug(f"Executing handler for team '{team.name}'", event_type="handler_execution", identifier=team.name)
-                    team_assignments = handler.handle(command)
+                    # Generate assignments using prefetched data
+                    team_assignments = handler.generate_with_prefetched_data(
+                        command, 
+                        team_employees, 
+                        team_workstations
+                    )
 
                     if team_assignments:
-                        logger.info(f"Generated {len(team_assignments)} assignments for team '{team.name}'", event_type="schedule_result", identifier=team.name)
+                        logger.info(f"Generated {len(team_assignments)} assignments for team '{team.name}'",
+                                   event_type="schedule_result", identifier=team.name)
                         print(f"Generated {len(team_assignments)} assignments for team '{team.name}'")
                         all_assignments.extend(team_assignments)
                     else:
-                        logger.warning(f"No assignments generated for team '{team.name}'", event_type="schedule_result", identifier=team.name)
+                        logger.warning(f"No assignments generated for team '{team.name}'", event_type="schedule_result",
+                                      identifier=team.name)
                         print(f"No assignments generated for team '{team.name}'")
+
+                # --- After all teams, save all assignments in a single batch ---
+                save_success = assignment_repository.save_all(all_assignments)
+
+                # Calculate and log performance metrics
+                end_time = time.time()
+                execution_time = end_time - start_time
+
+                logger.info(
+                    f"Performance metrics: {query_count} queries in {execution_time:.2f} seconds",
+                    event_type="performance_measurement",
+                    identifier="complete",
+                    extra={
+                        "query_count": query_count,
+                        "execution_time": execution_time,
+                        "team_count": len(teams),
+                        "employee_count": len(all_employees),
+                        "workstation_count": len(all_workstations),
+                        "assignment_count": len(all_assignments)
+                    }
+                )
+
+                print(f"\nPerformance: {query_count} queries executed in {execution_time:.2f} seconds")
+                print(f"Generated {len(all_assignments)} assignments for {len(teams)} teams using batch processing")
 
                 # Set assignments to all_assignments for display later
                 assignments = all_assignments
@@ -1052,8 +1144,8 @@ def main():
                             print(f"  ... and {len(assignments) - 5} more assignments")
 
                         # Count only the entries that were generated by the scheduler
-                        generated_entries = [entry for entry in work_history_entries 
-                                            if any(entry.employee_id == a.employee.id and 
+                        generated_entries = [entry for entry in work_history_entries
+                                            if any(entry.employee_id == a.employee.id and
                                                    entry.workstation_id == a.workstation.id and
                                                    entry.worked_date == a.period.date and
                                                    entry.work_period == a.period.period
@@ -1065,7 +1157,7 @@ def main():
 
                         if len(generated_entries) != len(assignments):
                             warning_msg = "Warning: Not all assignments were saved to the database."
-                            logger.warning(warning_msg, event_type="verification", identifier="assignments", 
+                            logger.warning(warning_msg, event_type="verification", identifier="assignments",
                                           extra={"expected": len(assignments), "actual": len(generated_entries)})
                             print(warning_msg)
 
@@ -1075,7 +1167,7 @@ def main():
                             for a in assignments:
                                 found = False
                                 for entry in work_history_entries:
-                                    if (entry.employee_id == a.employee.id and 
+                                    if (entry.employee_id == a.employee.id and
                                         entry.workstation_id == a.workstation.id and
                                         entry.worked_date == a.period.date and
                                         entry.work_period == a.period.period):
@@ -1119,10 +1211,10 @@ def main():
                             # Print schedule for each date for this team
                             for date_key in sorted(dates.keys()):
                                 print(format_schedule_table(
-                                    dates[date_key], 
-                                    employees, 
-                                    workstations, 
-                                    args.periods, 
+                                    dates[date_key],
+                                    employees,
+                                    workstations,
+                                    args.periods,
                                     date_key,
                                     args.call_ins,
                                     args.offline

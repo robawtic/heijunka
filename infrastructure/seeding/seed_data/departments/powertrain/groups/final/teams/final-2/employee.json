@@ -1,48 +1,200 @@
 {
   "employees": [
     {
-      "name": "Veronica",
+      "name": "Shari",
       "role": "Team Leader",
       "known_stations": []
     },
     {
-      "name": "Henry",
+      "name": "Aaron",
       "role": "Backup",
       "known_stations": [
-        "FIN328",
-        "FIN588"
+        "FIN060",
+        "FIN080",
+        "FIN090",
+        "FIN120",
+        "FIN130",
+        "FIN150",
+        "FIN160",
+        "FIN190",
+        "FIN200",
+        "FIN220",
+        "FIN240",
+        "FIN300"
       ]
     },
     {
-      "name": "Erik",
+      "name": "Kurt",
       "role": "Associate",
       "known_stations": [
-        "FIN328",
-        "FIN588"
+        "FIN240",
+        "FIN220",
+        "FIN130"
       ]
     },
     {
-      "name": "Michael",
+      "name": "Rachel",
       "role": "Associate",
       "known_stations": [
-        "FIN328",
-        "FIN588"
+        "FIN120",
+        "FIN220",
+        "FIN060",
+        "FIN150",
+        "FIN160",
+        "FIN200",
+        "FIN130",
+        "FIN190"
       ]
     },
     {
-      "name": "Brian",
+      "name": "Veronica",
       "role": "Associate",
       "known_stations": [
-        "FIN588",
-        "FIN328"
+        "FIN240",
+        "FIN150",
+        "FIN060",
+        "FIN120",
+        "FIN160",
+        "FIN200",
+        "FIN190",
+        "FIN090"
       ]
     },
     {
-      "name": "William",
+      "name": "Valerie",
       "role": "Associate",
       "known_stations": [
-        "FIN328",
-        "FIN588"
+        "FIN190",
+        "FIN090",
+        "FIN220",
+        "FIN080"
+      ]
+    },
+    {
+      "name": "Daniel",
+      "role": "Associate",
+      "known_stations": [
+        "FIN150",
+        "FIN080",
+        "FIN190",
+        "FIN220",
+        "FIN130",
+        "FIN200",
+        "FIN240",
+        "FIN120",
+        "FIN300",
+        "FIN060",
+        "FIN160"
+      ]
+    },
+    {
+      "name": "Lisa",
+      "role": "Associate",
+      "known_stations": [
+        "FIN120",
+        "FIN240",
+        "FIN160"
+      ]
+    },
+    {
+      "name": "Michelle",
+      "role": "Associate",
+      "known_stations": [
+        "FIN200",
+        "FIN190",
+        "FIN150",
+        "FIN130"
+      ]
+    },
+    {
+      "name": "Michele",
+      "role": "Associate",
+      "known_stations": [
+        "FIN090",
+        "FIN220",
+        "FIN190",
+        "FIN130",
+        "FIN060",
+        "FIN300",
+        "FIN150",
+        "FIN160",
+        "FIN200",
+        "FIN120",
+        "FIN240",
+        "FIN080"
+      ]
+    },
+    {
+      "name": "John",
+      "role": "Associate",
+      "known_stations": [
+        "FIN220",
+        "FIN240",
+        "FIN080",
+        "FIN190",
+        "FIN200",
+        "FIN160",
+        "FIN150"
+      ]
+    },
+    {
+      "name": "Derek",
+      "role": "Associate",
+      "known_stations": [
+        "FIN200",
+        "FIN240",
+        "FIN060",
+        "FIN080",
+        "FIN160",
+        "FIN120"
+      ]
+    },
+    {
+      "name": "Joseph",
+      "role": "Associate",
+      "known_stations": [
+        "FIN160",
+        "FIN240",
+        "FIN080",
+        "FIN120",
+        "FIN200",
+        "FIN060",
+        "FIN150",
+        "FIN220"
+      ]
+    },
+    {
+      "name": "Christopher",
+      "role": "Associate",
+      "known_stations": [
+        "FIN200",
+        "FIN190",
+        "FIN220",
+        "FIN060",
+        "FIN130"
+      ]
+    },
+    {
+      "name": "Grace",
+      "role": "Associate",
+      "known_stations": [
+        "FIN130",
+        "FIN300",
+        "FIN200",
+        "FIN060",
+        "FIN120"
+      ]
+    },
+    {
+      "name": "Michele",
+      "role": "Associate",
+      "known_stations": [
+        "FIN190",
+        "FIN150",
+        "FIN060",
+        "FIN300",
+        "FIN240",
+        "FIN160"
       ]
     }
   ]

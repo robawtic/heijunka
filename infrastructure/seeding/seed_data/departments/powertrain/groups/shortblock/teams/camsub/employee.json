@@ -1,69 +1,120 @@
 {
   "employees": [
     {
-      "name": "Jennifer",
+      "name": "Kevin",
       "role": "Team Leader",
       "known_stations": []
     },
     {
-      "name": "Robert",
+      "name": "Kathryn",
       "role": "Backup",
-      "known_stations": ["CS010", "CS020", "CS030", "CS040" , "CS050", "CS060", "CS070" ,"CS080", "CS090", "CS100"]
+      "known_stations": [
+        "CAM070",
+        "CAM120",
+        "CAM130",
+        "CAM150",
+        "CAM190",
+        "CAM260",
+        "CAM280"
+      ]
     },
     {
-      "name": "Maria",
+      "name": "Jeffrey",
       "role": "Associate",
-      "known_stations": ["CS010", "CS020", "CS030", "CS040" , "CS050", "CS060", "CS070" ,"CS080", "CS090", "CS100"]
+      "known_stations": [
+        "CAM260",
+        "CAM190",
+        "CAM280",
+        "CAM070",
+        "CAM150",
+        "CAM130",
+        "CAM120"
+      ]
     },
     {
-      "name": "James",
+      "name": "Jennifer",
       "role": "Associate",
-      "known_stations": ["CS030", "CS040" , "CS050", "CS060", "CS070" ,"CS080", "CS090"]
+      "known_stations": [
+        "CAM280",
+        "CAM190",
+        "CAM150",
+        "CAM130"
+      ]
     },
     {
-      "name": "Alicia",
+      "name": "David",
       "role": "Associate",
-      "known_stations": ["CS010", "CS020", "CS030", "CS040" , "CS050", "CS060", "CS070" ,"CS080", "CS090", "CS100"]
+      "known_stations": [
+        "CAM070",
+        "CAM280",
+        "CAM120",
+        "CAM190",
+        "CAM150"
+      ]
     },
     {
-      "name": "Marcus",
+      "name": "Brianna",
       "role": "Associate",
-      "known_stations": ["CS010", "CS020", "CS030", "CS040" , "CS050", "CS060", "CS070" ,"CS080", "CS090", "CS100"]
+      "known_stations": [
+        "CAM190",
+        "CAM280",
+        "CAM120",
+        "CAM070"
+      ]
     },
     {
-      "name": "Emily",
+      "name": "Suzanne",
       "role": "Associate",
-      "known_stations": ["CS010", "CS020", "CS030", "CS040" , "CS050", "CS060", "CS070" ,"CS080", "CS090", "CS100"]
+      "known_stations": [
+        "CAM120",
+        "CAM190",
+        "CAM070"
+      ]
     },
     {
-      "name": "Daniel",
+      "name": "Deanna",
       "role": "Associate",
-      "known_stations": ["CS010", "CS020", "CS030", "CS040" , "CS050", "CS060", "CS070" ,"CS080", "CS090", "CS100"]
+      "known_stations": [
+        "CAM130",
+        "CAM260",
+        "CAM070",
+        "CAM190",
+        "CAM150",
+        "CAM280"
+      ]
     },
     {
-      "name": "Sophia",
+      "name": "Jacob",
       "role": "Associate",
-      "known_stations": ["CS060", "CS070" ,"CS080", "CS090", "CS100"]
+      "known_stations": [
+        "CAM280",
+        "CAM120",
+        "CAM260",
+        "CAM190",
+        "CAM070"
+      ]
     },
     {
-      "name": "Noah",
+      "name": "Robert",
       "role": "Associate",
-      "known_stations": ["CS010", "CS020", "CS030"]
+      "known_stations": [
+        "CAM150",
+        "CAM130",
+        "CAM260",
+        "CAM120",
+        "CAM190",
+        "CAM070",
+        "CAM280"
+      ]
     },
     {
-      "name": "Olivia",
+      "name": "Stephanie",
       "role": "Associate",
-      "known_stations": ["CS010", "CS020", "CS030", "CS040", "CS070" ,"CS080", "CS090", "CS100"]
-    },
-    {
-      "name": "Liam",
-      "role": "Associate",
-      "known_stations": ["CS010", "CS020", "CS030", "CS040" , "CS050", "CS060", "CS070" ,"CS080", "CS090", "CS100"]
-    },
-    {
-      "name": "Ava",
-      "role": "Associate",
-      "known_stations": ["CS010", "CS020", "CS030", "CS040" , "CS050", "CS060", "CS070" ,"CS080", "CS090", "CS100"]
+      "known_stations": [
+        "CAM130",
+        "CAM260",
+        "CAM150"
+      ]
     }
   ]
 }

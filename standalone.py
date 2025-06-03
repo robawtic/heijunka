@@ -122,47 +122,289 @@ class HeijunkaDataExplorer:
         self.session.close()
 
 
-def main():
-    # Get database connection string from environment variables
-    connection_string = os.environ.get("DATABASE_URL", "postgresql+psycopg://postgres:Brownie12-@localhost/heijunka")
-    print(f"Using database connection: {connection_string}")
+def check_team_staffing_and_assign_if_needed(explorer, team_name, date_obj=None):
+    """
+    Check if a team has enough employees to cover all workstations.
+    If not, find employees from other teams to add to the short-staffed team.
 
+    Args:
+        explorer: HeijunkaDataExplorer instance
+        team_name: Name of the team to check
+        date_obj: Date to check (defaults to today)
+
+    Returns:
+        Tuple of (is_adequately_staffed, assignments_made)
+        where assignments_made is a list of tuples (employee_name, workstation_name)
+    """
+    from datetime import date
+    if date_obj is None:
+        date_obj = date.today()
+
+    # Find the team
+    team = explorer.team_repo.get_by_name(team_name)
+    if not team:
+        print(f"Team '{team_name}' not found")
+        return False, []
+
+    # Get team workstations
+    workstations = explorer.get_team_workstations(team_name)
+    if not workstations:
+        print(f"No workstations found for team '{team_name}'")
+        return True, []  # No workstations means no staffing needed
+
+    # Get team members
+    team_members = explorer.get_team_members(team_name)
+    if not team_members:
+        print(f"No members found for team '{team_name}'")
+        return False, []
+
+    # Filter out AROs (this would need to be implemented based on your ARO tracking)
+    # For now, assume all team members are available
+    available_members = team_members
+
+    print(f"Team '{team_name}' has {len(available_members)} available employees and {len(workstations)} workstations")
+
+    # Check if we have enough employees
+    if len(available_members) >= len(workstations):
+        print(f"Team '{team_name}' has enough employees to cover all workstations")
+        return True, []
+
+    # Not enough employees, find employees from other teams
+    print(f"Team '{team_name}' needs {len(workstations) - len(available_members)} more employees")
+
+    # Get employees from other teams in the same department
+    department = explorer.department_repo.get_by_team_id(team.id)
+    if not department:
+        print(f"Could not find department for team '{team_name}'")
+        return False, []
+
+    # Get all teams in the department
+    department_teams = explorer.team_repo.get_by_department_id(department.id)
+
+    # Exclude the current team
+    other_teams = [t for t in department_teams if t.id != team.id]
+
+    # Find employees from other teams who can work on this team's workstations
+    additional_employees = []
+    needed_count = len(workstations) - len(available_members)
+    assignments = []
+
+    for other_team in other_teams:
+        # Skip if we already have enough employees
+        if len(additional_employees) >= needed_count:
+            break
+
+        # Get employees from this team
+        other_team_members = explorer.get_team_members(other_team.name)
+
+        for employee in other_team_members:
+            # Skip if we already have enough employees
+            if len(additional_employees) >= needed_count:
+                break
+
+            # Check if this employee knows any of our workstations
+            for workstation in workstations:
+                # Check if employee already knows this workstation
+                existing_assignment = explorer.session.query(EmployeeWorkstationModel).filter(
+                    EmployeeWorkstationModel.employee_id == employee.id,
+                    EmployeeWorkstationModel.station_id == workstation.id
+                ).first()
+
+                if existing_assignment:
+                    # Employee already knows this workstation
+                    additional_employees.append(employee)
+                    assignments.append((employee.name, workstation.name))
+                    print(f"Found {employee.name} from team {other_team.name} who already knows {workstation.name}")
+                    break
+
+    # If we still need more employees, assign them to workstations
+    if len(additional_employees) < needed_count:
+        print(f"Still need {needed_count - len(additional_employees)} more employees, assigning new workstations")
+
+        for other_team in other_teams:
+            # Skip if we already have enough employees
+            if len(additional_employees) >= needed_count:
+                break
+
+            # Get employees from this team
+            other_team_members = explorer.get_team_members(other_team.name)
+
+            for employee in other_team_members:
+                # Skip if we already have enough employees
+                if len(additional_employees) >= needed_count:
+                    break
+
+                # Skip if employee is already in our list
+                if employee in additional_employees:
+                    continue
+
+                # Assign a workstation to this employee
+                for workstation in workstations:
+                    # Check if employee already knows this workstation
+                    existing_assignment = explorer.session.query(EmployeeWorkstationModel).filter(
+                        EmployeeWorkstationModel.employee_id == employee.id,
+                        EmployeeWorkstationModel.station_id == workstation.id
+                    ).first()
+
+                    if not existing_assignment:
+                        # Create new assignment
+                        try:
+                            new_assignment = EmployeeWorkstationModel(
+                                employee_id=employee.id,
+                                station_id=workstation.id
+                            )
+                            explorer.session.add(new_assignment)
+                            explorer.session.commit()
+
+                            additional_employees.append(employee)
+                            assignments.append((employee.name, workstation.name))
+                            print(f"Assigned {workstation.name} to {employee.name} from team {other_team.name}")
+                            break
+                        except Exception as e:
+                            print(f"Error assigning {workstation.name} to {employee.name}: {e}")
+                            explorer.session.rollback()
+
+    return len(additional_employees) >= needed_count, assignments
+
+def assign_opu_workstations_to_other_employees(explorer, num_employees=5):
+    """
+    Assign opu workstations to employees from other teams.
+
+    Args:
+        explorer: HeijunkaDataExplorer instance
+        num_employees: Number of employees to assign opu workstations to
+
+    Returns:
+        List of tuples (employee_name, workstation_name) of assignments made
+    """
+    # Find the opu team
+    opu_team = None
+    internal_group = explorer.get_group_teams("internal")
+    for team in internal_group:
+        if team.name.lower() == "opu":
+            opu_team = team
+            break
+
+    if not opu_team:
+        print("Camsub team not found")
+        return []
+
+    # Get opu workstations
+    opu_workstations = explorer.get_team_workstations(opu_team.name)
+    if not opu_workstations:
+        print("No workstations found for opu team")
+        return []
+
+    print(f"Found {len(opu_workstations)} workstations for opu team")
+
+    # Get employees from other teams in the powertrain department
+    other_employees = []
+    powertrain_groups = explorer.get_department_groups("powertrain")
+
+    for group in powertrain_groups:
+        teams = explorer.get_group_teams(group.name)
+        for team in teams:
+            if team.id != opu_team.id:  # Skip opu team
+                team_members = explorer.get_team_members(team.name)
+                other_employees.extend(team_members)
+
+    if not other_employees:
+        print("No employees found in other teams")
+        return []
+
+    print(f"Found {len(other_employees)} employees in other teams")
+
+    # Randomly select employees to assign opu workstations to
+    import random
+    selected_employees = random.sample(other_employees, min(num_employees, len(other_employees)))
+
+    # Assign opu workstations to selected employees
+    assignments = []
+    session = explorer.session
+
+    for employee in selected_employees:
+        # Randomly select a workstation to assign
+        workstation = random.choice(opu_workstations)
+
+        # Create the assignment in the database
+        try:
+            # Check if employee already knows this workstation
+            existing_assignment = session.query(EmployeeWorkstationModel).filter(
+                EmployeeWorkstationModel.employee_id == employee.id,
+                EmployeeWorkstationModel.station_id == workstation.id
+            ).first()
+
+            if not existing_assignment:
+                # Create new assignment
+                new_assignment = EmployeeWorkstationModel(
+                    employee_id=employee.id,
+                    station_id=workstation.id
+                )
+                session.add(new_assignment)
+                session.commit()
+
+                assignments.append((employee.name, workstation.name))
+                print(f"Assigned {workstation.name} to {employee.name}")
+            else:
+                print(f"{employee.name} already knows {workstation.name}")
+        except Exception as e:
+            print(f"Error assigning {workstation.name} to {employee.name}: {e}")
+            session.rollback()
+
+    return assignments
+
+def main():
+    import argparse
+    from datetime import datetime
+
+    # Parse command line arguments
+    parser = argparse.ArgumentParser(description='Heijunka Data Explorer')
+    parser.add_argument('--assign-opu', action='store_true', help='Assign opu workstations to employees from other teams')
+    parser.add_argument('--check-staffing', type=str, help='Check if a team has enough employees to cover all workstations')
+    parser.add_argument('--date', type=str, help='Date to check staffing for (YYYY-MM-DD)')
+    parser.add_argument('--num-employees', type=int, default=5, help='Number of employees to assign workstations to')
+
+    args = parser.parse_args()
+
+    connection_string = os.environ.get("DATABASE_URL", "postgresql+psycopg://postgres:Brownie12-@localhost/heijunka")
     explorer = HeijunkaDataExplorer(connection_string)
 
     try:
-        # Example usage
-        print("Departments and their groups:")
-        departments = explorer.session.query(DepartmentModel).all()
-        for dept in departments:
-            print(f"Department: {dept.name}")
-            groups = explorer.get_department_groups(dept.name)
-            for group in groups:
-                print(f"  Group: {group.name}")
-                teams = explorer.get_group_teams(group.name)
-                for team in teams:
-                    print(f"    Team: {team.name}")
+        if args.assign_opu:
+            print(f"Assigning opu workstations to {args.num_employees} employees from other teams...")
+            assignments = assign_opu_workstations_to_other_employees(explorer, num_employees=args.num_employees)
+            print(f"Made {len(assignments)} assignments")
 
-                    print(f"      Members:")
-                    members = explorer.get_team_members(team.name)
-                    for member in members:
-                        # member is already an Employee object
-                        print(f"        {member.name}")
+            # Print summary of assignments
+            if assignments:
+                print("\nAssignments made:")
+                for employee_name, workstation_name in assignments:
+                    print(f"  {employee_name} -> {workstation_name}")
+        elif args.check_staffing:
+            date_obj = None
+            if args.date:
+                try:
+                    date_obj = datetime.strptime(args.date, "%Y-%m-%d").date()
+                except ValueError:
+                    print("Invalid date format. Use YYYY-MM-DD")
+                    return
 
-                    print(f"      Workstations:")
-                    workstations = explorer.get_team_workstations(team.name)
-                    for ws in workstations:
-                        print(f"        {ws.name}")
+            is_staffed, assignments = check_team_staffing_and_assign_if_needed(explorer, args.check_staffing, date_obj)
 
-        # Example of getting employee metadata
-        employee_name = "Angela Page"  # Replace with an actual employee name
-        employee_data = explorer.get_employee_metadata(employee_name)
-        if employee_data:
-            print(f"\nEmployee: {employee_data['employee'].name}")
-            if employee_data['primary_team']:
-                print(f"Primary Team: {employee_data['primary_team'].name}")
-            print("Known Workstations:")
-            for ws in employee_data['known_workstations']:
-                print(f"  {ws.name}")
+            if is_staffed:
+                print(f"Team '{args.check_staffing}' is adequately staffed")
+            else:
+                print(f"Team '{args.check_staffing}' is not adequately staffed")
+
+            if assignments:
+                print("\nAssignments made:")
+                for employee_name, workstation_name in assignments:
+                    print(f"  {employee_name} -> {workstation_name}")
+        else:
+            print("No action specified. Use --assign-opu to assign opu workstations to employees from other teams.")
+            print("Or use --check-staffing to check if a team has enough employees to cover all workstations.")
+            print("Example: python standalone.py --assign-opu --num-employees 4")
+            print("Example: python standalone.py --check-staffing OPU --date 2023-05-01")
 
     finally:
         explorer.close()

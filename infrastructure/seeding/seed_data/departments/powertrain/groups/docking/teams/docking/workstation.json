@@ -1,10 +1,37 @@
 {
   "workstations": [
     {
-      "name": "DOC849"
+      "name": "DOC010"
     },
     {
-      "name": "DOC371"
+      "name": "DOC060"
+    },
+    {
+      "name": "DOC070"
+    },
+    {
+      "name": "DOC110"
+    },
+    {
+      "name": "DOC150"
+    },
+    {
+      "name": "DOC170"
+    },
+    {
+      "name": "DOC200"
+    },
+    {
+      "name": "DOC220"
+    },
+    {
+      "name": "DOC250"
+    },
+    {
+      "name": "DOC270"
+    },
+    {
+      "name": "DOC300"
     }
   ]
 }

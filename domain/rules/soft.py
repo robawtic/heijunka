@@ -1,6 +1,7 @@
 # domain/rules/soft.py
 from domain.rules.context import RuleContext, rule_metadata
 from datetime import timedelta
+from domain.value_objects.employee_availability import AvailabilityStatus
 
 @rule_metadata(uses=["model", "assign", "employees", "workstations", "periods"])
 def add_same_day_repeat_penalties(ctx: RuleContext):
@@ -176,3 +177,53 @@ def add_lookback_same_period_penalties(ctx: RuleContext):
 
     return penalties
 
+
+@rule_metadata(uses=["model", "assign", "employees", "workstations", "periods", "start_date"])
+def add_aro_reassignment_penalties(ctx: RuleContext):
+    """
+    Penalize reassigning employees who are already assigned as AROs.
+
+    This rule discourages (but doesn't forbid) reassigning ARO employees
+    by adding a high penalty to their assignments.
+
+    Returns:
+        List of penalty variables to be added to the objective function
+    """
+    model = ctx.model
+    assign = ctx.assign
+    employees = ctx.employees
+    workstations = ctx.workstations
+    periods = ctx.periods
+    start_date = ctx.start_date
+
+    # High weight for ARO reassignment penalties
+    weight = 5000  # Higher than other soft constraints
+
+    penalties = []
+
+    for i, emp in enumerate(employees):
+        # Check if employee is an ARO for this date
+        is_aro = any(
+            av.status == AvailabilityStatus.ARO 
+            for av in emp.available_periods 
+            if av.date == start_date
+        )
+
+        if is_aro:
+            # Add penalties for all possible assignments of this ARO employee
+            for j in range(len(workstations)):
+                for p in range(periods):
+                    pen = model.NewIntVar(0, weight, f"aro_reassign_e{i}_w{j}_p{p}")
+                    indicator = model.NewBoolVar(f"aro_reassign_indicator_e{i}_w{j}_p{p}")
+
+                    # indicator is true if ARO employee is assigned
+                    model.Add(assign[(i, j, p)] == 1).OnlyEnforceIf(indicator)
+                    model.Add(assign[(i, j, p)] == 0).OnlyEnforceIf(indicator.Not())
+
+                    # Set penalty value based on indicator
+                    model.Add(pen == weight).OnlyEnforceIf(indicator)
+                    model.Add(pen == 0).OnlyEnforceIf(indicator.Not())
+
+                    penalties.append(pen)
+
+    return penalties

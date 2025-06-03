@@ -1,65 +1,225 @@
 {
   "employees": [
     {
-      "name": "Taylor",
+      "name": "Aaron",
       "role": "Team Leader",
       "known_stations": []
     },
     {
-      "name": "Ray",
-      "role": "Associate",
-      "known_stations": ["H010", "H080/H090", "H100", "H110/H120", "BW070", "H170", "M050"]
-    },
-    {
-      "name": "Antonio",
-      "role": "Associate",
-      "known_stations": ["Parts Wash", "H010", "H080/H090", "H100", "H110/H120", "H170", "BW010", "BW070", "M050", "M090"]
-    },
-    {
-      "name": "Brian",
-      "role": "Associate",
-
-      "known_stations": ["H010", "H080/H090", "H100", "H110/H120", "H170", "BW010", "BW070", "M050", "M090"]
-    },
-    {
-      "name": "Rachael",
-      "role": "Associate",
-      "known_stations": ["H010", "H080/H090", "H100", "H110/H120", "H170", "BW010", "BW070", "M050"]
-    },
-    {
-      "name": "Matt",
-      "role": "Associate",
-      "known_stations": ["Parts Wash", "H010", "H080/H090", "H100", "H110/H120", "H170", "BW010", "BW070", "M050", "M090"]
-    },
-    {
-      "name": "Kaden",
-      "role": "Associate",
-      "known_stations": ["H010", "H080/H090", "H100", "H110/H120", "H170", "BW010", "BW070", "M050", "M090"]
-    },
-    {
-      "name": "Aaron",
-      "role": "Associate",
-      "known_stations": ["Parts Wash", "H010", "H080/H090", "H100", "H110/H120", "H170", "BW010", "BW070", "M050", "M090"]
-    },
-    {
-      "name": "Luke",
+      "name": "Jessica",
       "role": "Backup",
-      "known_stations": ["H010", "H080/H090", "H100", "H110/H120", "H170", "BW010", "BW070", "M050", "M090"]
+      "known_stations": [
+        "HEA080",
+        "HEA090",
+        "HEA100",
+        "HEA120",
+        "HEA130",
+        "HEA180",
+        "HEA190",
+        "HEA200",
+        "HEA240",
+        "HEA250",
+        "HEA260",
+        "HEA290",
+        "HEA300"
+      ]
     },
     {
-      "name": "Taje",
+      "name": "Robert",
       "role": "Associate",
-      "known_stations": ["H010", "H080/H090", "H100", "H110/H120", "H170", "BW010", "BW070", "M050", "M090"]
+      "known_stations": [
+        "HEA200",
+        "HEA120",
+        "HEA180",
+        "HEA240",
+        "HEA260",
+        "HEA190",
+        "HEA290",
+        "HEA300",
+        "HEA080"
+      ]
     },
     {
-      "name": "Chyla",
+      "name": "Matthew",
       "role": "Associate",
-      "known_stations": ["H010", "H080/H090", "H100", "H110/H120", "H170", "BW010", "M050", "M090"]
+      "known_stations": [
+        "HEA080",
+        "HEA100",
+        "HEA250"
+      ]
     },
     {
-      "name": "Fab",
+      "name": "John",
       "role": "Associate",
-      "known_stations": ["H010", "H080/H090", "H100", "H110/H120", "H170", "BW010", "BW070", "M050", "M090"]
+      "known_stations": [
+        "HEA300",
+        "HEA290",
+        "HEA180"
+      ]
+    },
+    {
+      "name": "Darren",
+      "role": "Associate",
+      "known_stations": [
+        "HEA080",
+        "HEA200",
+        "HEA180",
+        "HEA100",
+        "HEA090",
+        "HEA260",
+        "HEA190",
+        "HEA130",
+        "HEA250"
+      ]
+    },
+    {
+      "name": "Michael",
+      "role": "Associate",
+      "known_stations": [
+        "HEA250",
+        "HEA200",
+        "HEA180",
+        "HEA130",
+        "HEA190",
+        "HEA080",
+        "HEA090",
+        "HEA100",
+        "HEA300"
+      ]
+    },
+    {
+      "name": "Sarah",
+      "role": "Associate",
+      "known_stations": [
+        "HEA180",
+        "HEA240",
+        "HEA120",
+        "HEA300",
+        "HEA100"
+      ]
+    },
+    {
+      "name": "Gabriel",
+      "role": "Associate",
+      "known_stations": [
+        "HEA180",
+        "HEA250",
+        "HEA300",
+        "HEA090",
+        "HEA290",
+        "HEA260"
+      ]
+    },
+    {
+      "name": "Melissa",
+      "role": "Associate",
+      "known_stations": [
+        "HEA240",
+        "HEA200",
+        "HEA120"
+      ]
+    },
+    {
+      "name": "John",
+      "role": "Associate",
+      "known_stations": [
+        "HEA200",
+        "HEA290",
+        "HEA180",
+        "HEA240",
+        "HEA130",
+        "HEA260",
+        "HEA080"
+      ]
+    },
+    {
+      "name": "Timothy",
+      "role": "Associate",
+      "known_stations": [
+        "HEA090",
+        "HEA130",
+        "HEA260",
+        "HEA120",
+        "HEA190",
+        "HEA080",
+        "HEA180",
+        "HEA250",
+        "HEA100"
+      ]
+    },
+    {
+      "name": "Lisa",
+      "role": "Associate",
+      "known_stations": [
+        "HEA240",
+        "HEA090",
+        "HEA100",
+        "HEA130",
+        "HEA260",
+        "HEA250",
+        "HEA300",
+        "HEA080",
+        "HEA290",
+        "HEA190"
+      ]
+    },
+    {
+      "name": "Christopher",
+      "role": "Associate",
+      "known_stations": [
+        "HEA130",
+        "HEA190",
+        "HEA080",
+        "HEA120",
+        "HEA300",
+        "HEA290",
+        "HEA240"
+      ]
+    },
+    {
+      "name": "Karen",
+      "role": "Associate",
+      "known_stations": [
+        "HEA180",
+        "HEA120",
+        "HEA240",
+        "HEA190",
+        "HEA200",
+        "HEA300",
+        "HEA130",
+        "HEA260",
+        "HEA080",
+        "HEA250",
+        "HEA290",
+        "HEA090"
+      ]
+    },
+    {
+      "name": "Christine",
+      "role": "Associate",
+      "known_stations": [
+        "HEA290",
+        "HEA300",
+        "HEA250",
+        "HEA120",
+        "HEA190",
+        "HEA080",
+        "HEA090",
+        "HEA100",
+        "HEA200",
+        "HEA130"
+      ]
+    },
+    {
+      "name": "Luis",
+      "role": "Associate",
+      "known_stations": [
+        "HEA200",
+        "HEA080",
+        "HEA260",
+        "HEA100",
+        "HEA240"
+      ]
     }
   ]
 }

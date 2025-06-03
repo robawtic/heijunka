@@ -10,4 +10,4 @@ class GenerateScheduleCommand:
     periods_per_day: int
     call_ins: List[str] = None
     offline: List[str] = None
-    force_complete: bool = False
+    force_complete: bool = True

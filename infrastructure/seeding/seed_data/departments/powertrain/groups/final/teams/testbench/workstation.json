@@ -1,10 +1,34 @@
 {
   "workstations": [
     {
-      "name": "TES041"
+      "name": "TES030"
     },
     {
-      "name": "TES153"
+      "name": "TES060"
+    },
+    {
+      "name": "TES070"
+    },
+    {
+      "name": "TES140"
+    },
+    {
+      "name": "TES190"
+    },
+    {
+      "name": "TES200"
+    },
+    {
+      "name": "TES210"
+    },
+    {
+      "name": "TES220"
+    },
+    {
+      "name": "TES230"
+    },
+    {
+      "name": "TES260"
     }
   ]
 }

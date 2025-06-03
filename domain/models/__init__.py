@@ -1,4 +1,3 @@
-# models/__init__.py
 from domain.models.Base import Base
 from domain.models.LineType import LineType
 from domain.models.LineTypeModel import LineTypeModel
@@ -17,6 +16,7 @@ from domain.models.EmployeeAvailabilityModel import EmployeeAvailabilityModel
 from domain.models.EmployeeStationSkillModel import EmployeeStationSkillModel
 from domain.models.ScheduleModel import ScheduleModel
 from domain.models.WatcherHeartbeat import WatcherHeartbeatModel
+from domain.models.AROAssignmentModel import AROAssignmentModel
 
 __all__ = [
     'Base',
@@ -36,5 +36,6 @@ __all__ = [
     'EmployeeAvailabilityModel',
     'EmployeeStationSkillModel',
     'ScheduleModel',
-    'WatcherHeartbeatModel'
+    'WatcherHeartbeatModel',
+    'AROAssignmentModel'
 ]

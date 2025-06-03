@@ -94,7 +94,7 @@ def add_one_station_per_employee(ctx: RuleContext):
 
 
 @rule_metadata(uses=["model", "assign", "employees", "workstations", "periods"])
-def add_exactly_one_per_station(ctx: RuleContext):
+def add_at_most_one_per_station(ctx: RuleContext):
     """
     Ensure each workstation has at most one employee assigned per period.
 

@@ -1,48 +1,167 @@
 {
   "employees": [
     {
-      "name": "Robert",
+      "name": "Leslie",
       "role": "Team Leader",
       "known_stations": []
     },
     {
-      "name": "Amanda",
+      "name": "Michael",
       "role": "Backup",
       "known_stations": [
-        "TES041",
-        "TES153"
+        "TES030",
+        "TES060",
+        "TES070",
+        "TES140",
+        "TES190",
+        "TES200",
+        "TES210",
+        "TES220",
+        "TES230",
+        "TES260"
       ]
     },
     {
-      "name": "Gina",
+      "name": "Katherine",
       "role": "Associate",
       "known_stations": [
-        "TES153",
-        "TES041"
+        "TES200",
+        "TES260",
+        "TES070",
+        "TES190",
+        "TES060",
+        "TES210",
+        "TES230"
       ]
     },
     {
-      "name": "Victor",
+      "name": "Gregory",
       "role": "Associate",
       "known_stations": [
-        "TES041",
-        "TES153"
+        "TES230",
+        "TES190",
+        "TES140",
+        "TES200",
+        "TES070"
       ]
     },
     {
-      "name": "Cristian",
+      "name": "Brian",
       "role": "Associate",
       "known_stations": [
-        "TES041",
-        "TES153"
+        "TES190",
+        "TES030",
+        "TES140",
+        "TES060",
+        "TES220"
       ]
     },
     {
-      "name": "Ronald",
+      "name": "Angela",
       "role": "Associate",
       "known_stations": [
-        "TES041",
-        "TES153"
+        "TES190",
+        "TES140",
+        "TES060",
+        "TES200",
+        "TES220",
+        "TES070"
+      ]
+    },
+    {
+      "name": "Billy",
+      "role": "Associate",
+      "known_stations": [
+        "TES030",
+        "TES190",
+        "TES140",
+        "TES070",
+        "TES060",
+        "TES200",
+        "TES230",
+        "TES260",
+        "TES220",
+        "TES210"
+      ]
+    },
+    {
+      "name": "Tony",
+      "role": "Associate",
+      "known_stations": [
+        "TES210",
+        "TES060",
+        "TES140",
+        "TES260",
+        "TES220",
+        "TES230",
+        "TES070"
+      ]
+    },
+    {
+      "name": "David",
+      "role": "Associate",
+      "known_stations": [
+        "TES200",
+        "TES140",
+        "TES060"
+      ]
+    },
+    {
+      "name": "Morgan",
+      "role": "Associate",
+      "known_stations": [
+        "TES220",
+        "TES030",
+        "TES070",
+        "TES210"
+      ]
+    },
+    {
+      "name": "Darren",
+      "role": "Associate",
+      "known_stations": [
+        "TES140",
+        "TES210",
+        "TES190",
+        "TES200",
+        "TES230",
+        "TES220",
+        "TES070"
+      ]
+    },
+    {
+      "name": "Aaron",
+      "role": "Associate",
+      "known_stations": [
+        "TES260",
+        "TES070",
+        "TES230",
+        "TES190",
+        "TES210",
+        "TES060"
+      ]
+    },
+    {
+      "name": "James",
+      "role": "Associate",
+      "known_stations": [
+        "TES140",
+        "TES260",
+        "TES060",
+        "TES210",
+        "TES070",
+        "TES220"
+      ]
+    },
+    {
+      "name": "Tyler",
+      "role": "Associate",
+      "known_stations": [
+        "TES060",
+        "TES220",
+        "TES190",
+        "TES260",
+        "TES030"
       ]
     }
   ]

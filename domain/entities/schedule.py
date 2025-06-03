@@ -7,6 +7,7 @@ from ortools.sat.python import cp_model
 
 from domain.value_objects.schedule_period import SchedulePeriod
 from domain.value_objects.work_assignment import WorkAssignment
+from domain.value_objects.employee_availability import AvailabilityStatus
 from domain.events import (
     DomainEvent, ScheduleCreated, ScheduleUpdated, ScheduleStatusChanged,
     AssignmentAdded, AssignmentRemoved, ScheduleValidationFailed
@@ -316,7 +317,8 @@ class Schedule:
             self.register_domain_event(ScheduleUpdated(schedule_id=self.id))
 
     def generate_assignments(self, employees: List["Employee"], workstations: List["Workstation"],
-                            rule_context: Optional[Any] = None, session=None, team_repository=None) -> bool:
+                            rule_context: Optional[Any] = None, session=None, team_repository=None,
+                            aro_service=None, aro_graph_service=None) -> bool:
         """
         Generate assignments for this schedule using constraint programming.
 
@@ -326,6 +328,8 @@ class Schedule:
             rule_context: Optional pre-configured rule context
             session: Database session for accessing work history data
             team_repository: Optional repository for retrieving team information
+            aro_service: Optional ARO service for finding and assigning AROs
+            aro_graph_service: Optional ARO graph service for optimizing ARO assignments
 
         Returns:
             True if assignments were successfully generated, False otherwise
@@ -334,6 +338,173 @@ class Schedule:
 
         # Clear existing assignments if any
         self._assignments = []
+
+        # ... inside generate_assignments, before the ARO logic
+
+        """        
+
+        # Filter out employees who are unavailable, called in, or team leaders
+        filtered_employees = [
+            e for e in employees
+            if e.is_available_for_period(self.start_date, None)  # or for each period if needed
+               and (not hasattr(e, "is_team_lead") or not e.is_team_lead())
+               and (not hasattr(e, "name") or e.name not in (self.call_ins or []))
+        ]
+
+        if len(filtered_employees) < len(workstations):
+        # Not enough employees to cover all workstations
+        # ... (rest of your ARO logic unchanged)
+
+        """
+
+
+        # Check if we have enough employees to cover all workstations
+        # Filter out AROs, called-in employees, and team leaders from the count
+        aro_employees = [e for e in employees if any(
+            av.status == AvailabilityStatus.ARO 
+            for av in e.available_periods 
+            if av.date == self.start_date
+        )]
+
+        # Filter out employees who are unavailable (called in) or team leaders
+        non_aro_employees = [e for e in employees if 
+            e.is_available_for_period(self.start_date) and  # Filter out called-in employees
+            not e.has_role("Team Lead") and  # Filter out team leaders
+            e.name not in (self.call_ins or []) and  # Filter out explicitly called-in employees
+            not any(av.status == AvailabilityStatus.ARO for av in e.available_periods if av.date == self.start_date)  # Filter out AROs
+        ]
+
+        available_employees = len(non_aro_employees)
+        aro_count = len(aro_employees)
+
+        if available_employees < len(workstations):
+            # Not enough employees to cover all workstations
+            self.set_status("pending_aro")
+            self.set_error_message(f"Not enough employees to cover all workstations. " +
+                              f"Available: {available_employees}, Needed: {len(workstations)}")
+
+            # If ARO service is available, request AROs
+            if aro_service and aro_graph_service and team_repository:
+                needed_count = len(workstations) - available_employees
+
+                print(f"DEBUG: Team {self.team_id} needs {needed_count} AROs")
+                print(f"DEBUG: Using ARO service to find AROs")
+
+                # Request AROs through the ARO service
+                try:
+                    aro_assignments = aro_graph_service.assign_optimal_aros(
+                        understaffed_team_id=self.team_id,
+                        needed_aros=needed_count,
+                        assignment_date=self.start_date,
+                        period=None  # Full day assignment
+                    )
+
+                    print(f"DEBUG: ARO service returned {len(aro_assignments) if aro_assignments else 0} ARO assignments")
+
+                    if aro_assignments and len(aro_assignments) > 0:
+                        # AROs were assigned, continue with schedule generation
+                        # The event handlers will take care of regenerating schedules for affected teams
+                        print(f"DEBUG: AROs were assigned, getting updated employee list")
+
+                        # Get updated employee list including AROs
+                        updated_employees = aro_service.get_employees_for_team_and_period(
+                            team_id=self.team_id,
+                            assignment_date=self.start_date,
+                            period=None
+                        )
+
+                        print(f"DEBUG: Updated employee list has {len(updated_employees)} employees")
+
+                        # Replace the employees list with the updated one
+                        employees = updated_employees
+
+                        # Skip the fallback method since we have AROs
+                        print(f"DEBUG: Using AROs for schedule generation")
+                    else:
+                        print(f"DEBUG: No AROs could be assigned, falling back to direct method")
+                        # Fall back to direct method
+                        if team_repository and session:
+                            # Get the current team
+                            team = team_repository.get(self.team_id)
+                            if team:
+                                # Find employees from other teams who can work on this team's workstations
+                                additional_employees = self._find_employees_from_other_teams(
+                                    team, workstations, needed_count, session, team_repository
+                                )
+
+                                if additional_employees:
+                                    # Add the additional employees to our list
+                                    employees.extend(additional_employees)
+                                    print(f"DEBUG: Found {len(additional_employees)} additional employees using direct method")
+                                    # Continue with schedule generation
+                                else:
+                                    # Still not enough employees
+                                    self.set_status("failed")
+                                    print(f"DEBUG: No additional employees found using direct method")
+                                    return False
+                            else:
+                                self.set_status("failed")
+                                print(f"DEBUG: Team {self.team_id} not found")
+                                return False
+                        else:
+                            self.set_status("failed")
+                            print(f"DEBUG: No team_repository or session available")
+                            return False
+                except Exception as e:
+                    print(f"DEBUG: Error using ARO service: {str(e)}")
+                    print(f"DEBUG: Falling back to direct method")
+                    # Fall back to direct method
+                    if team_repository and session:
+                        # Get the current team
+                        team = team_repository.get(self.team_id)
+                        if team:
+                            # Find employees from other teams who can work on this team's workstations
+                            additional_employees = self._find_employees_from_other_teams(
+                                team, workstations, needed_count, session, team_repository
+                            )
+
+                            if additional_employees:
+                                # Add the additional employees to our list
+                                employees.extend(additional_employees)
+                                print(f"DEBUG: Found {len(additional_employees)} additional employees using direct method after ARO service error")
+                                # Continue with schedule generation
+                            else:
+                                # Still not enough employees
+                                self.set_status("failed")
+                                print(f"DEBUG: No additional employees found using direct method after ARO service error")
+                                return False
+                        else:
+                            self.set_status("failed")
+                            print(f"DEBUG: Team {self.team_id} not found after ARO service error")
+                            return False
+                    else:
+                        self.set_status("failed")
+                        print(f"DEBUG: No team_repository or session available after ARO service error")
+                        return False
+            # If ARO service is not available, use the direct method
+            elif team_repository and session:
+                # Get the current team
+                team = team_repository.get(self.team_id)
+                if team:
+                    # Find employees from other teams who can work on this team's workstations
+                    additional_employees = self._find_employees_from_other_teams(
+                        team, workstations, len(workstations) - len(non_aro_employees), session, team_repository
+                    )
+
+                    if additional_employees:
+                        # Add the additional employees to our list
+                        employees.extend(additional_employees)
+                        # Continue with schedule generation
+                    else:
+                        # Still not enough employees
+                        self.set_status("failed")
+                        return False
+                else:
+                    self.set_status("failed")
+                    return False
+            else:
+                self.set_status("failed")
+                return False
 
         # Create CP model
         model = cp_model.CpModel()
@@ -442,6 +613,59 @@ class Schedule:
             self.set_status("failed")
             self.set_error_message(f"No solution found. Status: {solver.StatusName(status)}")
             return False
+
+    def _find_employees_from_other_teams(self, team: "Team", workstations: List["Workstation"], 
+                                   needed_count: int, session, team_repository) -> List["Employee"]:
+        """
+        Find employees from other teams who can work on this team's workstations.
+
+        Args:
+            team: The team that needs additional employees
+            workstations: The workstations that need to be staffed
+            needed_count: The number of additional employees needed
+            session: Database session for accessing employee data
+            team_repository: Repository for retrieving team information
+
+        Returns:
+            List of employees from other teams who can work on this team's workstations
+        """
+        additional_employees = []
+
+        # Get all teams in the same department
+        # Since Team doesn't have a direct department_id attribute, we need to get it through the team's group
+        # Get the team's group first
+        group = team_repository.get_group(team.id)
+        if group and hasattr(group, 'department_id'):
+            # Get all teams in the same department
+            department_teams = team_repository.get_by_department_id(group.department_id)
+            # Exclude the current team
+            other_teams = [t for t in department_teams if t.id != team.id]
+        else:
+            # If we can't determine the department, just return an empty list
+            other_teams = []
+
+        # For each team, find employees who know the workstations we need
+        for other_team in other_teams:
+            # Skip if we already have enough employees
+            if len(additional_employees) >= needed_count:
+                break
+
+            # Get employees from this team
+            team_employees = team_repository.get_members(other_team.id)
+
+            for employee in team_employees:
+                # Skip if we already have enough employees
+                if len(additional_employees) >= needed_count:
+                    break
+
+                # Check if this employee knows any of our workstations
+                for workstation in workstations:
+                    if employee.can_work(workstation):
+                        # This employee can work on one of our workstations
+                        additional_employees.append(employee)
+                        break
+
+        return additional_employees
 
     def validate(self) -> bool:
         """

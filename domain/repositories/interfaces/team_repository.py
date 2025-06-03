@@ -1,5 +1,5 @@
 from abc import abstractmethod
-from typing import List, Optional
+from typing import List, Optional, Any
 
 from domain.entities.team import Team
 from domain.entities.employee import Employee
@@ -144,5 +144,18 @@ class TeamRepositoryInterface(BaseRepository[Team]):
 
         Returns:
             A list of teams that belong to the department (directly or through groups).
+        """
+        pass
+
+    @abstractmethod
+    def get_group(self, team_id: int) -> Optional[Any]:
+        """
+        Retrieve the group that a team belongs to.
+
+        Args:
+            team_id: The ID of the team.
+
+        Returns:
+            The group if found, None otherwise.
         """
         pass
