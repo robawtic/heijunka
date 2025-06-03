@@ -118,7 +118,7 @@ class SqlAlchemyWorkstationRepository(BaseSqlAlchemyRepository[Workstation, Work
 
     def get_by_team_ids(self, team_ids: List[int]) -> List[Workstation]:
         """
-        Retrieve all workstations for multiple teams in a single query.
+        Retrieve all workstations for multiple teams in a single query with eager loading.
 
         Args:
             team_ids: List of team IDs to fetch workstations for.
@@ -131,21 +131,28 @@ class SqlAlchemyWorkstationRepository(BaseSqlAlchemyRepository[Workstation, Work
 
         try:
             self.logger.info(
-                f"Retrieving workstations for {len(team_ids)} teams",
+                f"Retrieving workstations for {len(team_ids)} teams with eager loading",
                 extra={
                     "event_type": "bulk_workstations_lookup",
                     "team_count": len(team_ids)
                 }
             )
 
-            # Use SQLAlchemy's in_() for efficient bulk fetching
+            # Use SQLAlchemy's selectinload for eager loading related data
+            from sqlalchemy.orm import selectinload
+
             workstation_models = self._session.query(WorkstationModel).filter(
                 WorkstationModel.team_id.in_(team_ids)
+            ).options(
+                selectinload(WorkstationModel.line_type),
+                selectinload(WorkstationModel.employees),
+                selectinload(WorkstationModel.team),
+                selectinload(WorkstationModel.employee_skills)
             ).all()
 
             workstation_count = len(workstation_models)
             self.logger.info(
-                f"Found {workstation_count} workstations for {len(team_ids)} teams",
+                f"Found {workstation_count} workstations for {len(team_ids)} teams with eager loading",
                 extra={
                     "event_type": "bulk_workstations_lookup_success",
                     "team_count": len(team_ids),

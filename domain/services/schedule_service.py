@@ -124,21 +124,42 @@ class ScheduleService:
     def _get_team_id(
             self,
             team_name: str,
-            team_repository
+            team_repository,
+            prefetched_data: Optional[Dict] = None
     ) -> int:
         """
         Resolve team ID by team name only.
+        First checks prefetched data if available, then falls back to repository.
         Raises ValueError if not found.
+
+        Args:
+            team_name: Name of the team to look up
+            team_repository: Repository for retrieving team information
+            prefetched_data: Optional dictionary containing prefetched data
+
+        Returns:
+            The team ID
+
+        Raises:
+            ValueError: If team not found or repository not provided
         """
+        # First check if we have the team in prefetched data
+        if prefetched_data and 'teams_by_name' in prefetched_data and team_name in prefetched_data['teams_by_name']:
+            team = prefetched_data['teams_by_name'][team_name]
+            if team and hasattr(team, 'id'):
+                logger.debug(f"Found team_id={team.id} for team '{team_name}' via prefetched data")
+                return team.id
+
+        # Fall back to repository lookup
         if not team_repository:
-            raise ValueError("team_repository is required to look up team_id by team name.")
+            raise ValueError("team_repository is required to look up team_id by team name when not in prefetched data.")
 
         team = team_repository.get_by_name(team_name)
         if team and hasattr(team, 'id'):
             logger.debug(f"Found team_id={team.id} for team '{team_name}' via repository")
             return team.id
 
-        error_msg = f"Could not resolve team_id for team '{team_name}'. No matching team found in repository."
+        error_msg = f"Could not resolve team_id for team '{team_name}'. No matching team found in prefetched data or repository."
         logger.error(error_msg)
         raise ValueError(error_msg)
 
@@ -197,7 +218,7 @@ class ScheduleService:
 
     def _handle_aro_assignments(self, employees: List[Employee], team_id: int,
                                start_date: date, team_repository=None, 
-                               aro_assignment_repository=None) -> List[Employee]:
+                               aro_assignment_repository=None, prefetched_data: Optional[Dict] = None) -> List[Employee]:
         """
         Handle ARO (Assigned Relief Operator) assignments by:
         1. Removing employees leaving the team
@@ -209,11 +230,62 @@ class ScheduleService:
             start_date: Start date of the schedule
             team_repository: Optional repository for retrieving team information
             aro_assignment_repository: Optional repository for retrieving ARO assignments
+            prefetched_data: Optional dictionary containing prefetched data
 
         Returns:
             List of available employees after ARO processing
         """
-        # If no ARO repository, return original employees
+        # If prefetched ARO data is available, use it
+        if prefetched_data and 'aro_assignments_by_team' in prefetched_data and team_id in prefetched_data['aro_assignments_by_team']:
+            logger.debug(f"Using prefetched ARO data for team {team_id}")
+            aro_data = prefetched_data['aro_assignments_by_team'][team_id]
+
+            # Get employees leaving as AROs from prefetched data
+            aro_out_ids = aro_data.get('out', [])
+            if aro_out_ids:
+                logger.info(f"Found {len(aro_out_ids)} employees leaving team {team_id} as AROs (from prefetched data)")
+
+            # Get employees joining as AROs from prefetched data
+            aro_in_ids = aro_data.get('in', [])
+            if aro_in_ids:
+                logger.info(f"Found {len(aro_in_ids)} employees joining team {team_id} as AROs (from prefetched data)")
+
+            # Filter out employees leaving as AROs
+            available_employees = [e for e in employees if e.id not in aro_out_ids]
+
+            # Add employees joining as AROs
+            if aro_in_ids:
+                # Check if we have prefetched employees by ID
+                if 'employees_by_id' in prefetched_data:
+                    for aro_id in aro_in_ids:
+                        if aro_id in prefetched_data['employees_by_id']:
+                            emp = prefetched_data['employees_by_id'][aro_id]
+                            available_employees.append(emp)
+                            logger.debug(f"Added ARO employee {emp.name} (ID: {emp.id}) from prefetched data")
+                # If not, fall back to using team_repository and aro_assignments
+                elif team_repository and 'aro_assignments_by_employee' in prefetched_data:
+                    for aro_id in aro_in_ids:
+                        if aro_id in prefetched_data['aro_assignments_by_employee']:
+                            aro_assignments = prefetched_data['aro_assignments_by_employee'][aro_id]
+                            if aro_assignments:
+                                assignment = aro_assignments[0]  # Take the first assignment if multiple exist
+                                # Check if we have the team in prefetched data
+                                from_team = None
+                                if 'teams_by_id' in prefetched_data and assignment.from_team_id in prefetched_data['teams_by_id']:
+                                    from_team = prefetched_data['teams_by_id'][assignment.from_team_id]
+                                else:
+                                    from_team = team_repository.get(assignment.from_team_id)
+
+                                if from_team:
+                                    for emp in from_team.members:
+                                        if emp.id == aro_id:
+                                            available_employees.append(emp)
+                                            logger.debug(f"Added ARO employee {emp.name} (ID: {emp.id}) from team {from_team.name}")
+                                            break
+
+            return available_employees
+
+        # If no prefetched data or ARO repository, return original employees
         if not aro_assignment_repository:
             logger.debug("No ARO assignment repository provided, skipping ARO processing")
             return employees.copy()
@@ -265,7 +337,8 @@ class ScheduleService:
                           team_name: str, call_ins: List[str] = None, offline: List[str] = None,
                           force_complete: bool = False, session: Any = None, team_repository: Optional[Any] = None,
                           aro_assignment_repository: Optional[Any] = None, schedule_repository: Optional[Any] = None,
-                          aro_service: Optional[Any] = None, aro_graph_service: Optional[Any] = None) -> WorkAssignments:
+                          aro_service: Optional[Any] = None, aro_graph_service: Optional[Any] = None,
+                          prefetched_data: Optional[Dict] = None) -> WorkAssignments:
         """
         Generate a schedule for the given employees, workstations, and time period
 
@@ -290,6 +363,7 @@ class ScheduleService:
             schedule_repository: Optional repository for creating/retrieving schedules (optional for testing/offline use)
             aro_service: Optional ARO service for finding and assigning AROs
             aro_graph_service: Optional ARO graph service for optimizing ARO assignments
+            prefetched_data: Optional dictionary containing prefetched data to avoid database queries
 
         Returns:
             List of work assignments
@@ -297,12 +371,12 @@ class ScheduleService:
         # Parse offline parameter
         offline_dict = self._parse_offline(offline)
 
-        # Get team_id from team_name
-        team_id = self._get_team_id(team_name, team_repository)
+        # Get team_id from team_name (use prefetched data if available)
+        team_id = self._get_team_id(team_name, team_repository, prefetched_data)
 
         # Handle ARO assignments (employees leaving/joining)
         available_employees = self._handle_aro_assignments(
-            employees, team_id, start_date, team_repository, aro_assignment_repository
+            employees, team_id, start_date, team_repository, aro_assignment_repository, prefetched_data
         )
 
         # Create a Schedule entity
@@ -318,7 +392,8 @@ class ScheduleService:
             session=session,
             team_repository=team_repository,
             aro_service=aro_service,
-            aro_graph_service=aro_graph_service
+            aro_graph_service=aro_graph_service,
+            prefetched_data=prefetched_data
         )
 
         # Update schedule status based on generation result

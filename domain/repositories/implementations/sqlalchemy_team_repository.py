@@ -1099,6 +1099,61 @@ class SqlAlchemyTeamRepository(BaseSqlAlchemyRepository[Team, TeamModel], TeamRe
             )
             raise RepositoryError(f"Failed to get teams by department ID: {error_msg}")
 
+    def get_department(self, department_id: int) -> Optional[Any]:
+        """
+        Retrieve a department by its ID.
+
+        Args:
+            department_id: The ID of the department.
+
+        Returns:
+            The department if found, None otherwise.
+        """
+        try:
+            self.logger.info(
+                f"Retrieving department by ID: {department_id}",
+                extra={
+                    "event_type": "department_lookup",
+                    "department_id": department_id
+                }
+            )
+
+            from domain.models.DepartmentModel import DepartmentModel
+
+            department_model = self._session.query(DepartmentModel).filter(DepartmentModel.id == department_id).first()
+            if not department_model:
+                self.logger.info(
+                    f"No department found with ID: {department_id}",
+                    extra={
+                        "event_type": "department_lookup_failed",
+                        "department_id": department_id,
+                        "reason": "not_found"
+                    }
+                )
+                return None
+
+            self.logger.info(
+                f"Found department with ID: {department_id}",
+                extra={
+                    "event_type": "department_lookup_success",
+                    "department_id": department_id,
+                    "department_name": department_model.name
+                }
+            )
+
+            return department_model
+        except SQLAlchemyError as e:
+            error_msg = sanitize_exception(e)
+            self.logger.error(
+                f"Error retrieving department by ID: {error_msg}",
+                extra={
+                    "event_type": "department_lookup_error",
+                    "department_id": department_id,
+                    "error_type": type(e).__name__
+                }
+            )
+            raise RepositoryError(f"Failed to get department by ID: {error_msg}")
+
     def get(self, id: int) -> Optional[Team]:
         """
         Retrieve a team by its ID.

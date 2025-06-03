@@ -90,12 +90,20 @@ class SqlAlchemyEmployeeRepository(BaseSqlAlchemyRepository[Employee, EmployeeMo
             raise RepositoryError(f"Error retrieving employees for team: {error_msg}")
 
     def get_by_team_ids(self, team_ids: List[int]) -> List[Employee]:
-        """Retrieve all employees for multiple teams in a single query."""
+        """
+        Retrieve all employees for multiple teams in a single query with eager loading.
+
+        Args:
+            team_ids: List of team IDs to fetch employees for
+
+        Returns:
+            List of Employee domain objects
+        """
         if not team_ids:
             return []
 
         self.logger.info(
-            f"Retrieving employees for {len(team_ids)} teams",
+            f"Retrieving employees for {len(team_ids)} teams with eager loading",
             extra={
                 "event_type": "bulk_employees_lookup",
                 "team_count": len(team_ids)
@@ -103,14 +111,21 @@ class SqlAlchemyEmployeeRepository(BaseSqlAlchemyRepository[Employee, EmployeeMo
         )
 
         try:
-            # Use SQLAlchemy's in_() for efficient bulk fetching
+            # Use SQLAlchemy's selectinload for eager loading related data
+            from sqlalchemy.orm import selectinload
+
             employee_models = self._session.query(EmployeeModel).filter(
                 EmployeeModel.team_id.in_(team_ids)
+            ).options(
+                selectinload(EmployeeModel.teams),
+                selectinload(EmployeeModel.workstations),
+                selectinload(EmployeeModel.availability),
+                selectinload(EmployeeModel.station_skills)
             ).all()
 
             employee_count = len(employee_models)
             self.logger.info(
-                f"Found {employee_count} employees for {len(team_ids)} teams",
+                f"Found {employee_count} employees for {len(team_ids)} teams with eager loading",
                 extra={
                     "event_type": "bulk_employees_lookup_success",
                     "team_count": len(team_ids),

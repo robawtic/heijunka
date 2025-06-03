@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Dict
 
 from domain.services.schedule_service import ScheduleService
 from domain.value_objects.work_assignment import WorkAssignment
@@ -97,7 +97,8 @@ class GenerateScheduleHandler:
         self, 
         command: GenerateScheduleCommand, 
         employees: List["Employee"], 
-        workstations: List["Workstation"]
+        workstations: List["Workstation"],
+        prefetched_data: Dict = None
     ) -> List[WorkAssignment]:
         """
         Generate assignments using prefetched data.
@@ -106,12 +107,18 @@ class GenerateScheduleHandler:
             command: The command containing schedule generation parameters
             employees: Prefetched employees for the team
             workstations: Prefetched workstations for the team
+            prefetched_data: Additional prefetched data (teams, groups, ARO assignments, etc.)
 
         Returns:
             List of generated work assignments
         """
-        # Get team name from team ID
-        team = self.team_repository.get_by_id(command.team_id)
+        # Get team name from team ID (use prefetched data if available)
+        team = None
+        if prefetched_data and 'teams_by_id' in prefetched_data and command.team_id in prefetched_data['teams_by_id']:
+            team = prefetched_data['teams_by_id'][command.team_id]
+        else:
+            team = self.team_repository.get_by_id(command.team_id)
+
         if not team:
             raise ValueError(f"Team with ID {command.team_id} not found")
 
@@ -129,7 +136,8 @@ class GenerateScheduleHandler:
             team_repository=self.team_repository,
             schedule_repository=self.schedule_repository,
             aro_service=self.aro_service,
-            aro_graph_service=self.aro_graph_service
+            aro_graph_service=self.aro_graph_service,
+            prefetched_data=prefetched_data
         )
 
         return assignments

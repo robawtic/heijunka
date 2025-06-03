@@ -159,3 +159,16 @@ class TeamRepositoryInterface(BaseRepository[Team]):
             The group if found, None otherwise.
         """
         pass
+
+    @abstractmethod
+    def get_department(self, department_id: int) -> Optional[Any]:
+        """
+        Retrieve a department by its ID.
+
+        Args:
+            department_id: The ID of the department.
+
+        Returns:
+            The department if found, None otherwise.
+        """
+        pass
