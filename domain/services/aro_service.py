@@ -1,5 +1,6 @@
 from typing import List, Optional, Dict, Callable, Any
 from datetime import date
+import logging
 
 from domain.entities.employee import Employee
 from domain.contexts.assignment.aro_assignment import AROAssignment
@@ -8,6 +9,9 @@ from domain.repositories.interfaces.employee_repository import EmployeeRepositor
 from domain.repositories.interfaces.team_repository import TeamRepositoryInterface
 from domain.events import AROAssignmentCreated, AROAssignmentRemoved, AROAssignmentUpdated
 from domain.events.publisher import DomainEventPublisher
+
+# Logger for this module
+logger = logging.getLogger(__name__)
 
 class AROService:
     def __init__(self,
@@ -176,6 +180,67 @@ class AROService:
         assignment.clear_domain_events()
 
         return {"status": "success", "message": "ARO assignment removed"}
+
+    def get_aro(self, team_id: int, period: Optional[int] = None, assignment_date: Optional[date] = None) -> Optional[AROAssignment]:
+        """
+        Find the best ARO candidate for a team that needs additional staffing.
+
+        Args:
+            team_id: The ID of the team that needs an ARO
+            period: The period for which the ARO is needed
+            assignment_date: The date for the assignment (defaults to today if not provided)
+
+        Returns:
+            An AROAssignment object if a suitable ARO is found, None otherwise
+        """
+        try:
+            # Use today's date if not provided
+            if assignment_date is None:
+                assignment_date = date.today()
+
+            # Find teams that have excess employees for this period
+            # This is a simplified implementation - in a real system, you would
+            # query a database of available AROs based on various criteria
+
+            # For now, we'll just get the first employee from another team who isn't
+            # already assigned as an ARO for this period
+
+            # Get all teams
+            all_teams = self.team_repository.get_all()
+
+            for donor_team in all_teams:
+                # Skip the requesting team
+                if donor_team.id == team_id:
+                    continue
+
+                # Get the donor team's employees
+                donor_employees = self.employee_repository.get_by_team_id(donor_team.id)
+
+                # Get employees already assigned as AROs for this period
+                assigned_ids = self.aro_repository.get_employees_leaving(donor_team.id, assignment_date, period)
+
+                # Find available employees (not already assigned as AROs)
+                available_employees = [e for e in donor_employees if e.id not in assigned_ids]
+
+                # If there are available employees, return the first one as an ARO candidate
+                if available_employees:
+                    # Create a temporary AROAssignment object to return
+                    # This doesn't persist to the database until assign_aro is called
+                    return AROAssignment(
+                        id=None,  # No ID yet since it's not persisted
+                        employee_id=available_employees[0].id,
+                        from_team_id=donor_team.id,
+                        to_team_id=team_id,
+                        assignment_date=assignment_date,
+                        period=period
+                    )
+
+            # No suitable ARO found
+            return None
+
+        except Exception as e:
+            logger.error(f"Error finding ARO candidate: {str(e)}")
+            return None
 
     def get_employees_for_team_and_period(self, team_id: int, assignment_date: date, period: Optional[int] = None) -> List[Employee]:
         """

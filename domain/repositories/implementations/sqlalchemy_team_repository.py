@@ -73,6 +73,63 @@ class SqlAlchemyTeamRepository(BaseSqlAlchemyRepository[Team, TeamModel], TeamRe
             )
             raise RepositoryError(f"Repository error: {error_msg}")
 
+    def get(self, id: int) -> Optional[Team]:
+        """
+        Retrieve a team by its ID.
+
+        Args:
+            id: The ID of the team to retrieve.
+
+        Returns:
+            A team object if found, None otherwise.
+        """
+        try:
+            self.logger.info(
+                f"Retrieving team by ID: {id}",
+                extra={
+                    "event_type": "team_lookup",
+                    "lookup_type": "id",
+                    "team_id": id
+                }
+            )
+
+            team_model = self._session.query(TeamModel).filter(TeamModel.id == id).first()
+            if not team_model:
+                self.logger.info(
+                    f"No team found with ID: {id}",
+                    extra={
+                        "event_type": "team_lookup_failed",
+                        "lookup_type": "id",
+                        "team_id": id,
+                        "reason": "not_found"
+                    }
+                )
+                return None
+
+            self.logger.info(
+                f"Found team with ID: {id}",
+                extra={
+                    "event_type": "team_lookup_success",
+                    "lookup_type": "id",
+                    "team_id": id,
+                    "team_name": team_model.name
+                }
+            )
+
+            return team_model.to_domain()
+        except SQLAlchemyError as e:
+            error_msg = sanitize_exception(e)
+            self.logger.error(
+                f"Error retrieving team by ID: {error_msg}",
+                extra={
+                    "event_type": "team_lookup_error",
+                    "lookup_type": "id",
+                    "team_id": id,
+                    "error_type": type(e).__name__
+                }
+            )
+            raise RepositoryError(f"Failed to get team by ID: {error_msg}")
+
     def get_by_name(self, name: str) -> Optional[Team]:
         """
         Retrieve a team by its name.

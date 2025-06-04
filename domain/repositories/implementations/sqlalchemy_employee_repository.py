@@ -54,6 +54,56 @@ class SqlAlchemyEmployeeRepository(BaseSqlAlchemyRepository[Employee, EmployeeMo
             )
             raise
 
+    def get(self, employee_id: int) -> Optional[Employee]:
+        """
+        Retrieve an employee by their ID.
+
+        Args:
+            employee_id: The ID of the employee to retrieve.
+
+        Returns:
+            An employee object if found, None otherwise.
+        """
+        self.logger.info(
+            f"Retrieving employee with ID: {employee_id}",
+            extra={
+                "event_type": "employee_lookup",
+                "employee_id": employee_id
+            }
+        )
+        try:
+            employee_model = self._session.query(EmployeeModel).get(employee_id)
+
+            if employee_model:
+                self.logger.info(
+                    f"Found employee with ID: {employee_id}",
+                    extra={
+                        "event_type": "employee_lookup_success",
+                        "employee_id": employee_id
+                    }
+                )
+                return employee_model.to_domain()
+            else:
+                self.logger.info(
+                    f"No employee found with ID: {employee_id}",
+                    extra={
+                        "event_type": "employee_lookup_not_found",
+                        "employee_id": employee_id
+                    }
+                )
+                return None
+        except SQLAlchemyError as e:
+            error_msg = sanitize_exception(e)
+            self.logger.error(
+                f"Error retrieving employee with ID {employee_id}: {error_msg}",
+                extra={
+                    "event_type": "employee_lookup_error",
+                    "employee_id": employee_id,
+                    "error_type": type(e).__name__
+                }
+            )
+            raise RepositoryError(f"Error retrieving employee: {error_msg}")
+
     def get_by_team_id(self, team_id: int) -> List[Employee]:
         """Retrieve all employees for a specific team and return as domain entities."""
         self.logger.info(

@@ -7,6 +7,8 @@ from typing import Optional, Any, Dict, List, Tuple, Union
 from datetime import datetime
 from sqlalchemy.orm import Session
 
+from domain.entities.employee import Employee
+
 from application.commands.generate_schedule_command import GenerateScheduleCommand
 from application.commands.generate_schedule_handler import GenerateScheduleHandler
 from domain.repositories.implementations.sqlalchemy_employee_repository import SqlAlchemyEmployeeRepository
@@ -58,7 +60,7 @@ def handle_generate(
         event_type="generate", 
         identifier="start"
     )
-    
+
     try:
         # Unpack dependencies
         (
@@ -81,7 +83,7 @@ def handle_generate(
             event_type="handler", 
             identifier="generate"
         )
-        
+
         handler = GenerateScheduleHandler(
             employee_repository=employee_repository,
             workstation_repository=workstation_repository,
@@ -199,24 +201,84 @@ def handle_generate(
             event_type="bulk_data_fetch", 
             identifier="aro_assignments"
         )
-        
+
+        # Prefetch ARO assignments for each period
         aro_assignments_by_team = {}
+        aro_assignments_by_team_period = {}
+
         for team_id in team_ids:
-            # Get employees leaving as AROs
+            # Get employees leaving as AROs (full day)
             aro_out_ids = aro_repository.get_employees_leaving(team_id, start_date)
-            # Get employees joining as AROs
+            # Get employees joining as AROs (full day)
             aro_in_ids = aro_repository.get_employees_joining(team_id, start_date)
+
+            # Store full-day assignments
             aro_assignments_by_team[team_id] = {
                 'out': aro_out_ids,
                 'in': aro_in_ids
             }
 
+            # Initialize period-specific assignments
+            aro_assignments_by_team_period[team_id] = {}
+
+            # Get period-specific assignments for each period
+            for period in range(1, args.periods + 1):
+                try:
+                    # Get employees leaving as AROs for this period
+                    period_out_ids = aro_repository.get_employees_leaving(team_id, start_date, period)
+                    # Get employees joining as AROs for this period
+                    period_in_ids = aro_repository.get_employees_joining(team_id, start_date, period)
+
+                    aro_assignments_by_team_period[team_id][period] = {
+                        'out': period_out_ids,
+                        'in': period_in_ids
+                    }
+                except Exception as e:
+                    logger.error(
+                        f"Error prefetching period-specific ARO assignments for team {team_id}, period {period}: {str(e)}",
+                        event_type="bulk_data_fetch",
+                        identifier="aro_assignments_error"
+                    )
+                    # Use empty lists as fallback
+                    aro_assignments_by_team_period[team_id][period] = {
+                        'out': [],
+                        'in': []
+                    }
+
         # Prefetch all ARO assignments by employee
         aro_assignments_by_employee = {}
+
+        # Collect all employee IDs that need ARO assignments
+        all_aro_employee_ids = set()
+
+        # Add employees from full-day assignments
         for team_id, assignments in aro_assignments_by_team.items():
             for employee_id in assignments['in']:
+                all_aro_employee_ids.add(employee_id)
+            for employee_id in assignments['out']:
+                all_aro_employee_ids.add(employee_id)
+
+        # Add employees from period-specific assignments
+        for team_id, periods in aro_assignments_by_team_period.items():
+            for period, assignments in periods.items():
+                for employee_id in assignments['in']:
+                    all_aro_employee_ids.add(employee_id)
+                for employee_id in assignments['out']:
+                    all_aro_employee_ids.add(employee_id)
+
+        # Fetch ARO assignments for all collected employee IDs
+        for employee_id in all_aro_employee_ids:
+            try:
                 aro_assignments = aro_repository.get_by_employee_id(employee_id, start_date)
                 aro_assignments_by_employee[employee_id] = aro_assignments
+            except Exception as e:
+                logger.error(
+                    f"Error prefetching ARO assignments for employee {employee_id}: {str(e)}",
+                    event_type="bulk_data_fetch",
+                    identifier="aro_assignments_error"
+                )
+                # Use empty list as fallback
+                aro_assignments_by_employee[employee_id] = []
 
         logger.info(
             f"Prefetched {len(all_employees)} employees, {len(all_workstations)} workstations, {len(teams)} teams, {len(groups_by_team)} groups, and ARO assignments for {len(team_ids)} teams",
@@ -231,66 +293,260 @@ def handle_generate(
             }
         )
 
-        # Generate schedules for each team using prefetched data
-        for team in teams:
+        # Create a shared prefetched data dictionary
+        prefetched_data = {
+            'teams_by_name': teams_by_name,
+            'teams_by_id': teams_by_id,
+            'groups_by_team': groups_by_team,
+            'departments_by_group': departments_by_group,
+            'teams_by_department': teams_by_department,
+            'aro_assignments_by_team': aro_assignments_by_team,
+            'aro_assignments_by_team_period': aro_assignments_by_team_period,
+            'aro_assignments_by_employee': aro_assignments_by_employee,
+            'employees_by_id': employees_by_id,
+            'employees_by_team': employees_by_team,
+            'workstations_by_team': workstations_by_team,
+            'periods_per_day': args.periods
+        }
+
+        # Build initial available_by_team_and_period
+        available_by_team_and_period = {}
+        for team_id in team_ids:
+            available_by_team_and_period[team_id] = {}
+            for period in range(1, args.periods + 1):
+                # Start with all employees for the team
+                available_by_team_and_period[team_id][period] = set(
+                    emp.id for emp in employees_by_team.get(team_id, [])
+                )
+
+        # Remove any call-ins from every roster & period
+        if args.call_ins:
+            for call_in in args.call_ins:
+                # Find employee ID by name
+                emp_id = None
+                for emp_id, emp in employees_by_id.items():
+                    if emp.name == call_in:
+                        emp_id = emp.id
+                        break
+
+                if emp_id:
+                    for t_id in team_ids:
+                        for p in range(1, args.periods + 1):
+                            available_by_team_and_period[t_id][p].discard(emp_id)
+                else:
+                    logger.warning(f"Call-in employee '{call_in}' not found in any team")
+
+        # Process ARO assignments that are already in the system
+        for team_id in team_ids:
+            # Process full-day ARO assignments
+            if team_id in aro_assignments_by_team:
+                aro_data = aro_assignments_by_team[team_id]
+
+                # Remove employees leaving as AROs from all periods
+                for emp_id in aro_data.get('out', []):
+                    for period in range(1, args.periods + 1):
+                        available_by_team_and_period[team_id][period].discard(emp_id)
+
+                # Add employees joining as AROs to all periods
+                for emp_id in aro_data.get('in', []):
+                    for period in range(1, args.periods + 1):
+                        available_by_team_and_period[team_id][period].add(emp_id)
+
+            # Process period-specific ARO assignments
+            if team_id in aro_assignments_by_team_period:
+                for period, period_data in aro_assignments_by_team_period[team_id].items():
+                    # Remove employees leaving as AROs for this period
+                    for emp_id in period_data.get('out', []):
+                        available_by_team_and_period[team_id][period].discard(emp_id)
+
+                    # Add employees joining as AROs for this period
+                    for emp_id in period_data.get('in', []):
+                        available_by_team_and_period[team_id][period].add(emp_id)
+
+        # Loop over each period
+        all_assignments = []
+        for period in range(1, args.periods + 1):
             logger.info(
-                f"Generating schedule for team '{team.name}'", 
-                event_type="team_schedule", 
-                identifier=team.name
+                f"Processing period {period}", 
+                event_type="period_processing", 
+                identifier=f"period_{period}"
             )
-            print(f"\nGenerating schedule for team '{team.name}'...")
+            print(f"\nProcessing period {period}...")
 
-            # Create command for this team
-            command = GenerateScheduleCommand(
-                team_id=team.id,
-                start_date=start_date,
-                periods_per_day=args.periods,
-                call_ins=args.call_ins,
-                offline=args.offline,
-                force_complete=args.force_complete
-            )
+            # Keep track of which team rosters changed this period
+            influenced_teams = set()
 
-            # Use prefetched data instead of making new queries
-            team_employees = employees_by_team.get(team.id, [])
-            team_workstations = workstations_by_team.get(team.id, [])
+            # Identify & handle all understaffed teams THIS period
+            for team in teams:
+                team_id = team.id
+                roster_ids = available_by_team_and_period[team_id][period]
+                workstations = workstations_by_team.get(team_id, [])
 
-            # Create additional prefetched data dictionary
-            prefetched_data = {
-                'teams_by_name': teams_by_name,
-                'teams_by_id': teams_by_id,
-                'groups_by_team': groups_by_team,
-                'departments_by_group': departments_by_group,
-                'teams_by_department': teams_by_department,
-                'aro_assignments_by_team': aro_assignments_by_team,
-                'aro_assignments_by_employee': aro_assignments_by_employee,
-                'employees_by_id': employees_by_id,
-                'employees_by_team': employees_by_team,
-                'workstations_by_team': workstations_by_team
-            }
+                if len(roster_ids) < len(workstations):
+                    logger.info(
+                        f"Team '{team.name}' is understaffed for period {period}: {len(roster_ids)} employees, {len(workstations)} workstations", 
+                        event_type="understaffed_team", 
+                        identifier=f"{team.name}_period_{period}"
+                    )
+                    print(f"Team '{team.name}' is understaffed for period {period}: {len(roster_ids)} employees, {len(workstations)} workstations")
 
-            # Generate assignments using prefetched data
-            team_assignments = handler.generate_with_prefetched_data(
-                command, 
-                team_employees, 
-                team_workstations,
-                prefetched_data
-            )
+                    # Need AROs - keep trying until we have enough or run out of options
+                    while len(roster_ids) < len(workstations):
+                        try:
+                            aro_candidate = aro_service.get_aro(team_id, period, start_date)
+                            if not aro_candidate:
+                                logger.warning(
+                                    f"No ARO candidate available for team '{team.name}' period {period}", 
+                                    event_type="aro_not_found", 
+                                    identifier=f"{team.name}_period_{period}"
+                                )
+                                print(f"No ARO candidate available for team '{team.name}' period {period}")
+                                break
 
-            if team_assignments:
+                            donor_team_id = aro_candidate.from_team_id
+                            emp_id = aro_candidate.employee_id
+
+                            # Remove from donor, add to receiver
+                            available_by_team_and_period[donor_team_id][period].discard(emp_id)
+                            available_by_team_and_period[team_id][period].add(emp_id)
+
+                            # Mark both teams as influenced
+                            influenced_teams.add(team_id)
+                            influenced_teams.add(donor_team_id)
+
+                            # Log the ARO assignment
+                            donor_team_name = teams_by_id[donor_team_id].name if donor_team_id in teams_by_id else f"Team {donor_team_id}"
+                            emp_name = employees_by_id[emp_id].name if emp_id in employees_by_id else f"Employee {emp_id}"
+
+                            logger.info(
+                                f"Assigned ARO {emp_name} from team '{donor_team_name}' to team '{team.name}' for period {period}", 
+                                event_type="aro_assigned", 
+                                identifier=f"{emp_name}_period_{period}"
+                            )
+                            print(f"Assigned ARO {emp_name} from team '{donor_team_name}' to team '{team.name}' for period {period}")
+
+                            # Update roster_ids for the next iteration of the while loop
+                            roster_ids = available_by_team_and_period[team_id][period]
+
+                        except Exception as e:
+                            logger.error(
+                                f"Failed to get ARO for team {team.name} period {period}: {e}", 
+                                event_type="aro_error", 
+                                identifier=f"{team.name}_period_{period}"
+                            )
+                            print(f"Error assigning ARO for team '{team.name}' period {period}: {e}")
+                            break
+
+            # Regenerate schedule for every team whose roster changed this period
+            for infl_team_id in influenced_teams:
+                roster_ids = available_by_team_and_period[infl_team_id][period]
+                roster_employees = [employees_by_id[eid] for eid in roster_ids if eid in employees_by_id]
+                team_workstations = workstations_by_team.get(infl_team_id, [])
+                team_name = teams_by_id[infl_team_id].name if infl_team_id in teams_by_id else f"Team {infl_team_id}"
+
                 logger.info(
-                    f"Generated {len(team_assignments)} assignments for team '{team.name}'",
-                    event_type="schedule_result", 
-                    identifier=team.name
+                    f"Regenerating schedule for team '{team_name}' period {period}", 
+                    event_type="regenerate_schedule", 
+                    identifier=f"{team_name}_period_{period}"
                 )
-                print(f"Generated {len(team_assignments)} assignments for team '{team.name}'")
-                all_assignments.extend(team_assignments)
-            else:
-                logger.warning(
-                    f"No assignments generated for team '{team.name}'", 
-                    event_type="schedule_result",
-                    identifier=team.name
-                )
-                print(f"No assignments generated for team '{team.name}'")
+                print(f"Regenerating schedule for team '{team_name}' period {period}")
+
+                # Build a data bag for CP solver
+                cp_input = {
+                    "employees": roster_employees,
+                    "workstations": team_workstations,
+                    "period": period,
+                    "start_date": start_date,
+                    "aro_data": aro_assignments_by_employee,
+                    "teams_by_id": teams_by_id
+                }
+
+                try:
+                    # Call the new helper that runs the solver for exactly (team, period)
+                    period_assignments = schedule_service.generate_period_schedule(
+                        team_id=infl_team_id,
+                        cp_input=cp_input
+                    )
+
+                    if period_assignments:
+                        logger.info(
+                            f"Generated {len(period_assignments)} assignments for team '{team_name}' period {period}", 
+                            event_type="period_schedule_result", 
+                            identifier=f"{team_name}_period_{period}"
+                        )
+                        print(f"Generated {len(period_assignments)} assignments for team '{team_name}' period {period}")
+                        all_assignments.extend(period_assignments)
+                    else:
+                        logger.warning(
+                            f"No assignments generated for team '{team_name}' period {period}", 
+                            event_type="period_schedule_result", 
+                            identifier=f"{team_name}_period_{period}"
+                        )
+                        print(f"No assignments generated for team '{team_name}' period {period}")
+
+                except Exception as e:
+                    logger.error(
+                        f"Error generating schedule for team '{team_name}' period {period}: {e}", 
+                        event_type="period_schedule_error", 
+                        identifier=f"{team_name}_period_{period}"
+                    )
+                    print(f"Error generating schedule for team '{team_name}' period {period}: {e}")
+
+            # For teams that did not change roster this period, generate their schedules too
+            # This ensures all teams have a complete schedule
+            for team in teams:
+                if team.id not in influenced_teams:
+                    roster_ids = available_by_team_and_period[team.id][period]
+                    roster_employees = [employees_by_id[eid] for eid in roster_ids if eid in employees_by_id]
+                    team_workstations = workstations_by_team.get(team.id, [])
+
+                    logger.info(
+                        f"Generating schedule for team '{team.name}' period {period}", 
+                        event_type="generate_schedule", 
+                        identifier=f"{team.name}_period_{period}"
+                    )
+                    print(f"Generating schedule for team '{team.name}' period {period}")
+
+                    # Build a data bag for CP solver
+                    cp_input = {
+                        "employees": roster_employees,
+                        "workstations": team_workstations,
+                        "period": period,
+                        "start_date": start_date,
+                        "aro_data": aro_assignments_by_employee,
+                        "teams_by_id": teams_by_id
+                    }
+
+                    try:
+                        # Call the new helper that runs the solver for exactly (team, period)
+                        period_assignments = schedule_service.generate_period_schedule(
+                            team_id=team.id,
+                            cp_input=cp_input
+                        )
+
+                        if period_assignments:
+                            logger.info(
+                                f"Generated {len(period_assignments)} assignments for team '{team.name}' period {period}", 
+                                event_type="period_schedule_result", 
+                                identifier=f"{team.name}_period_{period}"
+                            )
+                            print(f"Generated {len(period_assignments)} assignments for team '{team.name}' period {period}")
+                            all_assignments.extend(period_assignments)
+                        else:
+                            logger.warning(
+                                f"No assignments generated for team '{team.name}' period {period}", 
+                                event_type="period_schedule_result", 
+                                identifier=f"{team.name}_period_{period}"
+                            )
+                            print(f"No assignments generated for team '{team.name}' period {period}")
+
+                    except Exception as e:
+                        logger.error(
+                            f"Error generating schedule for team '{team.name}' period {period}: {e}", 
+                            event_type="period_schedule_error", 
+                            identifier=f"{team.name}_period_{period}"
+                        )
+                        print(f"Error generating schedule for team '{team.name}' period {period}: {e}")
 
         # Save all assignments in a single batch
         save_success = assignment_repository.save_all(all_assignments)
@@ -317,7 +573,20 @@ def handle_generate(
         print(f"Generated {len(all_assignments)} assignments for {len(teams)} teams using batch processing")
 
         # Display results
-        display_generation_results(all_assignments, teams, team_repository, employee_repository, workstation_repository, args, work_history_repository, start_date)
+        display_generation_results(
+            all_assignments, 
+            teams, 
+            team_repository, 
+            employee_repository, 
+            workstation_repository, 
+            args, 
+            work_history_repository, 
+            start_date,
+            aro_assignments_by_team,
+            aro_assignments_by_team_period,
+            aro_assignments_by_employee,
+            employees_by_id
+        )
 
         return True
 
@@ -344,7 +613,7 @@ def get_teams_for_generation(args: Any, team_repository: SqlAlchemyTeamRepositor
         List of teams to generate schedules for
     """
     teams = []
-    
+
     if args.team:
         # Get team by name
         try:
@@ -404,7 +673,7 @@ def get_teams_for_generation(args: Any, team_repository: SqlAlchemyTeamRepositor
             identifier=args.department
         )
         print(f"Generating schedules for {len(teams)} teams in department '{args.department}'")
-    
+
     return teams
 
 def display_generation_results(
@@ -415,7 +684,11 @@ def display_generation_results(
     workstation_repository: SqlAlchemyWorkstationRepository,
     args: Any,
     work_history_repository: SqlAlchemyEmployeeWorkHistoryRepository,
-    start_date: datetime.date
+    start_date: datetime.date,
+    aro_assignments_by_team: Optional[Dict[int, Dict[str, List[int]]]] = None,
+    aro_assignments_by_team_period: Optional[Dict[int, Dict[int, Dict[str, List[int]]]]] = None,
+    aro_assignments_by_employee: Optional[Dict[int, List[Any]]] = None,
+    employees_by_id: Optional[Dict[int, Employee]] = None
 ) -> None:
     """
     Display the results of schedule generation.
@@ -444,7 +717,7 @@ def display_generation_results(
             event_type="verification", 
             identifier="assignments"
         )
-        
+
         # Get the start date from the first team's command
         end_date = start_date  # For now, just verify the first day
 
@@ -558,6 +831,11 @@ def display_generation_results(
                     args.periods,
                     date_key,
                     args.call_ins,
-                    args.offline
+                    args.offline,
+                    aro_assignments_by_team,
+                    aro_assignments_by_team_period,
+                    aro_assignments_by_employee,
+                    employees_by_id,
+                    team_id
                 ))
                 print()  # Add some space between dates

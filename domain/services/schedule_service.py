@@ -235,55 +235,65 @@ class ScheduleService:
         Returns:
             List of available employees after ARO processing
         """
+        # If no employees, return empty list
+        if not employees:
+            logger.warning(f"No employees provided for team {team_id}, skipping ARO processing")
+            return []
+
         # If prefetched ARO data is available, use it
-        if prefetched_data and 'aro_assignments_by_team' in prefetched_data and team_id in prefetched_data['aro_assignments_by_team']:
-            logger.debug(f"Using prefetched ARO data for team {team_id}")
-            aro_data = prefetched_data['aro_assignments_by_team'][team_id]
+        if prefetched_data and prefetched_data.get('aro_assignments_by_team') and team_id in prefetched_data.get('aro_assignments_by_team', {}):
+            try:
+                logger.debug(f"Using prefetched ARO data for team {team_id}")
 
-            # Get employees leaving as AROs from prefetched data
-            aro_out_ids = aro_data.get('out', [])
-            if aro_out_ids:
-                logger.info(f"Found {len(aro_out_ids)} employees leaving team {team_id} as AROs (from prefetched data)")
+                # Initialize available employees with a copy of the original list
+                available_employees = employees.copy()
 
-            # Get employees joining as AROs from prefetched data
-            aro_in_ids = aro_data.get('in', [])
-            if aro_in_ids:
-                logger.info(f"Found {len(aro_in_ids)} employees joining team {team_id} as AROs (from prefetched data)")
+                # Track which employees were processed for validation
+                processed_employees = set()
 
-            # Filter out employees leaving as AROs
-            available_employees = [e for e in employees if e.id not in aro_out_ids]
+                # Process full-day ARO assignments
+                self._process_full_day_aro_assignments(
+                    team_id, 
+                    available_employees, 
+                    prefetched_data, 
+                    processed_employees,
+                    team_repository
+                )
 
-            # Add employees joining as AROs
-            if aro_in_ids:
-                # Check if we have prefetched employees by ID
-                if 'employees_by_id' in prefetched_data:
-                    for aro_id in aro_in_ids:
-                        if aro_id in prefetched_data['employees_by_id']:
-                            emp = prefetched_data['employees_by_id'][aro_id]
-                            available_employees.append(emp)
-                            logger.debug(f"Added ARO employee {emp.name} (ID: {emp.id}) from prefetched data")
-                # If not, fall back to using team_repository and aro_assignments
-                elif team_repository and 'aro_assignments_by_employee' in prefetched_data:
-                    for aro_id in aro_in_ids:
-                        if aro_id in prefetched_data['aro_assignments_by_employee']:
-                            aro_assignments = prefetched_data['aro_assignments_by_employee'][aro_id]
-                            if aro_assignments:
-                                assignment = aro_assignments[0]  # Take the first assignment if multiple exist
-                                # Check if we have the team in prefetched data
-                                from_team = None
-                                if 'teams_by_id' in prefetched_data and assignment.from_team_id in prefetched_data['teams_by_id']:
-                                    from_team = prefetched_data['teams_by_id'][assignment.from_team_id]
-                                else:
-                                    from_team = team_repository.get(assignment.from_team_id)
+                # Process period-specific ARO assignments if available
+                if (prefetched_data.get('aro_assignments_by_team_period') and 
+                    team_id in prefetched_data.get('aro_assignments_by_team_period', {}) and
+                    prefetched_data.get('periods_per_day')):
 
-                                if from_team:
-                                    for emp in from_team.members:
-                                        if emp.id == aro_id:
-                                            available_employees.append(emp)
-                                            logger.debug(f"Added ARO employee {emp.name} (ID: {emp.id}) from team {from_team.name}")
-                                            break
+                    self._process_period_specific_aro_assignments(
+                        team_id, 
+                        available_employees, 
+                        prefetched_data, 
+                        processed_employees,
+                        team_repository
+                    )
 
-            return available_employees
+                # Validate ARO assignments
+                if not available_employees:
+                    logger.warning(
+                        f"No available employees after ARO processing for team {team_id}. "
+                        f"This may indicate an issue with ARO assignments."
+                    )
+
+                logger.info(
+                    f"Processed ARO assignments for team {team_id}: "
+                    f"{len(processed_employees)} employees processed, "
+                    f"{len(available_employees)} employees available"
+                )
+
+                return available_employees
+
+            except Exception as e:
+                logger.error(
+                    f"Error processing prefetched ARO assignments for team {team_id}: {str(e)}. "
+                    f"Falling back to non-prefetched path."
+                )
+                # Fall through to non-prefetched path
 
         # If no prefetched data or ARO repository, return original employees
         if not aro_assignment_repository:
@@ -329,7 +339,178 @@ class ScheduleService:
                 except Exception as e:
                     logger.error(f"Error processing ARO employee {aro_id}: {str(e)}")
 
+        # Validate ARO assignments
+        if not available_employees:
+            logger.warning(
+                f"No available employees after ARO processing for team {team_id}. "
+                f"This may indicate an issue with ARO assignments."
+            )
+
         return available_employees
+
+    def _process_full_day_aro_assignments(
+        self, 
+        team_id: int, 
+        available_employees: List[Employee], 
+        prefetched_data: Dict, 
+        processed_employees: Set[int],
+        team_repository=None
+    ) -> None:
+        """
+        Process full-day ARO assignments for a team.
+
+        Args:
+            team_id: ID of the team
+            available_employees: List of available employees to modify
+            prefetched_data: Dictionary containing prefetched data
+            processed_employees: Set to track which employees were processed
+            team_repository: Optional repository for retrieving team information
+        """
+        # Safely get ARO data
+        if 'aro_assignments_by_team' not in prefetched_data or team_id not in prefetched_data['aro_assignments_by_team']:
+            logger.warning(f"No ARO data found for team {team_id} in prefetched data")
+            return
+
+        aro_data = prefetched_data['aro_assignments_by_team'][team_id]
+
+        # Get employees leaving as AROs from prefetched data
+        aro_out_ids = aro_data.get('out', [])
+        if aro_out_ids:
+            logger.info(f"Found {len(aro_out_ids)} employees leaving team {team_id} as AROs (from prefetched data)")
+
+            # Filter out employees leaving as AROs
+            available_employees[:] = [e for e in available_employees if e.id not in aro_out_ids]
+
+            # Add to processed employees
+            processed_employees.update(aro_out_ids)
+
+        # Get employees joining as AROs from prefetched data
+        aro_in_ids = aro_data.get('in', [])
+        if aro_in_ids:
+            logger.info(f"Found {len(aro_in_ids)} employees joining team {team_id} as AROs (from prefetched data)")
+
+            # Add employees joining as AROs
+            self._add_aro_employees(aro_in_ids, available_employees, prefetched_data, processed_employees, team_repository)
+
+    def _process_period_specific_aro_assignments(
+        self, 
+        team_id: int, 
+        available_employees: List[Employee], 
+        prefetched_data: Dict, 
+        processed_employees: Set[int],
+        team_repository=None
+    ) -> None:
+        """
+        Process period-specific ARO assignments for a team.
+
+        Args:
+            team_id: ID of the team
+            available_employees: List of available employees to modify
+            prefetched_data: Dictionary containing prefetched data
+            processed_employees: Set to track which employees were processed
+            team_repository: Optional repository for retrieving team information
+        """
+        # Safely get period-specific ARO data
+        if 'aro_assignments_by_team_period' not in prefetched_data or team_id not in prefetched_data['aro_assignments_by_team_period']:
+            logger.warning(f"No period-specific ARO data found for team {team_id} in prefetched data")
+            return
+
+        if 'periods_per_day' not in prefetched_data:
+            logger.warning(f"No periods_per_day found in prefetched data")
+            return
+
+        periods_data = prefetched_data['aro_assignments_by_team_period'][team_id]
+        periods_per_day = prefetched_data['periods_per_day']
+
+        for period in range(1, periods_per_day + 1):
+            if period not in periods_data:
+                continue
+
+            period_data = periods_data[period]
+
+            # Get employees leaving as AROs for this period
+            period_out_ids = period_data.get('out', [])
+            if period_out_ids:
+                logger.info(f"Found {len(period_out_ids)} employees leaving team {team_id} as AROs for period {period} (from prefetched data)")
+
+                # Filter out employees leaving as AROs for this period
+                # Note: For period-specific assignments, we don't remove the employee entirely,
+                # but this information would be used during the actual scheduling
+                processed_employees.update(period_out_ids)
+
+            # Get employees joining as AROs for this period
+            period_in_ids = period_data.get('in', [])
+            if period_in_ids:
+                logger.info(f"Found {len(period_in_ids)} employees joining team {team_id} as AROs for period {period} (from prefetched data)")
+
+                # Add employees joining as AROs for this period
+                self._add_aro_employees(period_in_ids, available_employees, prefetched_data, processed_employees, team_repository)
+
+    def _add_aro_employees(
+        self, 
+        aro_ids: List[int], 
+        available_employees: List[Employee], 
+        prefetched_data: Dict,
+        processed_employees: Set[int],
+        team_repository=None
+    ) -> None:
+        """
+        Add ARO employees to the list of available employees.
+
+        Args:
+            aro_ids: List of ARO employee IDs to add
+            available_employees: List of available employees to modify
+            prefetched_data: Dictionary containing prefetched data
+            processed_employees: Set to track which employees were processed
+            team_repository: Optional repository for retrieving team information
+        """
+
+        # Track existing employee IDs to avoid duplicates
+        existing_employee_ids = {e.id for e in available_employees}
+
+        for aro_id in aro_ids:
+            # Skip if already processed
+            if aro_id in processed_employees:
+                continue
+
+            try:
+                # First try to get employee from prefetched employees_by_id
+                if prefetched_data.get('employees_by_id') and aro_id in prefetched_data.get('employees_by_id', {}):
+                    emp = prefetched_data['employees_by_id'][aro_id]
+
+                    # Add only if not already in the list
+                    if emp.id not in existing_employee_ids:
+                        available_employees.append(emp)
+                        existing_employee_ids.add(emp.id)
+                        logger.debug(f"Added ARO employee {emp.name} (ID: {emp.id}) from prefetched data")
+
+                # If not found, try to get from ARO assignments and team repository
+                elif prefetched_data.get('aro_assignments_by_employee') and aro_id in prefetched_data.get('aro_assignments_by_employee', {}):
+                    aro_assignments = prefetched_data['aro_assignments_by_employee'][aro_id]
+
+                    if aro_assignments and aro_id not in existing_employee_ids:
+                        assignment = aro_assignments[0]  # Take the first assignment if multiple exist
+
+                        # Try to get the team from prefetched data first
+                        from_team = None
+                        if prefetched_data.get('teams_by_id') and assignment.from_team_id in prefetched_data.get('teams_by_id', {}):
+                            from_team = prefetched_data['teams_by_id'][assignment.from_team_id]
+                        elif team_repository:
+                            from_team = team_repository.get(assignment.from_team_id)
+
+                        if from_team and hasattr(from_team, 'members'):
+                            for emp in from_team.members:
+                                if emp.id == aro_id and emp.id not in existing_employee_ids:
+                                    available_employees.append(emp)
+                                    existing_employee_ids.add(emp.id)
+                                    logger.debug(f"Added ARO employee {emp.name} (ID: {emp.id}) from team {from_team.name}")
+                                    break
+
+                # Mark as processed
+                processed_employees.add(aro_id)
+
+            except Exception as e:
+                logger.error(f"Error adding ARO employee {aro_id}: {str(e)}")
 
 
     def generate_schedule(self, employees: List[Employee], workstations: List[Workstation],
@@ -413,6 +594,137 @@ class ScheduleService:
             return schedule.assignments
         else:
             logger.warning(f"No solution found. Error: {schedule.error_message}")
+            return []
+
+    def generate_period_schedule(self, team_id: int, cp_input: Dict) -> WorkAssignments:
+        """
+        Generate a schedule for a specific team and period.
+
+        This method is used when we need to regenerate a schedule for a specific period
+        after an ARO has been assigned or removed.
+
+        Args:
+            team_id: The ID of the team to generate a schedule for
+            cp_input: Dictionary containing all necessary data for the CP solver:
+                - employees: List of employees available for this period
+                - workstations: List of workstations for this team
+                - period: The period to generate a schedule for
+                - start_date: The date of the schedule
+                - aro_data: Dictionary of ARO assignments by employee and period
+                - teams_by_id: Dictionary of teams by ID (optional)
+
+        Returns:
+            List of work assignments for the specified team and period
+        """
+        try:
+            # Extract data from cp_input
+            employees = cp_input.get("employees", [])
+            workstations = cp_input.get("workstations", [])
+            period = cp_input.get("period")
+            start_date = cp_input.get("start_date")
+            aro_data = cp_input.get("aro_data", {})
+
+            if not employees or not workstations or period is None or not start_date:
+                logger.error(f"Missing required data for generate_period_schedule: team_id={team_id}, period={period}")
+                return []
+
+            # Get team name for logging
+            team_name = "Unknown"
+            if "teams_by_id" in cp_input and team_id in cp_input["teams_by_id"]:
+                team = cp_input["teams_by_id"][team_id]
+                if hasattr(team, "name"):
+                    team_name = team.name
+
+            logger.info(f"Generating schedule for team '{team_name}' period {period}")
+
+            # Create CP model
+            model = cp_model.CpModel()
+
+            # Define decision variables
+            assign = {}
+            for e, employee in enumerate(employees):
+                for w, workstation in enumerate(workstations):
+                    assign[(e, w, period-1)] = model.NewBoolVar(
+                        f'assign_e{e}_w{w}_p{period-1}')
+
+            # Each employee is assigned to at most one workstation per period
+            for e in range(len(employees)):
+                model.Add(sum(assign[(e, w, period-1)] for w in range(len(workstations))) <= 1)
+
+            # Each workstation is assigned to at most one employee per period
+            for w in range(len(workstations)):
+                model.Add(sum(assign[(e, w, period-1)] for e in range(len(employees))) <= 1)
+
+            # Handle employee availability based on ARO assignments
+            for e, employee in enumerate(employees):
+                is_available = True
+
+                # Check if employee is available for this period based on ARO data
+                key_exact = (employee.id, period)
+                key_fullday = (employee.id, None)  # Check for full-day ARO assignments
+
+                if key_fullday in aro_data:
+                    aro_list = aro_data[key_fullday]
+                    # If employee has a full-day ARO assignment, check if they're available
+                    for aro in aro_list:
+                        if aro.to_team_id != team_id:  # Employee is assigned elsewhere
+                            is_available = False
+                            break
+                elif key_exact in aro_data:
+                    aro_list = aro_data[key_exact]
+                    # If employee has a period-specific ARO assignment, check if they're available
+                    for aro in aro_list:
+                        if aro.to_team_id != team_id:  # Employee is assigned elsewhere
+                            is_available = False
+                            break
+
+                # If employee is not available, ensure they're not assigned
+                if not is_available:
+                    for w in range(len(workstations)):
+                        model.Add(assign[(e, w, period-1)] == 0)
+
+            # Objective: Maximize the number of assignments
+            objective_terms = []
+            for e in range(len(employees)):
+                for w in range(len(workstations)):
+                    objective_terms.append(assign[(e, w, period-1)])
+
+            model.Maximize(sum(objective_terms))
+
+            # Create solver and solve the model
+            solver = cp_model.CpSolver()
+            status = solver.Solve(model)
+
+            # Process the solution
+            assignments = []
+            if status == cp_model.OPTIMAL or status == cp_model.FEASIBLE:
+                for e, employee in enumerate(employees):
+                    for w, workstation in enumerate(workstations):
+                        if solver.Value(assign[(e, w, period-1)]) == 1:
+                            # Create a schedule period
+                            schedule_period = SchedulePeriod(
+                                date=start_date,
+                                period=period
+                            )
+
+                            # Create a work assignment
+                            assignment = WorkAssignment(
+                                employee=employee,
+                                workstation=workstation,
+                                period=schedule_period
+                                # team_id=team_id # team_id is part of workstation
+                            )
+
+                            assignments.append(assignment)
+
+                logger.info(f"Generated {len(assignments)} assignments for team '{team_name}' period {period}")
+            else:
+                logger.warning(f"No solution found for team '{team_name}' period {period}. Status: {status}")
+
+            return assignments
+
+        except Exception as e:
+            logger.error(f"Error generating period schedule for team {team_id}, period {cp_input.get('period')}: {str(e)}")
             return []
 
     def add_constraint(self, constraint: ScheduleConstraint):

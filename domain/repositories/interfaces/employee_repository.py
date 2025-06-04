@@ -12,6 +12,18 @@ class EmployeeRepositoryInterface(BaseRepository[Employee]):
     """
 
     @abstractmethod
+    def get(self, employee_id: int) -> Optional[Employee]:
+        """
+        Retrieve an employee by their ID.
+
+        Args:
+            employee_id: The ID of the employee to retrieve.
+
+        Returns:
+            An employee object if found, None otherwise.
+        """
+
+    @abstractmethod
     def get_by_team_id(self, team_id: int) -> List[Employee]:
         """
         Retrieve all employees for a specific team.

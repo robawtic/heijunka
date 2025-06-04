@@ -1,7 +1,7 @@
 """
 Formatting utilities for the CLI application.
 """
-from typing import List, Dict, Optional, Any
+from typing import List, Dict, Optional, Any, Union
 from datetime import date
 from tabulate import tabulate
 
@@ -20,7 +20,12 @@ def format_schedule_table(
     periods: int,
     date_obj: date,
     call_ins: Optional[List[str]] = None,
-    offline: Optional[List[str]] = None
+    offline: Optional[List[str]] = None,
+    aro_assignments_by_team: Optional[Dict[int, Dict[str, List[int]]]] = None,
+    aro_assignments_by_team_period: Optional[Dict[int, Dict[int, Dict[str, List[int]]]]] = None,
+    aro_assignments_by_employee: Optional[Dict[int, List[Any]]] = None,
+    employees_by_id: Optional[Dict[int, Employee]] = None,
+    team_id: Optional[int] = None
 ) -> str:
     """
     Format assignments as a readable table for a specific date using tabulate.
@@ -33,6 +38,11 @@ def format_schedule_table(
         date_obj: The date to display
         call_ins: List of employee names who called in (unavailable)
         offline: List of strings in format "employee:periods" specifying which employees are offline for which periods
+        aro_assignments_by_team: Dictionary mapping team IDs to dictionaries with 'out' and 'in' lists of employee IDs
+        aro_assignments_by_team_period: Dictionary mapping team IDs and periods to dictionaries with 'out' and 'in' lists of employee IDs
+        aro_assignments_by_employee: Dictionary mapping employee IDs to lists of ARO assignments
+        employees_by_id: Dictionary mapping employee IDs to Employee objects
+        team_id: ID of the team for which the schedule is being displayed
 
     Returns:
         str: Formatted schedule as a string
@@ -42,7 +52,7 @@ def format_schedule_table(
         event_type="format_schedule",
         identifier=str(date_obj)
     )
-    
+
     # Filter assignments for the specified date
     day_assignments = [a for a in assignments if a.period.date == date_obj]
 
@@ -54,12 +64,27 @@ def format_schedule_table(
     # Add special rows
     schedule["Offline"] = {p+1: "-" for p in range(periods)}
     schedule["Called-in"] = {p+1: "-" for p in range(periods)}
+    schedule["AROs"] = {p+1: "-" for p in range(periods)}
 
     # Fill in the schedule with assignments
     for assignment in day_assignments:
         ws_name = assignment.workstation.name
         period = assignment.period.period
         emp_name = assignment.employee.name
+
+        # Check if workstation exists in schedule dictionary
+        if ws_name not in schedule:
+            logger.warning(
+                f"Workstation '{ws_name}' not found in workstations list for team",
+                event_type="missing_workstation",
+                identifier=ws_name,
+                extra={
+                    "workstation_name": ws_name
+                }
+            )
+            # Add the missing workstation to the schedule
+            schedule[ws_name] = {p+1: "-" for p in range(periods)}
+
         schedule[ws_name][period] = emp_name
 
     # Parse offline parameter
@@ -108,15 +133,55 @@ def format_schedule_table(
             for p in range(1, periods+1):
                 schedule["Called-in"][p] = ", ".join(called_in_names)
 
+    # Add ARO information to the AROs row
+    if team_id is not None and (aro_assignments_by_team_period or aro_assignments_by_team) and employees_by_id:
+        for p in range(1, periods+1):
+            aro_info = []
+
+            # Check for period-specific ARO assignments
+            if aro_assignments_by_team_period and team_id in aro_assignments_by_team_period and p in aro_assignments_by_team_period[team_id]:
+                period_data = aro_assignments_by_team_period[team_id][p]
+
+                # Process outgoing AROs (employees leaving this team)
+                for emp_id in period_data.get('out', []):
+                    if emp_id in employees_by_id:
+                        emp = employees_by_id[emp_id]
+                        aro_info.append(f"{emp.name}[From]")
+
+                # Process incoming AROs (employees joining this team)
+                for emp_id in period_data.get('in', []):
+                    if emp_id in employees_by_id:
+                        emp = employees_by_id[emp_id]
+                        aro_info.append(f"{emp.name}[To]")
+
+            # Check for full-day ARO assignments if no period-specific ones were found
+            elif aro_assignments_by_team and team_id in aro_assignments_by_team:
+                team_data = aro_assignments_by_team[team_id]
+
+                # Process outgoing AROs (employees leaving this team)
+                for emp_id in team_data.get('out', []):
+                    if emp_id in employees_by_id:
+                        emp = employees_by_id[emp_id]
+                        aro_info.append(f"{emp.name}[From]")
+
+                # Process incoming AROs (employees joining this team)
+                for emp_id in team_data.get('in', []):
+                    if emp_id in employees_by_id:
+                        emp = employees_by_id[emp_id]
+                        aro_info.append(f"{emp.name}[To]")
+
+            if aro_info:
+                schedule["AROs"][p] = ", ".join(aro_info)
+
     # Prepare data for tabulate
     headers = ["Station"] + [f"P{p}" for p in range(1, periods+1)]
     table_data = []
 
     # Get all workstation names from the schedule (excluding special rows)
-    regular_stations = [name for name in schedule.keys() if name not in ["Offline", "Called-in"]]
+    regular_stations = [name for name in schedule.keys() if name not in ["Offline", "Called-in", "AROs"]]
 
     # Define the order: regular workstations first, then special rows
-    station_order = sorted(regular_stations) + ["Offline", "Called-in"]
+    station_order = sorted(regular_stations) + ["AROs", "Offline", "Called-in"]
 
     # Create a dictionary mapping workstation names to their objects for easy lookup
     workstation_dict = {ws.name: ws for ws in workstations}

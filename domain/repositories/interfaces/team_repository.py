@@ -13,6 +13,18 @@ class TeamRepositoryInterface(BaseRepository[Team]):
     """
 
     @abstractmethod
+    def get(self, team_id: int) -> Optional[Team]:
+        """
+        Retrieve a team by its ID.
+
+        Arggs:
+            team_id: The ID of the team to retrieve.
+
+        Returns:
+            A team object if found, None otherwise.
+        """
+
+    @abstractmethod
     def get_by_name(self, name: str) -> Optional[Team]:
         """
         Retrieve a team by its name.
