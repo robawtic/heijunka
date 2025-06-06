@@ -48,7 +48,7 @@ def setup_dependencies() -> Tuple[
             - schedule_repository: Repository for schedule data
     """
     logger.debug("Setting up dependencies", event_type="dependencies", identifier="setup_start")
-    
+
     session = DbSession()
     employee_repository = SqlAlchemyEmployeeRepository(session)
     workstation_repository = SqlAlchemyWorkstationRepository(session)
@@ -60,7 +60,9 @@ def setup_dependencies() -> Tuple[
 
     # Import here to avoid circular imports
     from domain.repositories.implementations.sqlalchemy_aro_assignment_repository import SqlAlchemyAROAssignmentRepository
+    from domain.repositories.implementations.sqlalchemy_team_aro_repository import SqlAlchemyTeamAroRepository
     aro_repository = SqlAlchemyAROAssignmentRepository(session)
+    team_aro_repository = SqlAlchemyTeamAroRepository(session)
 
     # Create and register the schedule recalculation handler
     from domain.services.aro_service import AROService
@@ -68,7 +70,7 @@ def setup_dependencies() -> Tuple[
     from domain.contexts.assignment.services.aro_graph_service import AROGraphService
     from domain.services.cache_invalidation_handler import CacheInvalidationHandler
 
-    aro_service = AROService(aro_repository, employee_repository, team_repository)
+    aro_service = AROService(aro_repository, employee_repository, team_repository, team_aro_repository)
     schedule_recalculation_handler = ScheduleRecalculationHandler(
         team_repository, 
         employee_repository, 
@@ -102,7 +104,7 @@ def setup_dependencies() -> Tuple[
     aro_service.register_event_handler('aro_assignment_updated', cache_invalidation_handler.handle_aro_assignment_updated)
 
     logger.debug("Dependencies setup complete", event_type="dependencies", identifier="setup_complete")
-    
+
     return (
         session, 
         employee_repository, 

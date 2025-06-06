@@ -7,6 +7,7 @@ from domain.contexts.assignment.aro_assignment import AROAssignment
 from domain.repositories.interfaces.aro_assignment_repository import AROAssignmentRepositoryInterface
 from domain.repositories.interfaces.employee_repository import EmployeeRepositoryInterface
 from domain.repositories.interfaces.team_repository import TeamRepositoryInterface
+from domain.repositories.interfaces.team_aro_repository import TeamAroRepositoryInterface
 from domain.events import AROAssignmentCreated, AROAssignmentRemoved, AROAssignmentUpdated
 from domain.events.publisher import DomainEventPublisher
 
@@ -18,10 +19,12 @@ class AROService:
                  aro_repository: AROAssignmentRepositoryInterface,
                  employee_repository: EmployeeRepositoryInterface,
                  team_repository: TeamRepositoryInterface,
+                 team_aro_repository: TeamAroRepositoryInterface,
                  event_publisher: DomainEventPublisher = None):
         self.aro_repository = aro_repository
         self.employee_repository = employee_repository
         self.team_repository = team_repository
+        self.team_aro_repository = team_aro_repository
         self.event_publisher = event_publisher or DomainEventPublisher()
         self._event_handlers = {
             'aro_assignment_created': [],
@@ -181,7 +184,22 @@ class AROService:
 
         return {"status": "success", "message": "ARO assignment removed"}
 
-    def get_aro(self, team_id: int, period: Optional[int] = None, assignment_date: Optional[date] = None) -> Optional[AROAssignment]:
+    def get_aro_for_workstations(self, team_id: int, period: Optional[int] = None, assignment_date: Optional[date] = None, empty_workstations: Optional[List["Workstation"]] = None) -> Optional[AROAssignment]:
+        """
+        Find the best ARO candidate for a team that needs additional staffing for specific workstations.
+
+        Args:
+            team_id: The ID of the team that needs an ARO
+            period: The period for which the ARO is needed
+            assignment_date: The date for the assignment (defaults to today if not provided)
+            empty_workstations: List of empty workstations that need to be filled
+
+        Returns:
+            An AROAssignment object if a suitable ARO is found, None otherwise
+        """
+        return self.get_aro(team_id, period, assignment_date, empty_workstations)
+
+    def get_aro(self, team_id: int, period: Optional[int] = None, assignment_date: Optional[date] = None, empty_workstations: Optional[List["Workstation"]] = None) -> Optional[AROAssignment]:
         """
         Find the best ARO candidate for a team that needs additional staffing.
 
@@ -189,6 +207,8 @@ class AROService:
             team_id: The ID of the team that needs an ARO
             period: The period for which the ARO is needed
             assignment_date: The date for the assignment (defaults to today if not provided)
+            empty_workstations: Optional list of empty workstations that need to be filled.
+                                If provided, AROs will be selected based on their qualifications for these workstations.
 
         Returns:
             An AROAssignment object if a suitable ARO is found, None otherwise
@@ -198,49 +218,173 @@ class AROService:
             if assignment_date is None:
                 assignment_date = date.today()
 
-            # Find teams that have excess employees for this period
-            # This is a simplified implementation - in a real system, you would
-            # query a database of available AROs based on various criteria
+            # Dictionary to track qualified ARO candidates and their qualification scores
+            qualified_candidates = {}
 
-            # For now, we'll just get the first employee from another team who isn't
-            # already assigned as an ARO for this period
+            # Get all active TeamAro relationships for the team that needs an ARO
+            team_aros = self.team_aro_repository.get_by_team_id(team_id)
+            active_team_aros = [aro for aro in team_aros if aro.is_active()]
 
-            # Get all teams
-            all_teams = self.team_repository.get_all()
+            if not active_team_aros:
+                logger.warning(f"No active ARO relationships found for team {team_id}")
+                return None
 
-            for donor_team in all_teams:
-                # Skip the requesting team
-                if donor_team.id == team_id:
+            for team_aro in active_team_aros:
+                # Get the employee
+                employee = self.employee_repository.get(team_aro.employee_id)
+                if not employee:
                     continue
 
-                # Get the donor team's employees
-                donor_employees = self.employee_repository.get_by_team_id(donor_team.id)
+                # Get the employee's home team
+                from_team_id = employee.team_id
 
-                # Get employees already assigned as AROs for this period
-                assigned_ids = self.aro_repository.get_employees_leaving(donor_team.id, assignment_date, period)
+                # Skip if the employee is from the same team that needs an ARO
+                if from_team_id == team_id:
+                    continue
 
-                # Find available employees (not already assigned as AROs)
-                available_employees = [e for e in donor_employees if e.id not in assigned_ids]
+                # Check if employee is already assigned as ARO for this period
+                assigned_ids = self.aro_repository.get_employees_leaving(from_team_id, assignment_date, period)
 
-                # If there are available employees, return the first one as an ARO candidate
-                if available_employees:
-                    # Create a temporary AROAssignment object to return
-                    # This doesn't persist to the database until assign_aro is called
-                    return AROAssignment(
-                        id=None,  # No ID yet since it's not persisted
-                        employee_id=available_employees[0].id,
-                        from_team_id=donor_team.id,
-                        to_team_id=team_id,
-                        assignment_date=assignment_date,
-                        period=period
+                # Skip if employee is already assigned as ARO
+                if employee.id in assigned_ids:
+                    continue
+
+                # Check if employee is available for this period
+                if not employee.is_available_for_period(assignment_date, period):
+                    continue
+
+                # If workstations are provided, check qualifications
+                if empty_workstations:
+                    # Count how many empty workstations this employee is qualified for
+                    qualified_count = 0
+                    for workstation in empty_workstations:
+                        if employee.can_work(workstation) and employee.can_handle_workstation_type(workstation):
+                            qualified_count += 1
+
+                    # If employee is qualified for at least one workstation, add them as a candidate
+                    if qualified_count > 0:
+                        qualified_candidates[employee.id] = {
+                            'employee': employee,
+                            'from_team_id': from_team_id,
+                            'qualified_count': qualified_count
+                        }
+                else:
+                    # If no workstations provided, just add the employee as a candidate with a default score
+                    qualified_candidates[employee.id] = {
+                        'employee': employee,
+                        'from_team_id': from_team_id,
+                        'qualified_count': 1  # Default score
+                    }
+
+            # If we have qualified candidates, select the best one
+            if qualified_candidates:
+                # If workstations are provided, sort by qualification score
+                if empty_workstations:
+                    # Sort candidates by qualification score (descending)
+                    sorted_candidates = sorted(
+                        qualified_candidates.values(),
+                        key=lambda x: x['qualified_count'],
+                        reverse=True
                     )
+                    best_candidate = sorted_candidates[0]
+                else:
+                    # If no workstations, just pick the first candidate
+                    # In a real implementation, you might want to use other criteria here
+                    best_candidate = next(iter(qualified_candidates.values()))
+
+                # Create a temporary AROAssignment object to return
+                # This doesn't persist to the database until assign_aro is called
+                return AROAssignment(
+                    id=None,  # No ID yet since it's not persisted
+                    employee_id=best_candidate['employee'].id,
+                    from_team_id=best_candidate['from_team_id'],
+                    to_team_id=team_id,
+                    assignment_date=assignment_date,
+                    period=period
+                )
 
             # No suitable ARO found
+            logger.warning(f"No qualified ARO candidates found for team {team_id}, period {period}")
             return None
 
         except Exception as e:
             logger.error(f"Error finding ARO candidate: {str(e)}")
             return None
+
+    def get_workstation_aro_mapping(self, team_id: int, period: Optional[int] = None, 
+                               assignment_date: Optional[date] = None, 
+                               empty_workstations: Optional[List["Workstation"]] = None) -> Dict[int, List[int]]:
+        """
+        Get a mapping of workstations to qualified AROs for a team.
+
+        Args:
+            team_id: The ID of the team that needs AROs
+            period: The period for which AROs are needed
+            assignment_date: The date for the assignment (defaults to today if not provided)
+            empty_workstations: List of empty workstations that need to be filled
+
+        Returns:
+            A dictionary mapping workstation IDs to lists of qualified ARO employee IDs
+        """
+        try:
+            # Use today's date if not provided
+            if assignment_date is None:
+                assignment_date = date.today()
+
+            # If no empty workstations provided, return empty mapping
+            if not empty_workstations:
+                logger.warning(f"No empty workstations provided for team {team_id}, period {period}")
+                return {}
+
+            # Map of workstation to qualified AROs
+            workstation_to_aros = {}
+
+            # Get all active TeamAro relationships for the team that needs AROs
+            team_aros = self.team_aro_repository.get_by_team_id(team_id)
+            active_team_aros = [aro for aro in team_aros if aro.is_active()]
+
+            if not active_team_aros:
+                logger.warning(f"No active ARO relationships found for team {team_id}")
+                return {}
+
+            # For each active ARO relationship, check if the employee is available and qualified
+            for team_aro in active_team_aros:
+                # Get the employee
+                employee = self.employee_repository.get(team_aro.employee_id)
+                if not employee:
+                    continue
+
+                # Get the employee's home team
+                from_team_id = employee.team_id
+
+                # Skip if the employee is from the same team that needs AROs
+                if from_team_id == team_id:
+                    continue
+
+                # Check if employee is already assigned as ARO for this period
+                assigned_ids = self.aro_repository.get_employees_leaving(from_team_id, assignment_date, period)
+
+                # Skip if employee is already assigned as ARO
+                if employee.id in assigned_ids:
+                    continue
+
+                # Check if employee is available for this period
+                if not employee.is_available_for_period(assignment_date, period):
+                    continue
+
+                # Check which workstations this ARO can handle
+                for workstation in empty_workstations:
+                    if employee.can_work(workstation) and employee.can_handle_workstation_type(workstation):
+                        # Add this ARO to the workstation's list
+                        if workstation.id not in workstation_to_aros:
+                            workstation_to_aros[workstation.id] = []
+                        workstation_to_aros[workstation.id].append(employee.id)
+
+            return workstation_to_aros
+
+        except Exception as e:
+            logger.error(f"Error creating workstation-ARO mapping: {str(e)}")
+            return {}
 
     def get_employees_for_team_and_period(self, team_id: int, assignment_date: date, period: Optional[int] = None) -> List[Employee]:
         """

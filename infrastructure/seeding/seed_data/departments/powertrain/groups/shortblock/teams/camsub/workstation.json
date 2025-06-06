@@ -1,25 +1,43 @@
 {
   "workstations": [
     {
-      "name": "CAM070"
+      "name": "CAM010"
     },
     {
-      "name": "CAM120"
+      "name": "CAM020"
     },
     {
-      "name": "CAM130"
+      "name": "CAM030"
     },
     {
-      "name": "CAM150"
+      "name": "CAM050"
     },
     {
-      "name": "CAM190"
+      "name": "CAM100"
+    },
+    {
+      "name": "CAM110"
+    },
+    {
+      "name": "CAM160"
+    },
+    {
+      "name": "CAM180"
+    },
+    {
+      "name": "CAM200"
+    },
+    {
+      "name": "CAM210"
     },
     {
       "name": "CAM260"
     },
     {
       "name": "CAM280"
+    },
+    {
+      "name": "CAM290"
     }
   ]
 }

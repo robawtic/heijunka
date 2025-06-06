@@ -18,6 +18,7 @@ class WorkstationModel(Base):
     line_type_id = Column(Integer, ForeignKey('line_types.id'), nullable=False)
     is_loading_job = Column(Boolean, nullable=False, default=False)
     is_heavy_job = Column(Boolean, nullable=False, default=False)
+    is_active = Column(Boolean, nullable=False, default=True)
     is_key_skill_job = Column(Boolean, nullable=False, default=False)
     team_id = Column(Integer, ForeignKey('teams.id'), nullable=False)
 

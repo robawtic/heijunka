@@ -1,42 +1,99 @@
 {
   "employees": [
     {
-      "name": "Aaron",
+      "name": "Timothy",
       "role": "Team Leader",
       "known_stations": []
     },
     {
-      "name": "Jessica",
+      "name": "Brian",
       "role": "Backup",
       "known_stations": [
+        "HEA060",
         "HEA080",
         "HEA090",
-        "HEA100",
-        "HEA120",
-        "HEA130",
+        "HEA110",
+        "HEA150",
         "HEA180",
-        "HEA190",
         "HEA200",
-        "HEA240",
-        "HEA250",
+        "HEA230",
         "HEA260",
-        "HEA290",
-        "HEA300"
+        "HEA280"
       ]
     },
     {
-      "name": "Robert",
+      "name": "Barbara",
+      "role": "Associate",
+      "known_stations": [
+        "HEA280",
+        "HEA090",
+        "HEA080",
+        "HEA150",
+        "HEA060",
+        "HEA230",
+        "HEA110",
+        "HEA200",
+        "HEA260",
+        "HEA180"
+      ]
+    },
+    {
+      "name": "John",
+      "role": "Associate",
+      "known_stations": [
+        "HEA230",
+        "HEA060",
+        "HEA110",
+        "HEA280",
+        "HEA150",
+        "HEA200",
+        "HEA180",
+        "HEA080",
+        "HEA260",
+        "HEA090"
+      ]
+    },
+    {
+      "name": "Lynn",
+      "role": "Associate",
+      "known_stations": [
+        "HEA150",
+        "HEA080",
+        "HEA230",
+        "HEA110",
+        "HEA280",
+        "HEA200",
+        "HEA060",
+        "HEA260"
+      ]
+    },
+    {
+      "name": "Richard",
       "role": "Associate",
       "known_stations": [
         "HEA200",
-        "HEA120",
         "HEA180",
-        "HEA240",
+        "HEA080",
+        "HEA060",
+        "HEA280",
+        "HEA150",
+        "HEA230",
+        "HEA110"
+      ]
+    },
+    {
+      "name": "Teresa",
+      "role": "Associate",
+      "known_stations": [
+        "HEA080",
+        "HEA090",
+        "HEA180",
+        "HEA280",
+        "HEA060",
         "HEA260",
-        "HEA190",
-        "HEA290",
-        "HEA300",
-        "HEA080"
+        "HEA150",
+        "HEA230",
+        "HEA110"
       ]
     },
     {
@@ -44,181 +101,109 @@
       "role": "Associate",
       "known_stations": [
         "HEA080",
-        "HEA100",
-        "HEA250"
-      ]
-    },
-    {
-      "name": "John",
-      "role": "Associate",
-      "known_stations": [
-        "HEA300",
-        "HEA290",
+        "HEA090",
+        "HEA060",
+        "HEA280",
+        "HEA260",
+        "HEA200",
+        "HEA150",
+        "HEA110",
+        "HEA230",
         "HEA180"
       ]
     },
     {
-      "name": "Darren",
+      "name": "Vanessa",
       "role": "Associate",
       "known_stations": [
         "HEA080",
-        "HEA200",
-        "HEA180",
-        "HEA100",
-        "HEA090",
         "HEA260",
-        "HEA190",
-        "HEA130",
-        "HEA250"
+        "HEA230",
+        "HEA180",
+        "HEA280",
+        "HEA060",
+        "HEA200",
+        "HEA150",
+        "HEA090"
       ]
     },
     {
-      "name": "Michael",
+      "name": "Sabrina",
       "role": "Associate",
       "known_stations": [
-        "HEA250",
-        "HEA200",
-        "HEA180",
-        "HEA130",
-        "HEA190",
+        "HEA060",
+        "HEA230",
         "HEA080",
-        "HEA090",
-        "HEA100",
-        "HEA300"
-      ]
-    },
-    {
-      "name": "Sarah",
-      "role": "Associate",
-      "known_stations": [
-        "HEA180",
-        "HEA240",
-        "HEA120",
-        "HEA300",
-        "HEA100"
-      ]
-    },
-    {
-      "name": "Gabriel",
-      "role": "Associate",
-      "known_stations": [
-        "HEA180",
-        "HEA250",
-        "HEA300",
-        "HEA090",
-        "HEA290",
-        "HEA260"
-      ]
-    },
-    {
-      "name": "Melissa",
-      "role": "Associate",
-      "known_stations": [
-        "HEA240",
+        "HEA280",
         "HEA200",
-        "HEA120"
+        "HEA180",
+        "HEA150",
+        "HEA090",
+        "HEA260",
+        "HEA110"
       ]
     },
     {
-      "name": "John",
+      "name": "Malik",
       "role": "Associate",
       "known_stations": [
+        "HEA230",
+        "HEA090",
+        "HEA060",
+        "HEA180",
+        "HEA080",
         "HEA200",
-        "HEA290",
-        "HEA180",
-        "HEA240",
-        "HEA130",
-        "HEA260",
-        "HEA080"
-      ]
-    },
-    {
-      "name": "Timothy",
-      "role": "Associate",
-      "known_stations": [
-        "HEA090",
-        "HEA130",
-        "HEA260",
-        "HEA120",
-        "HEA190",
-        "HEA080",
-        "HEA180",
-        "HEA250",
-        "HEA100"
-      ]
-    },
-    {
-      "name": "Lisa",
-      "role": "Associate",
-      "known_stations": [
-        "HEA240",
-        "HEA090",
-        "HEA100",
-        "HEA130",
-        "HEA260",
-        "HEA250",
-        "HEA300",
-        "HEA080",
-        "HEA290",
-        "HEA190"
+        "HEA110",
+        "HEA150",
+        "HEA280"
       ]
     },
     {
       "name": "Christopher",
       "role": "Associate",
       "known_stations": [
-        "HEA130",
-        "HEA190",
-        "HEA080",
-        "HEA120",
-        "HEA300",
-        "HEA290",
-        "HEA240"
-      ]
-    },
-    {
-      "name": "Karen",
-      "role": "Associate",
-      "known_stations": [
+        "HEA260",
         "HEA180",
-        "HEA120",
-        "HEA240",
-        "HEA190",
         "HEA200",
-        "HEA300",
-        "HEA130",
-        "HEA260",
-        "HEA080",
-        "HEA250",
-        "HEA290",
-        "HEA090"
-      ]
-    },
-    {
-      "name": "Christine",
-      "role": "Associate",
-      "known_stations": [
-        "HEA290",
-        "HEA300",
-        "HEA250",
-        "HEA120",
-        "HEA190",
-        "HEA080",
+        "HEA230",
         "HEA090",
-        "HEA100",
-        "HEA200",
-        "HEA130"
+        "HEA060",
+        "HEA110",
+        "HEA080",
+        "HEA280",
+        "HEA150"
       ]
     },
     {
-      "name": "Luis",
+      "name": "Christopher",
       "role": "Associate",
       "known_stations": [
+        "HEA090",
+        "HEA280",
+        "HEA150",
+        "HEA060",
+        "HEA230",
         "HEA200",
-        "HEA080",
         "HEA260",
-        "HEA100",
-        "HEA240"
+        "HEA180",
+        "HEA110",
+        "HEA080"
+      ]
+    },
+    {
+      "name": "Brian",
+      "role": "Associate",
+      "known_stations": [
+        "HEA280",
+        "HEA060",
+        "HEA090",
+        "HEA230",
+        "HEA180",
+        "HEA150",
+        "HEA200",
+        "HEA110",
+        "HEA080",
+        "HEA260"
       ]
     }
   ]

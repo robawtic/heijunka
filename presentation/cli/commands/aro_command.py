@@ -37,7 +37,7 @@ def handle_aro_assignment(
         event_type="aro_assignment", 
         identifier=args.aro_command
     )
-    
+
     try:
         # Setup repositories
         logger.debug(
@@ -45,7 +45,7 @@ def handle_aro_assignment(
             event_type="aro_assignment", 
             identifier="setup"
         )
-        
+
         employee_repository = SqlAlchemyEmployeeRepository(session)
         team_repository = SqlAlchemyTeamRepository(session)
         workstation_repository = SqlAlchemyWorkstationRepository(session)
@@ -57,11 +57,13 @@ def handle_aro_assignment(
                 event_type="aro_assignment", 
                 identifier="service_creation"
             )
-            
+
             from domain.repositories.implementations.sqlalchemy_aro_assignment_repository import SqlAlchemyAROAssignmentRepository
+            from domain.repositories.implementations.sqlalchemy_team_aro_repository import SqlAlchemyTeamAroRepository
             aro_repository = SqlAlchemyAROAssignmentRepository(session)
+            team_aro_repository = SqlAlchemyTeamAroRepository(session)
             from domain.services.aro_service import AROService
-            aro_service = AROService(aro_repository, employee_repository, team_repository)
+            aro_service = AROService(aro_repository, employee_repository, team_repository, team_aro_repository)
 
         # Handle ARO optimize command
         if args.aro_command == 'optimize':
@@ -89,7 +91,7 @@ def handle_aro_assignment(
                 event_type=f"aro_{args.aro_command}", 
                 identifier="employee_lookup"
             )
-            
+
             employee = employee_repository.get_by_name(args.employee)
             if not employee:
                 error_msg = f"Error: Employee '{args.employee}' not found"
@@ -107,7 +109,7 @@ def handle_aro_assignment(
                 event_type=f"aro_{args.aro_command}", 
                 identifier="date_parsing"
             )
-            
+
             try:
                 assignment_date = datetime.strptime(args.date, "%Y-%m-%d").date()
             except ValueError:
@@ -199,7 +201,7 @@ def handle_aro_optimize(
             event_type="aro_optimize", 
             identifier="service_creation"
         )
-        
+
         from domain.repositories.implementations.sqlalchemy_aro_assignment_repository import SqlAlchemyAROAssignmentRepository
         aro_repository = SqlAlchemyAROAssignmentRepository(session)
         from domain.contexts.assignment.services.aro_graph_service import AROGraphService
@@ -220,7 +222,7 @@ def handle_aro_optimize(
         event_type="aro_optimize", 
         identifier="team_lookup"
     )
-    
+
     team = team_repository.get_by_name(args.team)
     if not team:
         error_msg = f"Error: Team '{args.team}' not found"
@@ -238,7 +240,7 @@ def handle_aro_optimize(
         event_type="aro_optimize", 
         identifier="date_parsing"
     )
-    
+
     try:
         assignment_date = datetime.strptime(args.date, "%Y-%m-%d").date()
     except ValueError:
@@ -263,7 +265,7 @@ def handle_aro_optimize(
             "period": args.period
         }
     )
-    
+
     assignments = aro_graph_service.assign_optimal_aros(
         understaffed_team_id=team.id,
         needed_aros=args.count,
@@ -345,7 +347,7 @@ def handle_aro_assign(
         event_type="aro_assign", 
         identifier="from_team_lookup"
     )
-    
+
     from_team = team_repository.get_by_name(args.from_team)
     if not from_team:
         error_msg = f"Error: Team '{args.from_team}' not found"
@@ -363,7 +365,7 @@ def handle_aro_assign(
         event_type="aro_assign", 
         identifier="to_team_lookup"
     )
-    
+
     to_team = team_repository.get_by_name(args.to_team)
     if not to_team:
         error_msg = f"Error: Team '{args.to_team}' not found"
@@ -381,7 +383,7 @@ def handle_aro_assign(
         event_type="aro_assign", 
         identifier="team_membership"
     )
-    
+
     if employee.team_id != from_team.id:
         error_msg = f"Error: Employee '{args.employee}' does not belong to team '{args.from_team}'"
         logger.error(
@@ -405,7 +407,7 @@ def handle_aro_assign(
             "period": args.period
         }
     )
-    
+
     result = aro_service.assign_aro(employee.id, to_team.id, assignment_date, args.period)
 
     if result["status"] == "success":
@@ -455,7 +457,7 @@ def handle_aro_remove(
         event_type="aro_remove", 
         identifier="assignment_lookup"
     )
-    
+
     assignment = aro_service.find_aro_assignment(employee.id, assignment_date, args.period)
     if not assignment:
         period_str = f" for period {args.period}" if args.period else " for the full day"
@@ -474,7 +476,7 @@ def handle_aro_remove(
         event_type="aro_remove", 
         identifier="team_lookup"
     )
-    
+
     from_team = team_repository.get(assignment.from_team_id)
     to_team = team_repository.get(assignment.to_team_id)
 
@@ -492,7 +494,7 @@ def handle_aro_remove(
             "period": assignment.period
         }
     )
-    
+
     result = aro_service.remove_aro_assignment(assignment.id)
 
     if result["status"] == "success":

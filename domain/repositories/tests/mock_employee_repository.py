@@ -11,8 +11,8 @@ class MockEmployeeRepository(EmployeeRepositoryInterface):
     """
 
     def __init__(self):
-        self.employees = {}  # Dictionary of employees by ID
-        self.work_history = {}  # Dictionary of work history by (id, workstation_id)
+        self.employees = {}
+        self.work_history = {}
 
     def get_by_id(self, entity_id: int) -> Optional[Employee]:
         """Retrieve an employee by ID."""
@@ -45,7 +45,6 @@ class MockEmployeeRepository(EmployeeRepositoryInterface):
 
     def is_available(self, employee_id: int, date_obj: date, period: Optional[int] = None) -> bool:
         """Check if employee is available on the given date and period."""
-        # In this mock implementation, all employees are available
         return True
 
     def assign_role(self, employee_id: int, role_name: str, team_id: int) -> Dict[str, str]:
@@ -61,8 +60,6 @@ class MockEmployeeRepository(EmployeeRepositoryInterface):
             if employee.add_team_role(role_name, team_id):
                 return {"status": "success", "message": f"RoleModel '{role_name}' assigned"}
             else:
-                # If add_team_role returns False, the employee is not in the team
-                # Let's try to assign a general role instead
                 if employee.assign_role(role_name):
                     return {"status": "success", "message": f"RoleModel '{role_name}' assigned"}
                 else:
@@ -75,20 +72,13 @@ class MockEmployeeRepository(EmployeeRepositoryInterface):
         employee = self.employees.get(employee_id)
         if not employee:
             return {"status": "error", "message": "Employee not found"}
-
-        # First try to remove from team roles
         for membership in employee.team_memberships:
             if membership.team_id == team_id:
                 if role_name in membership.roles:
                     membership.remove_role(role_name)
                     return {"status": "success", "message": f"Removed role '{role_name}'"}
-
-        # If not found in team roles, try to remove from general roles
         if role_name not in employee.roles:
             return {"status": "error", "message": f"RoleModel '{role_name}' not found"}
-
-        # We can't directly modify employee.roles because it's a property that returns a copy
-        # We need to access the private _roles attribute
         employee._roles.remove(role_name)
         return {"status": "success", "message": f"Removed role '{role_name}'"}
 
@@ -97,11 +87,6 @@ class MockEmployeeRepository(EmployeeRepositoryInterface):
         employee = self.employees.get(employee_id)
         if not employee:
             return {"status": "error", "message": "Employee not found"}
-
-        # In a real implementation, we would check if the workstation exists
-        # and if the employee is qualified for it
-
-        # For the mock, we'll just assign a workstation with a dummy name
         try:
             if employee.assign_workstation(workstation_id, f"Workstation {workstation_id}"):
                 return {"status": "success", "message": "Workstation assigned"}
@@ -139,8 +124,6 @@ class MockEmployeeRepository(EmployeeRepositoryInterface):
 
         if not history:
             return None, None
-
-        # Sort by date and period in descending order
         sorted_history = sorted(
             history,
             key=lambda x: (x['worked_date'], x['work_period']),

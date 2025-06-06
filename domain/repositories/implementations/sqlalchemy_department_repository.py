@@ -1,20 +1,30 @@
-from contextlib import contextmanager
-from typing import Optional, List, Generator
+# domain/repositories/implementations/refactored_sqlalchemy_department_repository.py
+from typing import Optional, List
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 
 from domain.entities.department import Department
 from domain.models.DepartmentModel import DepartmentModel
 from domain.repositories.interfaces.department_repository import DepartmentRepositoryInterface
+from domain.factories.department_factory import DepartmentFactory
 from infrastructure.repositories.sqlalchemy.base_sqlalchemy_repository import BaseSqlAlchemyRepository
 from infrastructure.exceptions import RepositoryError
 from utilities.secure_logging import sanitize_exception
 from utilities.logging_factory import get_logger
 
 
-class SqlAlchemyDepartmentRepository(BaseSqlAlchemyRepository[Department, DepartmentModel], DepartmentRepositoryInterface):
+class SqlAlchemyDepartmentRepository(BaseSqlAlchemyRepository[Department, DepartmentModel],
+                                     DepartmentRepositoryInterface):
     """
     SQLAlchemy implementation of the DepartmentRepository interface.
+
+    This repository is responsible for:
+    1. Retrieving Department entities from the database
+    2. Persisting Department entities to the database
+    3. Converting between DepartmentModel and Department using DepartmentFactory
+
+    It does not contain any business logic, which is encapsulated in the domain entities.
     """
 
     def __init__(self, session: Session):
@@ -28,55 +38,22 @@ class SqlAlchemyDepartmentRepository(BaseSqlAlchemyRepository[Department, Depart
         self.logger = get_logger("heijunka.repositories.department")
         self.rate_limited_logger = get_logger("heijunka.repositories.department", rate_limit=True)
 
-    @contextmanager
-    def session_scope(self) -> Generator[Session, None, None]:
-        """
-        Provide a transactional scope around a series of operations.
-
-        Yields:
-            The SQLAlchemy session.
-        """
-        try:
-            yield self._session
-            self._session.commit()
-        except SQLAlchemyError as e:
-            self._session.rollback()
-            error_msg = sanitize_exception(e)
-            self.logger.error(
-                f"Database operation failed: {error_msg}",
-                extra={
-                    "event_type": "database_error",
-                    "error_type": type(e).__name__,
-                    "repository": "department"
-                }
-            )
-            raise RepositoryError(f"Database error: {error_msg}")
-        except Exception as e:
-            self._session.rollback()
-            error_msg = sanitize_exception(e)
-            self.logger.error(
-                f"Unexpected error in department repository: {error_msg}",
-                extra={
-                    "event_type": "unexpected_error",
-                    "error_type": type(e).__name__,
-                    "repository": "department"
-                }
-            )
-            raise RepositoryError(f"Repository error: {error_msg}")
-
     def get_by_name(self, department_name: str) -> Optional[Department]:
         """
-        Retrieve a department by its name.
+        Retrieve a department by its name (case-insensitive).
 
         Args:
             department_name: The name of the department to retrieve.
 
         Returns:
             The department if found, None otherwise.
+
+        Raises:
+            RepositoryError: If there is an error retrieving the department.
         """
         try:
             self.logger.info(
-                f"Retrieving department by name: {department_name}",
+                f"Entering DepartmentRepository.get_by_name (name={department_name})",
                 extra={
                     "event_type": "department_lookup",
                     "lookup_type": "name",
@@ -84,7 +61,6 @@ class SqlAlchemyDepartmentRepository(BaseSqlAlchemyRepository[Department, Depart
                 }
             )
 
-            from sqlalchemy import func
             department_model = self._session.query(DepartmentModel).filter(
                 func.lower(DepartmentModel.name) == func.lower(department_name)
             ).first()
@@ -111,11 +87,20 @@ class SqlAlchemyDepartmentRepository(BaseSqlAlchemyRepository[Department, Depart
                 }
             )
 
-            return self._to_domain(department_model)
+            self.logger.debug(
+                f"Converting DepartmentModel [id={department_model.id}] to domain Department",
+                extra={
+                    "event_type": "model_to_domain_conversion",
+                    "entity_id": department_model.id,
+                    "entity_type": "Department"
+                }
+            )
+
+            return DepartmentFactory.create_from_model(department_model)
         except SQLAlchemyError as e:
             error_msg = sanitize_exception(e)
             self.logger.error(
-                f"Error retrieving department by name: {error_msg}",
+                f"Error in DepartmentRepository.get_by_name: {error_msg}",
                 extra={
                     "event_type": "department_lookup_error",
                     "lookup_type": "name",
@@ -127,7 +112,7 @@ class SqlAlchemyDepartmentRepository(BaseSqlAlchemyRepository[Department, Depart
         except Exception as e:
             error_msg = sanitize_exception(e)
             self.logger.error(
-                f"Unexpected error retrieving department by name: {error_msg}",
+                f"Unexpected error in DepartmentRepository.get_by_name: {error_msg}",
                 extra={
                     "event_type": "department_lookup_error",
                     "lookup_type": "name",
@@ -143,18 +128,18 @@ class SqlAlchemyDepartmentRepository(BaseSqlAlchemyRepository[Department, Depart
 
         Returns:
             A list of all departments with their associated groups.
+
+        Raises:
+            RepositoryError: If there is an error retrieving the departments.
         """
         try:
             self.logger.info(
-                "Retrieving all departments with groups",
+                "Entering DepartmentRepository.get_all_with_groups",
                 extra={
                     "event_type": "departments_with_groups_lookup"
                 }
             )
 
-            from domain.models.GroupModel import GroupModel
-
-            departments = []
             department_models = self._session.query(DepartmentModel).all()
 
             department_count = len(department_models)
@@ -166,8 +151,18 @@ class SqlAlchemyDepartmentRepository(BaseSqlAlchemyRepository[Department, Depart
                 }
             )
 
+            departments = []
             for department_model in department_models:
-                department = self._to_domain(department_model)
+                self.logger.debug(
+                    f"Converting DepartmentModel [id={department_model.id}] to domain Department",
+                    extra={
+                        "event_type": "model_to_domain_conversion",
+                        "entity_id": department_model.id,
+                        "entity_type": "Department"
+                    }
+                )
+
+                department = DepartmentFactory.create_from_model(department_model)
                 departments.append(department)
 
                 self.rate_limited_logger.debug(
@@ -184,7 +179,7 @@ class SqlAlchemyDepartmentRepository(BaseSqlAlchemyRepository[Department, Depart
         except SQLAlchemyError as e:
             error_msg = sanitize_exception(e)
             self.logger.error(
-                f"Error retrieving departments with groups: {error_msg}",
+                f"Error in DepartmentRepository.get_all_with_groups: {error_msg}",
                 extra={
                     "event_type": "departments_with_groups_lookup_error",
                     "error_type": type(e).__name__
@@ -194,7 +189,7 @@ class SqlAlchemyDepartmentRepository(BaseSqlAlchemyRepository[Department, Depart
         except Exception as e:
             error_msg = sanitize_exception(e)
             self.logger.error(
-                f"Unexpected error retrieving departments with groups: {error_msg}",
+                f"Unexpected error in DepartmentRepository.get_all_with_groups: {error_msg}",
                 extra={
                     "event_type": "departments_with_groups_lookup_error",
                     "error_type": type(e).__name__
@@ -204,7 +199,7 @@ class SqlAlchemyDepartmentRepository(BaseSqlAlchemyRepository[Department, Depart
 
     def _to_domain(self, model: DepartmentModel) -> Department:
         """
-        Convert a DepartmentModel to a Department domain entity.
+        Convert a DepartmentModel to a Department domain entity using the DepartmentFactory.
 
         Args:
             model: The SQLAlchemy model to convert.
@@ -214,54 +209,15 @@ class SqlAlchemyDepartmentRepository(BaseSqlAlchemyRepository[Department, Depart
         """
         try:
             self.logger.debug(
-                "Converting department model to domain entity",
+                f"Converting DepartmentModel [id={model.id}] to domain Department",
                 extra={
                     "event_type": "model_to_domain_conversion",
                     "entity_id": model.id,
-                    "department_name": model.name
+                    "entity_type": "Department"
                 }
             )
 
-            department = Department(
-                id=model.id,
-                name=model.name,
-                description=model.description
-            )
-
-            # Load groups if they exist
-            if hasattr(model, 'groups') and model.groups:
-                from domain.entities.group import Group
-                for group_model in model.groups:
-                    # Create Group entity from GroupModel
-                    group = Group(
-                        id=group_model.id,
-                        name=group_model.name,
-                        department_id=group_model.department_id
-                    )
-                    # Add group to department
-                    department.add_group(group)
-
-                    self.rate_limited_logger.debug(
-                        f"Added group {group.name} to department {department.name}",
-                        event_type="group_added_to_department",
-                        identifier=str(group.id),
-                        extra={
-                            "group_id": group.id,
-                            "group_name": group.name,
-                            "department_id": department.id,
-                            "department_name": department.name
-                        }
-                    )
-
-            self.logger.debug(
-                "Successfully converted department model to domain entity",
-                extra={
-                    "event_type": "model_to_domain_conversion_success",
-                    "entity_id": model.id
-                }
-            )
-
-            return department
+            return DepartmentFactory.create_from_model(model)
         except Exception as e:
             error_msg = sanitize_exception(e)
             self.logger.error(
@@ -276,7 +232,7 @@ class SqlAlchemyDepartmentRepository(BaseSqlAlchemyRepository[Department, Depart
 
     def _to_model(self, entity: Department) -> DepartmentModel:
         """
-        Convert a Department domain entity to a DepartmentModel.
+        Convert a Department domain entity to a DepartmentModel using the DepartmentFactory.
 
         Args:
             entity: The domain entity to convert.
@@ -287,31 +243,15 @@ class SqlAlchemyDepartmentRepository(BaseSqlAlchemyRepository[Department, Depart
         try:
             entity_id = entity.id if entity.id is not None else "new"
             self.logger.debug(
-                "Converting department domain entity to model",
+                f"Converting Department domain entity [id={entity_id}] to model",
                 extra={
                     "event_type": "domain_to_model_conversion",
                     "entity_id": entity_id,
-                    "department_name": entity.name
+                    "entity_type": "Department"
                 }
             )
 
-            model = DepartmentModel(
-                name=entity.name,
-                description=entity.description
-            )
-
-            if entity.id is not None:
-                model.id = entity.id
-
-            self.logger.debug(
-                "Successfully converted department domain entity to model",
-                extra={
-                    "event_type": "domain_to_model_conversion_success",
-                    "entity_id": entity_id
-                }
-            )
-
-            return model
+            return DepartmentFactory.to_model(entity)
         except Exception as e:
             error_msg = sanitize_exception(e)
             self.logger.error(
@@ -326,7 +266,7 @@ class SqlAlchemyDepartmentRepository(BaseSqlAlchemyRepository[Department, Depart
 
     def _update_model(self, model: DepartmentModel, entity: Department) -> None:
         """
-        Update a DepartmentModel with values from a Department domain entity.
+        Update a DepartmentModel with values from a Department domain entity using the DepartmentFactory.
 
         Args:
             model: The SQLAlchemy model to update.
@@ -334,11 +274,11 @@ class SqlAlchemyDepartmentRepository(BaseSqlAlchemyRepository[Department, Depart
         """
         try:
             self.logger.debug(
-                "Updating department model from domain entity",
+                f"Updating DepartmentModel [id={model.id}] from domain entity",
                 extra={
-                    "event_type": "department_model_update",
+                    "event_type": "model_update",
                     "entity_id": model.id,
-                    "department_name": model.name
+                    "entity_type": "Department"
                 }
             )
 
@@ -367,15 +307,18 @@ class SqlAlchemyDepartmentRepository(BaseSqlAlchemyRepository[Department, Depart
                     }
                 )
 
-            # Update the model
-            model.name = entity.name
-            model.description = entity.description
+            # Use the factory to update the model
+            DepartmentFactory.update_model(model, entity)
+
+            # Update timestamp if available
+            self._stamp_updated(model)
 
             self.logger.debug(
                 "Successfully updated department model",
                 extra={
-                    "event_type": "department_model_update_success",
-                    "entity_id": model.id
+                    "event_type": "model_update_success",
+                    "entity_id": model.id,
+                    "entity_type": "Department"
                 }
             )
         except Exception as e:
@@ -383,7 +326,7 @@ class SqlAlchemyDepartmentRepository(BaseSqlAlchemyRepository[Department, Depart
             self.logger.error(
                 f"Error updating department model: {error_msg}",
                 extra={
-                    "event_type": "department_model_update_error",
+                    "event_type": "model_update_error",
                     "entity_id": model.id if model else None,
                     "error_type": type(e).__name__
                 }

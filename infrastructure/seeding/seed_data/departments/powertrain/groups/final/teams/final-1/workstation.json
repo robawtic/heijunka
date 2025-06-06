@@ -1,28 +1,28 @@
 {
   "workstations": [
     {
+      "name": "FIN020"
+    },
+    {
       "name": "FIN060"
+    },
+    {
+      "name": "FIN070"
     },
     {
       "name": "FIN080"
     },
     {
-      "name": "FIN090"
+      "name": "FIN120"
     },
     {
       "name": "FIN140"
     },
     {
-      "name": "FIN210"
-    },
-    {
       "name": "FIN230"
     },
     {
-      "name": "FIN240"
-    },
-    {
-      "name": "FIN270"
+      "name": "FIN260"
     }
   ]
 }

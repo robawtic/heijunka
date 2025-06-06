@@ -2,7 +2,10 @@
 
 import json
 import os
+import random
+import math
 from pathlib import Path
+from typing import List, Dict
 
 from faker import Faker
 from sqlalchemy.orm import Session
@@ -14,6 +17,7 @@ from domain.models.WorkstationModel import WorkstationModel
 from domain.models.EmployeeModel import EmployeeModel
 from domain.models.TeamMemberModel import TeamMemberModel
 from domain.models.EmployeeWorkstationModel import EmployeeWorkstationModel
+from domain.models.TeamAroModel import TeamAroModel, AroTeamStatus
 from domain.models.RoleModel import RoleModel
 from domain.models.LineTypeModel import LineTypeModel
 from domain.models.db import Session as SessionFactory
@@ -39,11 +43,42 @@ def load_json_data(file_path: Path):
         return None
 
 
+def pick_aros_for_team(team_id: int, candidates: List[int], workstations_by_team: Dict[int, List[int]], coverage_pct: float) -> List[int]:
+    """
+    Select a subset of employees from other teams to serve as AROs for a given team.
+
+    Args:
+        team_id: The target team we want ARO coverage for.
+        candidates: A list of employee IDs from other teams (i.e. not the same team_id).
+        workstations_by_team: A dictionary mapping team IDs to lists of workstation IDs.
+        coverage_pct: A float representing the fraction of total workstations to cover.
+
+    Returns:
+        A list of selected employee_id values that will serve as AROs for this team_id.
+    """
+    if team_id not in workstations_by_team or not workstations_by_team[team_id]:
+        return []
+
+    num_jobs = len(workstations_by_team[team_id])
+    target_aros = max(3, math.ceil(num_jobs * coverage_pct))
+
+    # If there aren't enough candidates, take as many as possible
+    if len(candidates) <= target_aros:
+        return candidates
+
+    # Randomly sample target_aros distinct IDs from candidates
+    return random.sample(candidates, target_aros)
+
+
 def seed_powertrain_data(session: Session):
     """
     Seeds the database with Powertrain department data,
     loading from JSON files generated under infrastructure/seeding/seed_data/departments/powertrain.
     """
+    # Dictionaries to store IDs for ARO seeding
+    teams_by_name = {}  # {team_name: team_id}
+    employees_by_team = {}  # {team_id: [employee_id, ...]}
+    workstations_by_team = {}  # {team_id: [workstation_id, ...]}
     # 1) Ensure core roles exist
     role_names = ['Group Leader', 'Team Leader', 'Backup', 'Associate']
     role_objs = {}
@@ -163,6 +198,13 @@ def seed_powertrain_data(session: Session):
                 print(f"    Created Team: {team_name}")
             team_objs[team_name] = t_obj
 
+            # Store team ID for ARO seeding
+            teams_by_name[team_name] = t_obj.id
+            if t_obj.id not in employees_by_team:
+                employees_by_team[t_obj.id] = []
+            if t_obj.id not in workstations_by_team:
+                workstations_by_team[t_obj.id] = []
+
             # 8) Load workstation.json for this team
             ws_json = load_json_data(team_dir / "workstation.json")
             if ws_json and "workstations" in ws_json:
@@ -187,6 +229,9 @@ def seed_powertrain_data(session: Session):
                         session.add(ws_obj)
                         session.commit()
                         print(f"      Created Workstation: {ws_name}")
+
+                        # Store workstation ID for ARO seeding
+                        workstations_by_team[t_obj.id].append(ws_obj.id)
             else:
                 print(f"      ⚠ No workstation.json for team '{team_name}'")
 
@@ -215,6 +260,9 @@ def seed_powertrain_data(session: Session):
                         session.add(emp_obj)
                         session.commit()
                         print(f"      Created Employee: {emp_name}")
+
+                        # Store employee ID for ARO seeding
+                        employees_by_team[t_obj.id].append(emp_obj.id)
 
                     # Create TeamMember mapping
                     tm_obj = (
@@ -270,4 +318,68 @@ def seed_powertrain_data(session: Session):
             else:
                 print(f"      ⚠ No employee.json for team '{team_name}'")
 
+    # ARO seeding: For each team, select AROs from other teams and assign them workstations
+    print("\nStarting ARO seeding...")
+    coverage_pct = 0.30  # 30% coverage of workstations
+
+    for team_id, workstations in workstations_by_team.items():
+        if not workstations:
+            print(f"  Skipping ARO seeding for team ID {team_id} (no workstations)")
+            continue
+
+        # Get all employees from other teams as candidates
+        candidates = []
+        for other_team_id, employee_ids in employees_by_team.items():
+            if other_team_id != team_id:
+                candidates.extend(employee_ids)
+
+        if not candidates:
+            print(f"  Skipping ARO seeding for team ID {team_id} (no candidates from other teams)")
+            continue
+
+        # Select AROs for this team
+        aro_employee_ids = pick_aros_for_team(team_id, candidates, workstations_by_team, coverage_pct)
+
+        if not aro_employee_ids:
+            print(f"  No AROs selected for team ID {team_id}")
+            continue
+
+        print(f"  Selected {len(aro_employee_ids)} AROs for team ID {team_id}")
+
+        # For each ARO, create TeamAroModel and assign workstations
+        for aro_emp_id in aro_employee_ids:
+            # Create TeamAroModel row linking this employee as floater/ARO
+            team_aro = TeamAroModel(
+                team_id=team_id,
+                employee_id=aro_emp_id,
+                status=AroTeamStatus.ACTIVE
+            )
+            session.add(team_aro)
+
+            # Decide which workstations this ARO knows
+            ws_ids = workstations_by_team[team_id]
+            if len(ws_ids) <= 2:
+                # If there are only 1-2 workstations, assign all of them
+                subset_size = len(ws_ids)
+            else:
+                # Pick anywhere from 3 to len(ws_ids) random workstations
+                subset_size = random.randint(min(3, len(ws_ids)), len(ws_ids))
+
+            known_ws_ids = random.sample(ws_ids, subset_size)
+
+            # Create EmployeeWorkstationModel rows for each known workstation
+            for ws_id in known_ws_ids:
+                emp_ws = EmployeeWorkstationModel(
+                    employee_id=aro_emp_id,
+                    station_id=ws_id,
+                    last_worked_date=None
+                )
+                session.add(emp_ws)
+
+            print(f"    ARO employee ID {aro_emp_id} assigned {len(known_ws_ids)} workstations")
+
+        session.flush()
+
+    session.commit()
+    print("✅ ARO seeding completed successfully.")
     print("✅ Powertrain department data seeded successfully.")

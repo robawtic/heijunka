@@ -1,7 +1,6 @@
 # heijunka/domain/repositories/implementations/sqlalchemy_employee_work_history_repository.py
-from typing import List, Optional, Tuple, Generator, Set, Dict
+from typing import List, Optional, Tuple, Set, Dict
 from datetime import date
-from contextlib import contextmanager
 from sqlalchemy import and_, or_, func
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
@@ -9,6 +8,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from domain.value_objects.work_history_entry import WorkHistoryEntry
 from domain.models.EmployeeWorkHistoryModel import EmployeeWorkHistoryModel
 from domain.repositories.interfaces.employee_work_history_repository import EmployeeWorkHistoryRepositoryInterface
+from domain.factories.work_history_entry_factory import WorkHistoryEntryFactory
 from infrastructure.repositories.sqlalchemy.base_sqlalchemy_repository import BaseSqlAlchemyRepository
 from infrastructure.exceptions import RepositoryError
 from utilities.secure_logging import sanitize_exception
@@ -34,41 +34,6 @@ class SqlAlchemyEmployeeWorkHistoryRepository(BaseSqlAlchemyRepository[WorkHisto
         self.logger = get_logger("heijunka.repositories.employee_work_history")
         self.rate_limited_logger = get_logger("heijunka.repositories.employee_work_history", rate_limit=True)
 
-    @contextmanager
-    def session_scope(self) -> Generator[Session, None, None]:
-        """
-        Provide a transactional scope around a series of operations.
-
-        Yields:
-            The SQLAlchemy session.
-        """
-        try:
-            yield self._session
-            self._session.commit()
-        except SQLAlchemyError as e:
-            self._session.rollback()
-            error_msg = sanitize_exception(e)
-            self.logger.error(
-                f"Database operation failed: {error_msg}",
-                extra={
-                    "event_type": "database_error",
-                    "error_type": type(e).__name__,
-                    "repository": "employee_work_history"
-                }
-            )
-            raise RepositoryError(f"Database error: {error_msg}")
-        except Exception as e:
-            self._session.rollback()
-            error_msg = sanitize_exception(e)
-            self.logger.error(
-                f"Unexpected error in employee work history repository: {error_msg}",
-                extra={
-                    "event_type": "unexpected_error",
-                    "error_type": type(e).__name__,
-                    "repository": "employee_work_history"
-                }
-            )
-            raise RepositoryError(f"Repository error: {error_msg}")
 
     def add(self, work_history_entry: WorkHistoryEntry) -> WorkHistoryEntry:
         """
@@ -79,21 +44,25 @@ class SqlAlchemyEmployeeWorkHistoryRepository(BaseSqlAlchemyRepository[WorkHisto
 
         Returns:
             The added work history entry
-        """
-        try:
-            self.logger.info(
-                "Adding new work history entry",
-                extra={
-                    "event_type": "work_history_entry_add",
-                    "employee_id": work_history_entry.employee_id,
-                    "workstation_id": work_history_entry.workstation_id,
-                    "worked_date": work_history_entry.worked_date.isoformat() if hasattr(work_history_entry.worked_date, 'isoformat') else str(work_history_entry.worked_date),
-                    "work_period": work_history_entry.work_period
-                }
-            )
 
+        Raises:
+            RepositoryError: If there was an error adding the work history entry
+        """
+        self.logger.info(
+            "Entering EmployeeWorkHistoryRepository.add",
+            extra={
+                "event_type": "work_history_entry_add",
+                "employee_id": work_history_entry.employee_id,
+                "workstation_id": work_history_entry.workstation_id,
+                "worked_date": work_history_entry.worked_date.isoformat() if hasattr(work_history_entry.worked_date, 'isoformat') else str(work_history_entry.worked_date),
+                "work_period": work_history_entry.work_period
+            }
+        )
+
+        try:
             with self.session_scope() as session:
-                model = self._to_model(work_history_entry)
+                # Use the factory to create the model
+                model = WorkHistoryEntryFactory.create_from_entity(work_history_entry)
                 session.add(model)
                 session.flush()  # Flush to get the ID
 
@@ -107,14 +76,15 @@ class SqlAlchemyEmployeeWorkHistoryRepository(BaseSqlAlchemyRepository[WorkHisto
                     }
                 )
 
-                return self._to_domain(model)
+                # Use the factory to convert back to domain entity
+                return WorkHistoryEntryFactory.create_from_model(model)
         except RepositoryError:
             # This will be caught and logged by session_scope
             raise
         except Exception as e:
             error_msg = sanitize_exception(e)
             self.logger.error(
-                f"Error adding work history entry: {error_msg}",
+                f"Error in EmployeeWorkHistoryRepository.add: {error_msg}",
                 extra={
                     "event_type": "work_history_entry_add_error",
                     "employee_id": work_history_entry.employee_id,
@@ -141,30 +111,34 @@ class SqlAlchemyEmployeeWorkHistoryRepository(BaseSqlAlchemyRepository[WorkHisto
 
         Returns:
             The created work history entry
-        """
-        try:
-            self.logger.info(
-                "Creating new work history entry",
-                extra={
-                    "event_type": "work_history_entry_create",
-                    "employee_id": employee_id,
-                    "workstation_id": workstation_id,
-                    "worked_date": date_obj.isoformat() if hasattr(date_obj, 'isoformat') else str(date_obj),
-                    "work_period": period,
-                    "schedule_id": schedule_id,
-                    "is_generated": is_generated,
-                    "is_temporary": is_temporary
-                }
-            )
 
+        Raises:
+            RepositoryError: If there was an error creating the work history entry
+        """
+        self.logger.info(
+            "Entering EmployeeWorkHistoryRepository.create",
+            extra={
+                "event_type": "work_history_entry_create",
+                "employee_id": employee_id,
+                "workstation_id": workstation_id,
+                "worked_date": date_obj.isoformat() if hasattr(date_obj, 'isoformat') else str(date_obj),
+                "work_period": period,
+                "schedule_id": schedule_id,
+                "is_generated": is_generated,
+                "is_temporary": is_temporary
+            }
+        )
+
+        try:
             with self.session_scope() as session:
-                model = EmployeeWorkHistoryModel(
+                # Use the factory to create the model with all fields
+                model = WorkHistoryEntryFactory.create_with_all_fields(
                     employee_id=employee_id,
-                    station_id=workstation_id,
-                    schedule_id=schedule_id,
+                    workstation_id=workstation_id,
                     worked_date=date_obj,
                     work_period=period,
                     end_flag=False,  # Default value
+                    schedule_id=schedule_id,
                     is_generated=is_generated,
                     is_temporary=is_temporary
                 )
@@ -184,14 +158,15 @@ class SqlAlchemyEmployeeWorkHistoryRepository(BaseSqlAlchemyRepository[WorkHisto
                     }
                 )
 
-                return self._to_domain(model)
+                # Use the factory to convert back to domain entity
+                return WorkHistoryEntryFactory.create_from_model(model)
         except RepositoryError:
             # This will be caught and logged by session_scope
             raise
         except Exception as e:
             error_msg = sanitize_exception(e)
             self.logger.error(
-                f"Error creating work history entry: {error_msg}",
+                f"Error in EmployeeWorkHistoryRepository.create: {error_msg}",
                 extra={
                     "event_type": "work_history_entry_create_error",
                     "employee_id": employee_id,
@@ -211,18 +186,21 @@ class SqlAlchemyEmployeeWorkHistoryRepository(BaseSqlAlchemyRepository[WorkHisto
 
         Returns:
             A list of work history entries
-        """
-        try:
-            self.logger.info(
-                "Retrieving work history entries for employee and workstation",
-                extra={
-                    "event_type": "work_history_entries_lookup",
-                    "lookup_type": "employee_and_workstation",
-                    "employee_id": employee_id,
-                    "workstation_id": workstation_id
-                }
-            )
 
+        Raises:
+            RepositoryError: If there was an error retrieving the work history entries
+        """
+        self.logger.info(
+            "Entering EmployeeWorkHistoryRepository.get_by_employee_and_workstation",
+            extra={
+                "event_type": "work_history_entries_lookup",
+                "lookup_type": "employee_and_workstation",
+                "employee_id": employee_id,
+                "workstation_id": workstation_id
+            }
+        )
+
+        try:
             models = self._session.query(EmployeeWorkHistoryModel).filter(
                 and_(
                     EmployeeWorkHistoryModel.employee_id == employee_id,
@@ -242,11 +220,12 @@ class SqlAlchemyEmployeeWorkHistoryRepository(BaseSqlAlchemyRepository[WorkHisto
                 }
             )
 
-            return [self._to_domain(model) for model in models]
+            # Use the factory to convert models to domain entities
+            return [WorkHistoryEntryFactory.create_from_model(model) for model in models]
         except SQLAlchemyError as e:
             error_msg = sanitize_exception(e)
             self.logger.error(
-                f"Error retrieving work history entries for employee and workstation: {error_msg}",
+                f"Error in EmployeeWorkHistoryRepository.get_by_employee_and_workstation: {error_msg}",
                 extra={
                     "event_type": "work_history_entries_lookup_error",
                     "lookup_type": "employee_and_workstation",
@@ -267,17 +246,20 @@ class SqlAlchemyEmployeeWorkHistoryRepository(BaseSqlAlchemyRepository[WorkHisto
 
         Returns:
             A tuple containing the date and period, or (None, None) if no history exists
-        """
-        try:
-            self.logger.info(
-                "Retrieving last worked date for employee at workstation",
-                extra={
-                    "event_type": "last_worked_date_lookup",
-                    "employee_id": employee_id,
-                    "workstation_id": workstation_id
-                }
-            )
 
+        Raises:
+            RepositoryError: If there was an error retrieving the last worked date
+        """
+        self.logger.info(
+            "Entering EmployeeWorkHistoryRepository.get_last_worked_date",
+            extra={
+                "event_type": "last_worked_date_lookup",
+                "employee_id": employee_id,
+                "workstation_id": workstation_id
+            }
+        )
+
+        try:
             entry = self._session.query(EmployeeWorkHistoryModel).filter(
                 and_(
                     EmployeeWorkHistoryModel.employee_id == employee_id,
@@ -313,7 +295,7 @@ class SqlAlchemyEmployeeWorkHistoryRepository(BaseSqlAlchemyRepository[WorkHisto
         except SQLAlchemyError as e:
             error_msg = sanitize_exception(e)
             self.logger.error(
-                f"Error retrieving last worked date: {error_msg}",
+                f"Error in EmployeeWorkHistoryRepository.get_last_worked_date: {error_msg}",
                 extra={
                     "event_type": "last_worked_date_lookup_error",
                     "employee_id": employee_id,
@@ -333,18 +315,21 @@ class SqlAlchemyEmployeeWorkHistoryRepository(BaseSqlAlchemyRepository[WorkHisto
 
         Returns:
             A list of work history entries
-        """
-        try:
-            self.logger.info(
-                "Retrieving work history entries by date range",
-                extra={
-                    "event_type": "work_history_entries_lookup",
-                    "lookup_type": "date_range",
-                    "start_date": start_date.isoformat() if hasattr(start_date, 'isoformat') else str(start_date),
-                    "end_date": end_date.isoformat() if hasattr(end_date, 'isoformat') else str(end_date)
-                }
-            )
 
+        Raises:
+            RepositoryError: If there was an error retrieving the work history entries
+        """
+        self.logger.info(
+            "Entering EmployeeWorkHistoryRepository.get_by_date_range",
+            extra={
+                "event_type": "work_history_entries_lookup",
+                "lookup_type": "date_range",
+                "start_date": start_date.isoformat() if hasattr(start_date, 'isoformat') else str(start_date),
+                "end_date": end_date.isoformat() if hasattr(end_date, 'isoformat') else str(end_date)
+            }
+        )
+
+        try:
             models = self._session.query(EmployeeWorkHistoryModel).filter(
                 and_(
                     EmployeeWorkHistoryModel.worked_date >= start_date,
@@ -364,11 +349,12 @@ class SqlAlchemyEmployeeWorkHistoryRepository(BaseSqlAlchemyRepository[WorkHisto
                 }
             )
 
-            return [self._to_domain(model) for model in models]
+            # Use the factory to convert models to domain entities
+            return [WorkHistoryEntryFactory.create_from_model(model) for model in models]
         except SQLAlchemyError as e:
             error_msg = sanitize_exception(e)
             self.logger.error(
-                f"Error retrieving work history entries by date range: {error_msg}",
+                f"Error in EmployeeWorkHistoryRepository.get_by_date_range: {error_msg}",
                 extra={
                     "event_type": "work_history_entries_lookup_error",
                     "lookup_type": "date_range",
@@ -390,19 +376,22 @@ class SqlAlchemyEmployeeWorkHistoryRepository(BaseSqlAlchemyRepository[WorkHisto
 
         Returns:
             A list of work history entries
-        """
-        try:
-            self.logger.info(
-                "Retrieving work history entries for employee by date range",
-                extra={
-                    "event_type": "work_history_entries_lookup",
-                    "lookup_type": "employee_date_range",
-                    "employee_id": employee_id,
-                    "start_date": start_date.isoformat() if hasattr(start_date, 'isoformat') else str(start_date),
-                    "end_date": end_date.isoformat() if hasattr(end_date, 'isoformat') else str(end_date)
-                }
-            )
 
+        Raises:
+            RepositoryError: If there was an error retrieving the work history entries
+        """
+        self.logger.info(
+            "Entering EmployeeWorkHistoryRepository.get_by_employee_date_range",
+            extra={
+                "event_type": "work_history_entries_lookup",
+                "lookup_type": "employee_date_range",
+                "employee_id": employee_id,
+                "start_date": start_date.isoformat() if hasattr(start_date, 'isoformat') else str(start_date),
+                "end_date": end_date.isoformat() if hasattr(end_date, 'isoformat') else str(end_date)
+            }
+        )
+
+        try:
             models = self._session.query(EmployeeWorkHistoryModel).filter(
                 and_(
                     EmployeeWorkHistoryModel.employee_id == employee_id,
@@ -424,11 +413,12 @@ class SqlAlchemyEmployeeWorkHistoryRepository(BaseSqlAlchemyRepository[WorkHisto
                 }
             )
 
-            return [self._to_domain(model) for model in models]
+            # Use the factory to convert models to domain entities
+            return [WorkHistoryEntryFactory.create_from_model(model) for model in models]
         except SQLAlchemyError as e:
             error_msg = sanitize_exception(e)
             self.logger.error(
-                f"Error retrieving work history entries for employee by date range: {error_msg}",
+                f"Error in EmployeeWorkHistoryRepository.get_by_employee_date_range: {error_msg}",
                 extra={
                     "event_type": "work_history_entries_lookup_error",
                     "lookup_type": "employee_date_range",
@@ -452,19 +442,22 @@ class SqlAlchemyEmployeeWorkHistoryRepository(BaseSqlAlchemyRepository[WorkHisto
 
         Returns:
             True if deleted, False if not found
-        """
-        try:
-            self.logger.info(
-                "Deleting work history entry",
-                extra={
-                    "event_type": "work_history_entry_delete",
-                    "employee_id": employee_id,
-                    "workstation_id": workstation_id,
-                    "worked_date": worked_date.isoformat() if hasattr(worked_date, 'isoformat') else str(worked_date),
-                    "work_period": work_period
-                }
-            )
 
+        Raises:
+            RepositoryError: If there was an error deleting the work history entry
+        """
+        self.logger.info(
+            "Entering EmployeeWorkHistoryRepository.delete",
+            extra={
+                "event_type": "work_history_entry_delete",
+                "employee_id": employee_id,
+                "workstation_id": workstation_id,
+                "worked_date": worked_date.isoformat() if hasattr(worked_date, 'isoformat') else str(worked_date),
+                "work_period": work_period
+            }
+        )
+
+        try:
             with self.session_scope() as session:
                 entry = session.query(EmployeeWorkHistoryModel).filter(
                     and_(
@@ -490,6 +483,18 @@ class SqlAlchemyEmployeeWorkHistoryRepository(BaseSqlAlchemyRepository[WorkHisto
                     return False
 
                 entity_id = entry.id
+
+                # Log the entity being deleted
+                self.logger.debug(
+                    f"Deleting EmployeeWorkHistoryModel [id={entity_id}]",
+                    extra={
+                        "event_type": "entity_delete",
+                        "entity_id": entity_id,
+                        "employee_id": employee_id,
+                        "workstation_id": workstation_id
+                    }
+                )
+
                 session.delete(entry)
 
                 self.logger.info(
@@ -510,7 +515,7 @@ class SqlAlchemyEmployeeWorkHistoryRepository(BaseSqlAlchemyRepository[WorkHisto
         except Exception as e:
             error_msg = sanitize_exception(e)
             self.logger.error(
-                f"Error deleting work history entry: {error_msg}",
+                f"Error in EmployeeWorkHistoryRepository.delete: {error_msg}",
                 extra={
                     "event_type": "work_history_entry_delete_error",
                     "employee_id": employee_id,
@@ -725,7 +730,7 @@ class SqlAlchemyEmployeeWorkHistoryRepository(BaseSqlAlchemyRepository[WorkHisto
         """
         try:
             self.logger.debug(
-                "Converting work history model to domain entity",
+                f"Converting EmployeeWorkHistoryModel [id={model.id}] to domain WorkHistoryEntry",
                 extra={
                     "event_type": "model_to_domain_conversion",
                     "entity_id": model.id,
@@ -734,13 +739,8 @@ class SqlAlchemyEmployeeWorkHistoryRepository(BaseSqlAlchemyRepository[WorkHisto
                 }
             )
 
-            entry = WorkHistoryEntry(
-                employee_id=model.employee_id,
-                workstation_id=model.station_id,
-                worked_date=model.worked_date,
-                work_period=model.work_period,
-                end_flag=model.end_flag
-            )
+            # Use the factory to create the domain entity
+            entry = WorkHistoryEntryFactory.create_from_model(model)
 
             self.logger.debug(
                 "Successfully converted work history model to domain entity",
@@ -775,7 +775,7 @@ class SqlAlchemyEmployeeWorkHistoryRepository(BaseSqlAlchemyRepository[WorkHisto
         """
         try:
             self.logger.debug(
-                "Converting work history domain entity to model",
+                "Converting WorkHistoryEntry domain entity to model",
                 extra={
                     "event_type": "domain_to_model_conversion",
                     "employee_id": entity.employee_id,
@@ -785,15 +785,8 @@ class SqlAlchemyEmployeeWorkHistoryRepository(BaseSqlAlchemyRepository[WorkHisto
                 }
             )
 
-            model = EmployeeWorkHistoryModel(
-                employee_id=entity.employee_id,
-                station_id=entity.workstation_id,
-                worked_date=entity.worked_date,
-                work_period=entity.work_period,
-                end_flag=entity.end_flag,
-                is_generated=False,  # Default value
-                is_temporary=False   # Default value
-            )
+            # Use the factory to create the model
+            model = WorkHistoryEntryFactory.create_from_entity(entity)
 
             self.logger.debug(
                 "Successfully converted work history domain entity to model",
@@ -827,7 +820,7 @@ class SqlAlchemyEmployeeWorkHistoryRepository(BaseSqlAlchemyRepository[WorkHisto
         """
         try:
             self.logger.debug(
-                "Updating work history model from domain entity",
+                f"Updating EmployeeWorkHistoryModel [id={model.id}] from domain entity",
                 extra={
                     "event_type": "work_history_model_update",
                     "entity_id": model.id,
@@ -836,74 +829,8 @@ class SqlAlchemyEmployeeWorkHistoryRepository(BaseSqlAlchemyRepository[WorkHisto
                 }
             )
 
-            # Check for significant changes and log them
-            if model.employee_id != entity.employee_id:
-                self.logger.info(
-                    "Changing work history employee",
-                    extra={
-                        "event_type": "work_history_field_change",
-                        "entity_id": model.id,
-                        "field": "employee_id",
-                        "old_value": model.employee_id,
-                        "new_value": entity.employee_id
-                    }
-                )
-
-            if model.station_id != entity.workstation_id:
-                self.logger.info(
-                    "Changing work history workstation",
-                    extra={
-                        "event_type": "work_history_field_change",
-                        "entity_id": model.id,
-                        "field": "station_id",
-                        "old_value": model.station_id,
-                        "new_value": entity.workstation_id
-                    }
-                )
-
-            if model.worked_date != entity.worked_date:
-                self.logger.info(
-                    "Changing work history date",
-                    extra={
-                        "event_type": "work_history_field_change",
-                        "entity_id": model.id,
-                        "field": "worked_date",
-                        "old_value": model.worked_date.isoformat() if hasattr(model.worked_date, 'isoformat') else str(model.worked_date),
-                        "new_value": entity.worked_date.isoformat() if hasattr(entity.worked_date, 'isoformat') else str(entity.worked_date)
-                    }
-                )
-
-            if model.work_period != entity.work_period:
-                self.logger.info(
-                    "Changing work history period",
-                    extra={
-                        "event_type": "work_history_field_change",
-                        "entity_id": model.id,
-                        "field": "work_period",
-                        "old_value": model.work_period,
-                        "new_value": entity.work_period
-                    }
-                )
-
-            if model.end_flag != entity.end_flag:
-                self.logger.info(
-                    "Changing work history end flag",
-                    extra={
-                        "event_type": "work_history_field_change",
-                        "entity_id": model.id,
-                        "field": "end_flag",
-                        "old_value": model.end_flag,
-                        "new_value": entity.end_flag
-                    }
-                )
-
-            # Update the model
-            model.employee_id = entity.employee_id
-            model.station_id = entity.workstation_id
-            model.worked_date = entity.worked_date
-            model.work_period = entity.work_period
-            model.end_flag = entity.end_flag
-            # We don't update is_generated or is_temporary as they're not part of the WorkHistoryEntry entity
+            # Use the factory to update the model
+            WorkHistoryEntryFactory.update_model_from_entity(model, entity)
 
             self.logger.debug(
                 "Successfully updated work history model",

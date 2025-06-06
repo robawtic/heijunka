@@ -1,8 +1,8 @@
 """Initial schema
 
-Revision ID: b8da5cc1614e
+Revision ID: 03472447cb7a
 Revises: 
-Create Date: 2025-05-28 11:52:35.683310
+Create Date: 2025-06-05 03:36:31.069876
 
 """
 from typing import Sequence, Union
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = 'b8da5cc1614e'
+revision: str = '03472447cb7a'
 down_revision: Union[str, None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -90,6 +90,18 @@ def upgrade() -> None:
     sa.UniqueConstraint('name', name=op.f('uq_teams_name'))
     )
     op.create_index(op.f('ix_teams_created_at'), 'teams', ['created_at'], unique=False)
+    op.create_table('aro_assignments',
+    sa.Column('id', sa.Integer(), autoincrement=True, nullable=False),
+    sa.Column('employee_id', sa.Integer(), nullable=False),
+    sa.Column('from_team_id', sa.Integer(), nullable=False),
+    sa.Column('to_team_id', sa.Integer(), nullable=False),
+    sa.Column('assignment_date', sa.Date(), nullable=False),
+    sa.Column('period', sa.Integer(), nullable=True),
+    sa.ForeignKeyConstraint(['employee_id'], ['employees.id'], name=op.f('fk_aro_assignments_employee_id_employees')),
+    sa.ForeignKeyConstraint(['from_team_id'], ['teams.id'], name=op.f('fk_aro_assignments_from_team_id_teams')),
+    sa.ForeignKeyConstraint(['to_team_id'], ['teams.id'], name=op.f('fk_aro_assignments_to_team_id_teams')),
+    sa.PrimaryKeyConstraint('id', name=op.f('pk_aro_assignments'))
+    )
     op.create_table('schedules',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('team_id', sa.Integer(), nullable=False),
@@ -127,12 +139,13 @@ def upgrade() -> None:
     sa.Column('line_type_id', sa.Integer(), nullable=False),
     sa.Column('is_loading_job', sa.Boolean(), nullable=False),
     sa.Column('is_heavy_job', sa.Boolean(), nullable=False),
+    sa.Column('is_active', sa.Boolean(), nullable=False),
     sa.Column('is_key_skill_job', sa.Boolean(), nullable=False),
     sa.Column('team_id', sa.Integer(), nullable=False),
     sa.ForeignKeyConstraint(['line_type_id'], ['line_types.id'], name=op.f('fk_workstations_line_type_id_line_types')),
     sa.ForeignKeyConstraint(['team_id'], ['teams.id'], name=op.f('fk_workstations_team_id_teams')),
     sa.PrimaryKeyConstraint('id', name=op.f('pk_workstations')),
-    sa.UniqueConstraint('name', name=op.f('uq_workstations_name'))
+    sa.UniqueConstraint('name', 'team_id', name='uq_workstations_name_team_id')
     )
     op.create_table('employee_station_skills',
     sa.Column('id', sa.Integer(), nullable=False),
@@ -208,6 +221,7 @@ def downgrade() -> None:
     op.drop_index(op.f('ix_schedules_created_at'), table_name='schedules')
     op.drop_index('idx_team_date_status', table_name='schedules')
     op.drop_table('schedules')
+    op.drop_table('aro_assignments')
     op.drop_index(op.f('ix_teams_created_at'), table_name='teams')
     op.drop_table('teams')
     op.drop_table('groups')

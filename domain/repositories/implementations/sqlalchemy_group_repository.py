@@ -1,10 +1,10 @@
-from contextlib import contextmanager
-from typing import Optional, Generator
+from typing import Optional, List
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from domain.entities.group import Group
 from domain.models.GroupModel import GroupModel
+from domain.factories.group_factory import GroupFactory
 from domain.repositories.interfaces.group_repository import GroupRepositoryInterface
 from infrastructure.repositories.sqlalchemy.base_sqlalchemy_repository import BaseSqlAlchemyRepository
 from infrastructure.exceptions import RepositoryError
@@ -15,6 +15,9 @@ from utilities.logging_factory import get_logger
 class SqlAlchemyGroupRepository(BaseSqlAlchemyRepository[Group, GroupModel], GroupRepositoryInterface):
     """
     SQLAlchemy implementation of the GroupRepository interface.
+
+    This repository provides CRUD operations for Group entities and implements
+    the GroupRepositoryInterface.
     """
 
     def __init__(self, session: Session):
@@ -28,42 +31,6 @@ class SqlAlchemyGroupRepository(BaseSqlAlchemyRepository[Group, GroupModel], Gro
         self.logger = get_logger("heijunka.repositories.group")
         self.rate_limited_logger = get_logger("heijunka.repositories.group", rate_limit=True)
 
-    @contextmanager
-    def session_scope(self) -> Generator[Session, None, None]:
-        """
-        Provide a transactional scope around a series of operations.
-
-        Yields:
-            The SQLAlchemy session.
-        """
-        try:
-            yield self._session
-            self._session.commit()
-        except SQLAlchemyError as e:
-            self._session.rollback()
-            error_msg = sanitize_exception(e)
-            self.logger.error(
-                f"Database operation failed: {error_msg}",
-                extra={
-                    "event_type": "database_error",
-                    "error_type": type(e).__name__,
-                    "repository": "group"
-                }
-            )
-            raise RepositoryError(f"Database error: {error_msg}")
-        except Exception as e:
-            self._session.rollback()
-            error_msg = sanitize_exception(e)
-            self.logger.error(
-                f"Unexpected error in group repository: {error_msg}",
-                extra={
-                    "event_type": "unexpected_error",
-                    "error_type": type(e).__name__,
-                    "repository": "group"
-                }
-            )
-            raise RepositoryError(f"Repository error: {error_msg}")
-
     def get_by_name(self, group_name: str) -> Optional[Group]:
         """
         Retrieve a group by its name.
@@ -73,10 +40,13 @@ class SqlAlchemyGroupRepository(BaseSqlAlchemyRepository[Group, GroupModel], Gro
 
         Returns:
             The group if found, None otherwise.
+
+        Raises:
+            RepositoryError: If there is an error retrieving the group.
         """
         try:
             self.logger.info(
-                f"Retrieving group by name: {group_name}",
+                f"Entering GroupRepository.get_by_name (name={group_name})",
                 extra={
                     "event_type": "group_lookup",
                     "lookup_type": "name",
@@ -110,11 +80,21 @@ class SqlAlchemyGroupRepository(BaseSqlAlchemyRepository[Group, GroupModel], Gro
                 }
             )
 
-            return self._to_domain(group_model)
+            # Use rate-limited logger for potentially high-frequency debug logs
+            self.rate_limited_logger.debug(
+                f"Converting GroupModel [id={group_model.id}] to domain Group",
+                event_type="model_to_domain_conversion",
+                identifier=str(group_model.id),
+                extra={
+                    "entity_type": "Group"
+                }
+            )
+
+            return GroupFactory.create_from_model(group_model)
         except SQLAlchemyError as e:
             error_msg = sanitize_exception(e)
             self.logger.error(
-                f"Error retrieving group by name: {error_msg}",
+                f"Error in GroupRepository.get_by_name: {error_msg}",
                 extra={
                     "event_type": "group_lookup_error",
                     "lookup_type": "name",
@@ -126,7 +106,7 @@ class SqlAlchemyGroupRepository(BaseSqlAlchemyRepository[Group, GroupModel], Gro
         except Exception as e:
             error_msg = sanitize_exception(e)
             self.logger.error(
-                f"Unexpected error retrieving group by name: {error_msg}",
+                f"Unexpected error in GroupRepository.get_by_name: {error_msg}",
                 extra={
                     "event_type": "group_lookup_error",
                     "lookup_type": "name",
@@ -148,33 +128,19 @@ class SqlAlchemyGroupRepository(BaseSqlAlchemyRepository[Group, GroupModel], Gro
         """
         try:
             self.logger.debug(
-                "Converting group model to domain entity",
+                f"Converting GroupModel [id={model.id}] to domain Group",
                 extra={
                     "event_type": "model_to_domain_conversion",
                     "entity_id": model.id,
-                    "group_name": model.name
+                    "entity_type": "Group"
                 }
             )
 
-            group = Group(
-                id=model.id,
-                name=model.name,
-                department_id=model.department_id
-            )
-
-            self.logger.debug(
-                "Successfully converted group model to domain entity",
-                extra={
-                    "event_type": "model_to_domain_conversion_success",
-                    "entity_id": model.id
-                }
-            )
-
-            return group
+            return GroupFactory.create_from_model(model)
         except Exception as e:
             error_msg = sanitize_exception(e)
             self.logger.error(
-                f"Error converting group model to domain entity: {error_msg}",
+                f"Error converting GroupModel to domain entity: {error_msg}",
                 extra={
                     "event_type": "model_to_domain_conversion_error",
                     "entity_id": model.id if model else None,
@@ -196,35 +162,19 @@ class SqlAlchemyGroupRepository(BaseSqlAlchemyRepository[Group, GroupModel], Gro
         try:
             entity_id = entity.id if entity.id is not None else "new"
             self.logger.debug(
-                "Converting group domain entity to model",
+                f"Converting domain Group [id={entity_id}] to GroupModel",
                 extra={
                     "event_type": "domain_to_model_conversion",
                     "entity_id": entity_id,
-                    "group_name": entity.name
+                    "entity_type": "Group"
                 }
             )
 
-            model = GroupModel(
-                name=entity.name,
-                department_id=entity.department_id
-            )
-
-            if entity.id is not None:
-                model.id = entity.id
-
-            self.logger.debug(
-                "Successfully converted group domain entity to model",
-                extra={
-                    "event_type": "domain_to_model_conversion_success",
-                    "entity_id": entity_id
-                }
-            )
-
-            return model
+            return GroupFactory.to_model(entity)
         except Exception as e:
             error_msg = sanitize_exception(e)
             self.logger.error(
-                f"Error converting group domain entity to model: {error_msg}",
+                f"Error converting domain Group to model: {error_msg}",
                 extra={
                     "event_type": "domain_to_model_conversion_error",
                     "entity_id": entity.id if entity and hasattr(entity, 'id') else None,
@@ -243,21 +193,22 @@ class SqlAlchemyGroupRepository(BaseSqlAlchemyRepository[Group, GroupModel], Gro
         """
         try:
             self.logger.debug(
-                "Updating group model from domain entity",
+                f"Updating GroupModel [id={model.id}] from domain Group",
                 extra={
-                    "event_type": "group_model_update",
+                    "event_type": "model_update",
                     "entity_id": model.id,
-                    "group_name": model.name
+                    "entity_type": "Group"
                 }
             )
 
             # Check for significant changes and log them
             if model.name != entity.name:
                 self.logger.info(
-                    "Changing group name",
+                    f"Changing group name from '{model.name}' to '{entity.name}'",
                     extra={
-                        "event_type": "group_field_change",
+                        "event_type": "field_change",
                         "entity_id": model.id,
+                        "entity_type": "Group",
                         "field": "name",
                         "old_value": model.name,
                         "new_value": entity.name
@@ -266,35 +217,457 @@ class SqlAlchemyGroupRepository(BaseSqlAlchemyRepository[Group, GroupModel], Gro
 
             if model.department_id != entity.department_id:
                 self.logger.info(
-                    "Changing group department",
+                    f"Changing group department from {model.department_id} to {entity.department_id}",
                     extra={
-                        "event_type": "group_field_change",
+                        "event_type": "field_change",
                         "entity_id": model.id,
+                        "entity_type": "Group",
                         "field": "department_id",
                         "old_value": model.department_id,
                         "new_value": entity.department_id
                     }
                 )
 
-            # Update the model
-            model.name = entity.name
-            model.department_id = entity.department_id
+            # Update the model using the factory
+            GroupFactory.update_model(model, entity)
 
             self.logger.debug(
-                "Successfully updated group model",
+                f"Successfully updated GroupModel [id={model.id}]",
                 extra={
-                    "event_type": "group_model_update_success",
-                    "entity_id": model.id
+                    "event_type": "model_update_success",
+                    "entity_id": model.id,
+                    "entity_type": "Group"
                 }
             )
         except Exception as e:
             error_msg = sanitize_exception(e)
             self.logger.error(
-                f"Error updating group model: {error_msg}",
+                f"Error updating GroupModel: {error_msg}",
                 extra={
-                    "event_type": "group_model_update_error",
+                    "event_type": "model_update_error",
                     "entity_id": model.id if model else None,
                     "error_type": type(e).__name__
                 }
             )
             raise
+
+    def get_by_id(self, entity_id: int) -> Optional[Group]:
+        """
+        Retrieve a group by its ID.
+
+        Args:
+            entity_id: The ID of the group to retrieve.
+
+        Returns:
+            The group if found, None otherwise.
+
+        Raises:
+            RepositoryError: If there is an error retrieving the group.
+        """
+        try:
+            self.logger.info(
+                f"Entering GroupRepository.get_by_id (id={entity_id})",
+                extra={
+                    "event_type": "group_lookup",
+                    "lookup_type": "id",
+                    "entity_id": entity_id
+                }
+            )
+
+            # Use session.get for more efficient primary key lookup
+            group_model = self._session.get(GroupModel, entity_id)
+
+            if group_model is None:
+                self.logger.info(
+                    f"No group found with ID: {entity_id}",
+                    extra={
+                        "event_type": "group_lookup_failed",
+                        "lookup_type": "id",
+                        "entity_id": entity_id,
+                        "reason": "not_found"
+                    }
+                )
+                return None
+
+            self.logger.info(
+                f"Found group with ID: {entity_id}",
+                extra={
+                    "event_type": "group_lookup_success",
+                    "lookup_type": "id",
+                    "entity_id": entity_id
+                }
+            )
+
+            # Use rate-limited logger for potentially high-frequency debug logs
+            self.rate_limited_logger.debug(
+                f"Converting GroupModel [id={group_model.id}] to domain Group",
+                event_type="model_to_domain_conversion",
+                identifier=str(group_model.id),
+                extra={
+                    "entity_type": "Group"
+                }
+            )
+
+            return GroupFactory.create_from_model(group_model)
+        except SQLAlchemyError as e:
+            error_msg = sanitize_exception(e)
+            self.logger.error(
+                f"Error in GroupRepository.get_by_id: {error_msg}",
+                extra={
+                    "event_type": "group_lookup_error",
+                    "lookup_type": "id",
+                    "entity_id": entity_id,
+                    "error_type": type(e).__name__
+                }
+            )
+            raise RepositoryError(f"Error retrieving group by ID: {error_msg}")
+        except Exception as e:
+            error_msg = sanitize_exception(e)
+            self.logger.error(
+                f"Unexpected error in GroupRepository.get_by_id: {error_msg}",
+                extra={
+                    "event_type": "group_lookup_error",
+                    "lookup_type": "id",
+                    "entity_id": entity_id,
+                    "error_type": type(e).__name__
+                }
+            )
+            raise RepositoryError(f"Error retrieving group by ID: {error_msg}")
+
+    def add(self, entity: Group) -> Group:
+        """
+        Add a new group.
+
+        Args:
+            entity: The group to add.
+
+        Returns:
+            The added group with its new ID.
+
+        Raises:
+            RepositoryError: If there is an error adding the group.
+        """
+        try:
+            entity_id = getattr(entity, 'id', 'new')
+            self.logger.info(
+                f"Entering GroupRepository.add (entity_id={entity_id})",
+                extra={
+                    "event_type": "group_add",
+                    "entity_type": "Group",
+                    "entity_id": entity_id
+                }
+            )
+
+            # Use rate-limited logger for potentially high-frequency debug logs
+            self.rate_limited_logger.debug(
+                f"Converting domain Group [id={entity_id}] to GroupModel",
+                event_type="domain_to_model_conversion",
+                identifier=str(entity_id),
+                extra={
+                    "entity_type": "Group"
+                }
+            )
+
+            with self.session_scope() as session:
+                model = GroupFactory.to_model(entity)
+                session.add(model)
+                session.flush()  # Flush to get the ID if it's auto-generated
+
+                # Get the ID after flush
+                model_id = model.id
+
+                self.logger.info(
+                    f"Successfully added Group with ID: {model_id}",
+                    extra={
+                        "event_type": "group_add_success",
+                        "entity_type": "Group",
+                        "entity_id": model_id
+                    }
+                )
+
+                # Use rate-limited logger for potentially high-frequency debug logs
+                self.rate_limited_logger.debug(
+                    f"Converting GroupModel [id={model_id}] to domain Group",
+                    event_type="model_to_domain_conversion",
+                    identifier=str(model_id),
+                    extra={
+                        "entity_type": "Group"
+                    }
+                )
+
+                return GroupFactory.create_from_model(model)
+        except RepositoryError:
+            # This will be caught and logged by session_scope
+            raise
+        except Exception as e:
+            error_msg = sanitize_exception(e)
+            self.logger.error(
+                f"Error in GroupRepository.add: {error_msg}",
+                extra={
+                    "event_type": "group_add_error",
+                    "entity_type": "Group",
+                    "error_type": type(e).__name__
+                }
+            )
+            raise RepositoryError(f"Error adding group: {error_msg}")
+
+    def update(self, entity: Group) -> Group:
+        """
+        Update an existing group.
+
+        Args:
+            entity: The group to update.
+
+        Returns:
+            The updated group.
+
+        Raises:
+            RepositoryError: If there is an error updating the group or if the group doesn't exist.
+        """
+        try:
+            entity_id = getattr(entity, 'id', None)
+            if entity_id is None:
+                error_msg = "Cannot update group without ID"
+                self.logger.error(
+                    error_msg,
+                    extra={
+                        "event_type": "group_update_error",
+                        "entity_type": "Group",
+                        "reason": "missing_id"
+                    }
+                )
+                raise RepositoryError(error_msg)
+
+            self.logger.info(
+                f"Entering GroupRepository.update (entity_id={entity_id})",
+                extra={
+                    "event_type": "group_update",
+                    "entity_type": "Group",
+                    "entity_id": entity_id
+                }
+            )
+
+            with self.session_scope() as session:
+                # Use session.get for more efficient primary key lookup
+                model = session.get(GroupModel, entity_id)
+                if model is None:
+                    error_msg = f"Group with ID {entity_id} not found"
+                    self.logger.warning(
+                        error_msg,
+                        extra={
+                            "event_type": "group_update_failed",
+                            "entity_type": "Group",
+                            "entity_id": entity_id,
+                            "reason": "not_found"
+                        }
+                    )
+                    raise RepositoryError(error_msg)
+
+                # Use rate-limited logger for potentially high-frequency debug logs
+                self.rate_limited_logger.debug(
+                    f"Updating GroupModel [id={model.id}] from domain Group",
+                    event_type="model_update",
+                    identifier=str(model.id),
+                    extra={
+                        "entity_type": "Group"
+                    }
+                )
+
+                # Check for significant changes and log them
+                if model.name != entity.name:
+                    self.logger.info(
+                        f"Changing group name from '{model.name}' to '{entity.name}'",
+                        extra={
+                            "event_type": "field_change",
+                            "entity_id": model.id,
+                            "entity_type": "Group",
+                            "field": "name",
+                            "old_value": model.name,
+                            "new_value": entity.name
+                        }
+                    )
+
+                if model.department_id != entity.department_id:
+                    self.logger.info(
+                        f"Changing group department from {model.department_id} to {entity.department_id}",
+                        extra={
+                            "event_type": "field_change",
+                            "entity_id": model.id,
+                            "entity_type": "Group",
+                            "field": "department_id",
+                            "old_value": model.department_id,
+                            "new_value": entity.department_id
+                        }
+                    )
+
+                GroupFactory.update_model(model, entity)
+
+                self.logger.info(
+                    f"Successfully updated Group with ID: {entity_id}",
+                    extra={
+                        "event_type": "group_update_success",
+                        "entity_type": "Group",
+                        "entity_id": entity_id
+                    }
+                )
+
+                # Use rate-limited logger for potentially high-frequency debug logs
+                self.rate_limited_logger.debug(
+                    f"Converting GroupModel [id={model.id}] to domain Group",
+                    event_type="model_to_domain_conversion",
+                    identifier=str(model.id),
+                    extra={
+                        "entity_type": "Group"
+                    }
+                )
+
+                return GroupFactory.create_from_model(model)
+        except RepositoryError:
+            # This will be caught and logged by session_scope
+            raise
+        except Exception as e:
+            error_msg = sanitize_exception(e)
+            self.logger.error(
+                f"Error in GroupRepository.update: {error_msg}",
+                extra={
+                    "event_type": "group_update_error",
+                    "entity_type": "Group",
+                    "entity_id": getattr(entity, 'id', None),
+                    "error_type": type(e).__name__
+                }
+            )
+            raise RepositoryError(f"Error updating group: {error_msg}")
+
+    def delete(self, entity_id: int) -> bool:
+        """
+        Delete a group by its ID.
+
+        Args:
+            entity_id: The ID of the group to delete.
+
+        Returns:
+            True if the group was deleted, False if it wasn't found.
+
+        Raises:
+            RepositoryError: If there is an error deleting the group.
+        """
+        try:
+            self.logger.info(
+                f"Entering GroupRepository.delete (entity_id={entity_id})",
+                extra={
+                    "event_type": "group_delete",
+                    "entity_type": "Group",
+                    "entity_id": entity_id
+                }
+            )
+
+            with self.session_scope() as session:
+                # Use session.get for more efficient primary key lookup
+                model = session.get(GroupModel, entity_id)
+                if model is None:
+                    self.logger.info(
+                        f"No group found with ID: {entity_id} to delete",
+                        extra={
+                            "event_type": "group_delete_failed",
+                            "entity_type": "Group",
+                            "entity_id": entity_id,
+                            "reason": "not_found"
+                        }
+                    )
+                    return False
+
+                session.delete(model)
+
+                self.logger.info(
+                    f"Successfully deleted Group with ID: {entity_id}",
+                    extra={
+                        "event_type": "group_delete_success",
+                        "entity_type": "Group",
+                        "entity_id": entity_id
+                    }
+                )
+
+                return True
+        except RepositoryError:
+            # This will be caught and logged by session_scope
+            raise
+        except Exception as e:
+            error_msg = sanitize_exception(e)
+            self.logger.error(
+                f"Error in GroupRepository.delete: {error_msg}",
+                extra={
+                    "event_type": "group_delete_error",
+                    "entity_type": "Group",
+                    "entity_id": entity_id,
+                    "error_type": type(e).__name__
+                }
+            )
+            raise RepositoryError(f"Error deleting group with ID {entity_id}: {error_msg}")
+
+    def list_all(self) -> List[Group]:
+        """
+        Retrieve all groups.
+
+        Returns:
+            A list of all groups.
+
+        Raises:
+            RepositoryError: If there is an error retrieving the groups.
+        """
+        try:
+            self.logger.info(
+                "Entering GroupRepository.list_all",
+                extra={
+                    "event_type": "group_list_all",
+                    "entity_type": "Group"
+                }
+            )
+
+            group_models = self._session.query(GroupModel).all()
+            count = len(group_models)
+
+            self.logger.info(
+                f"Retrieved {count} groups",
+                extra={
+                    "event_type": "group_list_all_success",
+                    "entity_type": "Group",
+                    "count": count
+                }
+            )
+
+            groups = []
+            for model in group_models:
+                # Use rate-limited logger for potentially high-frequency debug logs
+                self.rate_limited_logger.debug(
+                    f"Converting GroupModel [id={model.id}] to domain Group",
+                    event_type="model_to_domain_conversion",
+                    identifier=str(model.id),
+                    extra={
+                        "entity_type": "Group"
+                    }
+                )
+                groups.append(GroupFactory.create_from_model(model))
+
+            return groups
+        except SQLAlchemyError as e:
+            error_msg = sanitize_exception(e)
+            self.logger.error(
+                f"Error in GroupRepository.list_all: {error_msg}",
+                extra={
+                    "event_type": "group_list_all_error",
+                    "entity_type": "Group",
+                    "error_type": type(e).__name__
+                }
+            )
+            raise RepositoryError(f"Error retrieving all groups: {error_msg}")
+        except Exception as e:
+            error_msg = sanitize_exception(e)
+            self.logger.error(
+                f"Unexpected error in GroupRepository.list_all: {error_msg}",
+                extra={
+                    "event_type": "group_list_all_error",
+                    "entity_type": "Group",
+                    "error_type": type(e).__name__
+                }
+            )
+            raise RepositoryError(f"Error retrieving all groups: {error_msg}")

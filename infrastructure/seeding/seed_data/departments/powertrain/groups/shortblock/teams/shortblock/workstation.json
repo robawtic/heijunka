@@ -1,31 +1,37 @@
 {
   "workstations": [
     {
-      "name": "SB030"
+      "name": "SB010"
     },
     {
-      "name": "SB050"
+      "name": "SB070"
     },
     {
       "name": "SB100"
     },
     {
-      "name": "SB110"
+      "name": "SB130"
     },
     {
-      "name": "SB170"
+      "name": "SB150"
     },
     {
-      "name": "SB230"
+      "name": "SB160"
     },
     {
-      "name": "SB250"
+      "name": "SB180"
     },
     {
-      "name": "SB290"
+      "name": "SB190"
     },
     {
-      "name": "SB300"
+      "name": "SB200"
+    },
+    {
+      "name": "SB260"
+    },
+    {
+      "name": "SB270"
     }
   ]
 }

@@ -22,7 +22,7 @@ async def get_workstations(
     repositories = get_repositories(db)
     workstations = repositories["workstation_repository"].get_all()
     
-    # Apply filters
+    # Apply filtersFF
     if team_id is not None:
         workstations = [w for w in workstations if w.team_id == team_id]
     if is_active is not None:

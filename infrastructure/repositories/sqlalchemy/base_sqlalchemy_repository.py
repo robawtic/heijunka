@@ -93,7 +93,7 @@ class BaseSqlAlchemyRepository(Generic[T, M], BaseRepository[T]):
                 }
             )
 
-            model = self._session.query(self._model_class).get(entity_id)
+            model = self._session.get(self._model_class, entity_id)
 
             if model is None:
                 self.logger.info(
@@ -122,6 +122,19 @@ class BaseSqlAlchemyRepository(Generic[T, M], BaseRepository[T]):
             error_msg = sanitize_exception(e)
             self.logger.error(
                 f"Error retrieving {self._model_class.__name__} by ID: {error_msg}",
+                extra={
+                    "event_type": "entity_lookup_error",
+                    "lookup_type": "id",
+                    "entity_type": self._model_class.__name__,
+                    "entity_id": entity_id,
+                    "error_type": type(e).__name__
+                }
+            )
+            raise RepositoryError(f"Error retrieving {self._model_class.__name__} by ID: {error_msg}")
+        except Exception as e:
+            error_msg = sanitize_exception(e)
+            self.logger.error(
+                f"Unexpected error retrieving {self._model_class.__name__} by ID: {error_msg}",
                 extra={
                     "event_type": "entity_lookup_error",
                     "lookup_type": "id",
@@ -160,7 +173,18 @@ class BaseSqlAlchemyRepository(Generic[T, M], BaseRepository[T]):
                 }
             )
 
-            return [self._to_domain(model) for model in models]
+            entities = []
+            for model in models:
+                self.rate_limited_logger.debug(
+                    f"Converting {self._model_class.__name__} [id={model.id}] to domain entity",
+                    extra={
+                        "event_type": "model_to_domain_conversion",
+                        "entity_id": model.id,
+                        "entity_type": self._model_class.__name__
+                    }
+                )
+                entities.append(self._to_domain(model))
+            return entities
         except SQLAlchemyError as e:
             error_msg = sanitize_exception(e)
             self.logger.error(
@@ -261,7 +285,7 @@ class BaseSqlAlchemyRepository(Generic[T, M], BaseRepository[T]):
             )
 
             with self.session_scope() as session:
-                model = session.query(self._model_class).get(entity_id)
+                model = session.get(self._model_class, entity_id)
                 if model is None:
                     error_msg = f"Entity with ID {entity_id} not found"
                     self.logger.warning(
@@ -324,7 +348,7 @@ class BaseSqlAlchemyRepository(Generic[T, M], BaseRepository[T]):
             )
 
             with self.session_scope() as session:
-                model = session.query(self._model_class).get(entity_id)
+                model = session.get(self._model_class, entity_id)
                 if model is None:
                     self.logger.info(
                         f"No {self._model_class.__name__} found with ID: {entity_id} to delete",
@@ -446,6 +470,106 @@ class BaseSqlAlchemyRepository(Generic[T, M], BaseRepository[T]):
         """
         raise NotImplementedError("Subclasses must implement _to_model")
 
+    def _find_first(self, **kwargs) -> Optional[T]:
+        """
+        Generic "filter by column=value" helper.
+
+        Example:
+            repo._find_first(name="foo") will do
+            session.query(Model).filter_by(name="foo").first() and convert to domain.
+
+        Args:
+            **kwargs: The filter criteria as keyword arguments.
+
+        Returns:
+            The domain entity if found, None otherwise.
+
+        Raises:
+            RepositoryError: If there is an error finding the entity.
+        """
+        try:
+            self.logger.info(
+                f"Finding {self._model_class.__name__} by criteria",
+                extra={
+                    "event_type": "entity_lookup",
+                    "lookup_type": "filter",
+                    "entity_type": self._model_class.__name__,
+                    "criteria": str(kwargs)
+                }
+            )
+
+            model = self._session.query(self._model_class).filter_by(**kwargs).first()
+
+            if model is None:
+                self.logger.info(
+                    f"No {self._model_class.__name__} found matching criteria",
+                    extra={
+                        "event_type": "entity_lookup_failed",
+                        "lookup_type": "filter",
+                        "entity_type": self._model_class.__name__,
+                        "criteria": str(kwargs),
+                        "reason": "not_found"
+                    }
+                )
+                return None
+
+            self.logger.info(
+                f"Found {self._model_class.__name__} with ID: {model.id}",
+                extra={
+                    "event_type": "entity_lookup_success",
+                    "lookup_type": "filter",
+                    "entity_type": self._model_class.__name__,
+                    "entity_id": model.id
+                }
+            )
+
+            self.rate_limited_logger.debug(
+                f"Converting {self._model_class.__name__} [id={model.id}] to domain entity",
+                extra={
+                    "event_type": "model_to_domain_conversion",
+                    "entity_id": model.id,
+                    "entity_type": self._model_class.__name__
+                }
+            )
+
+            return self._to_domain(model)
+        except SQLAlchemyError as e:
+            error_msg = sanitize_exception(e)
+            self.logger.error(
+                f"Error in _find_first: {error_msg}",
+                extra={
+                    "event_type": "entity_lookup_error",
+                    "lookup_type": "filter",
+                    "entity_type": self._model_class.__name__,
+                    "criteria": str(kwargs),
+                    "error_type": type(e).__name__
+                }
+            )
+            raise RepositoryError(f"Error finding {self._model_class.__name__}: {error_msg}")
+        except Exception as e:
+            error_msg = sanitize_exception(e)
+            self.logger.error(
+                f"Unexpected error in _find_first: {error_msg}",
+                extra={
+                    "event_type": "entity_lookup_error",
+                    "lookup_type": "filter",
+                    "entity_type": self._model_class.__name__,
+                    "criteria": str(kwargs),
+                    "error_type": type(e).__name__
+                }
+            )
+            raise RepositoryError(f"Error finding {self._model_class.__name__}: {error_msg}")
+
+    def _stamp_updated(self, model: M) -> None:
+        """
+        Update the updated_at timestamp on a model if it has that field.
+
+        Args:
+            model: The SQLAlchemy model to update.
+        """
+        if hasattr(model, "updated_at"):
+            model.updated_at = datetime.utcnow()
+
     def _update_model(self, model: M, entity: T) -> None:
         """
         Update a SQLAlchemy model with values from a domain entity.
@@ -477,7 +601,9 @@ class BaseSqlAlchemyRepository(Generic[T, M], BaseRepository[T]):
 
             # Update logic here
             model.some_field = entity.some_field
-            model.updated_at = datetime.utcnow()
+
+            # Update timestamp
+            self._stamp_updated(model)
 
             self.logger.debug(
                 f"Successfully updated {self._model_class.__name__} model",

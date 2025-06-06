@@ -21,6 +21,7 @@ class TeamModel(Base):
     group = relationship('GroupModel', back_populates='teams', lazy='joined')
     members = relationship('TeamMemberModel', back_populates='team', lazy='joined')
     workstations = relationship('WorkstationModel', back_populates='team', lazy='joined')
+    team_aros = relationship('TeamAroModel', back_populates='team', lazy='select', viewonly=True)
 
     def to_domain(self) -> Team:
         """Convert TeamModel to Team domain entity"""

@@ -72,6 +72,12 @@ def format_schedule_table(
         period = assignment.period.period
         emp_name = assignment.employee.name
 
+        # Check if employee is an ARO (from a different team)
+        is_aro = False
+        if team_id is not None and assignment.employee.team_id != team_id:
+            is_aro = True
+            emp_name = f"{emp_name} [ARO]"  # Mark AROs in the workstation assignment
+
         # Check if workstation exists in schedule dictionary
         if ws_name not in schedule:
             logger.warning(
@@ -86,6 +92,13 @@ def format_schedule_table(
             schedule[ws_name] = {p+1: "-" for p in range(periods)}
 
         schedule[ws_name][period] = emp_name
+
+        # Also add this ARO to the AROs row for reference
+        if is_aro:
+            if schedule["AROs"][period] == "-":
+                schedule["AROs"][period] = f"{assignment.employee.name} → {ws_name}"
+            else:
+                schedule["AROs"][period] += f", {assignment.employee.name} → {ws_name}"
 
     # Parse offline parameter
     employee_offline_periods = {}

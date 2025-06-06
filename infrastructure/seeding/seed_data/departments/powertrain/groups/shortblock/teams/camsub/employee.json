@@ -1,119 +1,297 @@
 {
   "employees": [
     {
-      "name": "Kevin",
+      "name": "Dawn",
       "role": "Team Leader",
       "known_stations": []
     },
     {
-      "name": "Kathryn",
+      "name": "Vickie",
       "role": "Backup",
       "known_stations": [
-        "CAM070",
-        "CAM120",
-        "CAM130",
-        "CAM150",
-        "CAM190",
+        "CAM010",
+        "CAM020",
+        "CAM030",
+        "CAM050",
+        "CAM100",
+        "CAM110",
+        "CAM160",
+        "CAM180",
+        "CAM200",
+        "CAM210",
         "CAM260",
-        "CAM280"
+        "CAM280",
+        "CAM290"
+      ]
+    },
+    {
+      "name": "Lisa",
+      "role": "Associate",
+      "known_stations": [
+        "CAM210",
+        "CAM100",
+        "CAM180",
+        "CAM050",
+        "CAM260",
+        "CAM290",
+        "CAM160",
+        "CAM200",
+        "CAM280",
+        "CAM020",
+        "CAM030"
+      ]
+    },
+    {
+      "name": "Heidi",
+      "role": "Associate",
+      "known_stations": [
+        "CAM280",
+        "CAM010",
+        "CAM210",
+        "CAM180",
+        "CAM020",
+        "CAM200",
+        "CAM050",
+        "CAM100",
+        "CAM160",
+        "CAM260",
+        "CAM290",
+        "CAM030",
+        "CAM110"
+      ]
+    },
+    {
+      "name": "Natalie",
+      "role": "Associate",
+      "known_stations": [
+        "CAM030",
+        "CAM290",
+        "CAM020",
+        "CAM100",
+        "CAM210",
+        "CAM050",
+        "CAM110",
+        "CAM280",
+        "CAM180",
+        "CAM200",
+        "CAM010",
+        "CAM260",
+        "CAM160"
       ]
     },
     {
       "name": "Jeffrey",
       "role": "Associate",
       "known_stations": [
-        "CAM260",
-        "CAM190",
         "CAM280",
-        "CAM070",
-        "CAM150",
-        "CAM130",
-        "CAM120"
+        "CAM160",
+        "CAM200",
+        "CAM030",
+        "CAM100",
+        "CAM110",
+        "CAM260",
+        "CAM180",
+        "CAM210",
+        "CAM050",
+        "CAM290",
+        "CAM010"
       ]
     },
     {
-      "name": "Jennifer",
+      "name": "Bradley",
+      "role": "Associate",
+      "known_stations": [
+        "CAM100",
+        "CAM290",
+        "CAM110",
+        "CAM050",
+        "CAM180",
+        "CAM200",
+        "CAM160",
+        "CAM020",
+        "CAM210",
+        "CAM260",
+        "CAM010"
+      ]
+    },
+    {
+      "name": "Catherine",
+      "role": "Associate",
+      "known_stations": [
+        "CAM200",
+        "CAM210",
+        "CAM050",
+        "CAM100",
+        "CAM160",
+        "CAM280",
+        "CAM020",
+        "CAM260",
+        "CAM290",
+        "CAM110",
+        "CAM030",
+        "CAM180",
+        "CAM010"
+      ]
+    },
+    {
+      "name": "Melinda",
+      "role": "Associate",
+      "known_stations": [
+        "CAM030",
+        "CAM200",
+        "CAM280",
+        "CAM050",
+        "CAM020",
+        "CAM110",
+        "CAM010",
+        "CAM210",
+        "CAM290",
+        "CAM100",
+        "CAM180",
+        "CAM160"
+      ]
+    },
+    {
+      "name": "Kevin",
+      "role": "Associate",
+      "known_stations": [
+        "CAM110",
+        "CAM180",
+        "CAM280",
+        "CAM100",
+        "CAM290",
+        "CAM210",
+        "CAM050",
+        "CAM020",
+        "CAM260",
+        "CAM160",
+        "CAM200",
+        "CAM010"
+      ]
+    },
+    {
+      "name": "Jason",
+      "role": "Associate",
+      "known_stations": [
+        "CAM210",
+        "CAM030",
+        "CAM160",
+        "CAM020",
+        "CAM260",
+        "CAM050",
+        "CAM200",
+        "CAM180",
+        "CAM110",
+        "CAM280",
+        "CAM100",
+        "CAM290"
+      ]
+    },
+    {
+      "name": "Anna",
+      "role": "Associate",
+      "known_stations": [
+        "CAM160",
+        "CAM200",
+        "CAM010",
+        "CAM030",
+        "CAM290",
+        "CAM100",
+        "CAM110",
+        "CAM260",
+        "CAM020",
+        "CAM210",
+        "CAM280",
+        "CAM180",
+        "CAM050"
+      ]
+    },
+    {
+      "name": "Eric",
+      "role": "Associate",
+      "known_stations": [
+        "CAM290",
+        "CAM030",
+        "CAM210",
+        "CAM020",
+        "CAM160",
+        "CAM110",
+        "CAM100",
+        "CAM050",
+        "CAM010",
+        "CAM280",
+        "CAM260"
+      ]
+    },
+    {
+      "name": "Caitlin",
+      "role": "Associate",
+      "known_stations": [
+        "CAM030",
+        "CAM290",
+        "CAM180",
+        "CAM280",
+        "CAM020",
+        "CAM010",
+        "CAM050",
+        "CAM110",
+        "CAM160",
+        "CAM100",
+        "CAM260"
+      ]
+    },
+    {
+      "name": "Thomas",
       "role": "Associate",
       "known_stations": [
         "CAM280",
-        "CAM190",
-        "CAM150",
-        "CAM130"
+        "CAM050",
+        "CAM200",
+        "CAM110",
+        "CAM100",
+        "CAM210",
+        "CAM030",
+        "CAM260",
+        "CAM160",
+        "CAM180",
+        "CAM020",
+        "CAM290"
       ]
     },
     {
-      "name": "David",
+      "name": "Pamela",
       "role": "Associate",
       "known_stations": [
-        "CAM070",
+        "CAM210",
+        "CAM200",
         "CAM280",
-        "CAM120",
-        "CAM190",
-        "CAM150"
+        "CAM050",
+        "CAM290",
+        "CAM160",
+        "CAM010",
+        "CAM260",
+        "CAM180",
+        "CAM100",
+        "CAM020",
+        "CAM110",
+        "CAM030"
       ]
     },
     {
-      "name": "Brianna",
+      "name": "Nancy",
       "role": "Associate",
       "known_stations": [
-        "CAM190",
+        "CAM260",
+        "CAM290",
+        "CAM160",
+        "CAM110",
+        "CAM020",
+        "CAM100",
+        "CAM180",
         "CAM280",
-        "CAM120",
-        "CAM070"
-      ]
-    },
-    {
-      "name": "Suzanne",
-      "role": "Associate",
-      "known_stations": [
-        "CAM120",
-        "CAM190",
-        "CAM070"
-      ]
-    },
-    {
-      "name": "Deanna",
-      "role": "Associate",
-      "known_stations": [
-        "CAM130",
-        "CAM260",
-        "CAM070",
-        "CAM190",
-        "CAM150",
-        "CAM280"
-      ]
-    },
-    {
-      "name": "Jacob",
-      "role": "Associate",
-      "known_stations": [
-        "CAM280",
-        "CAM120",
-        "CAM260",
-        "CAM190",
-        "CAM070"
-      ]
-    },
-    {
-      "name": "Robert",
-      "role": "Associate",
-      "known_stations": [
-        "CAM150",
-        "CAM130",
-        "CAM260",
-        "CAM120",
-        "CAM190",
-        "CAM070",
-        "CAM280"
-      ]
-    },
-    {
-      "name": "Stephanie",
-      "role": "Associate",
-      "known_stations": [
-        "CAM130",
-        "CAM260",
-        "CAM150"
+        "CAM210",
+        "CAM030",
+        "CAM200"
       ]
     }
   ]

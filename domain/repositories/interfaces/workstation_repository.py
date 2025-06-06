@@ -25,14 +25,13 @@ class WorkstationRepositoryInterface(BaseRepository[Workstation]):
 
     @abstractmethod
     def get_all(self, team_id: Optional[int] = None, is_active: Optional[bool] = None,
-                required_qualification: Optional[str] = None, skip: int = 0, limit: int = 100) -> List[Workstation]:
+                skip: int = 0, limit: int = 100) -> List[Workstation]:
         """
         Get all workstations with filtering and pagination.
 
         Args:
             team_id: Filter by team ID
             is_active: Filter by active status
-            required_qualification: Filter by required qualification
             skip: Number of records to skip
             limit: Maximum number of records to return
 

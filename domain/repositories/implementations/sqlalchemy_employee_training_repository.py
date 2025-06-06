@@ -1,7 +1,6 @@
 # heijunka/domain/repositories/implementations/sqlalchemy_employee_training_repository.py
-from typing import List, Optional, Generator
+from typing import List, Optional, Type
 from datetime import date
-from contextlib import contextmanager
 from sqlalchemy import and_
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
@@ -9,13 +8,14 @@ from sqlalchemy.exc import SQLAlchemyError
 from domain.value_objects.employee_training import EmployeeTraining
 from domain.models.EmployeeTrainingModel import EmployeeTrainingModel
 from domain.repositories.interfaces.employee_training_repository import EmployeeTrainingRepositoryInterface
+from domain.factories.employee_training_factory import EmployeeTrainingFactory
 from infrastructure.repositories.sqlalchemy.base_sqlalchemy_repository import BaseSqlAlchemyRepository
 from infrastructure.exceptions import RepositoryError
 from utilities.secure_logging import sanitize_exception
 from utilities.logging_factory import get_logger
 
 
-class SqlAlchemyEmployeeTrainingRepository(BaseSqlAlchemyRepository, EmployeeTrainingRepositoryInterface):
+class SqlAlchemyEmployeeTrainingRepository(BaseSqlAlchemyRepository[EmployeeTraining, EmployeeTrainingModel], EmployeeTrainingRepositoryInterface):
     """
     SQLAlchemy implementation of the EmployeeTrainingRepository interface.
 
@@ -34,42 +34,6 @@ class SqlAlchemyEmployeeTrainingRepository(BaseSqlAlchemyRepository, EmployeeTra
         self.logger = get_logger("heijunka.repositories.employee_training")
         self.rate_limited_logger = get_logger("heijunka.repositories.employee_training", rate_limit=True)
 
-    @contextmanager
-    def session_scope(self) -> Generator[Session, None, None]:
-        """
-        Provide a transactional scope around a series of operations.
-
-        Yields:
-            The SQLAlchemy session.
-        """
-        try:
-            yield self._session
-            self._session.commit()
-        except SQLAlchemyError as e:
-            self._session.rollback()
-            error_msg = sanitize_exception(e)
-            self.logger.error(
-                f"Database operation failed: {error_msg}",
-                extra={
-                    "event_type": "database_error",
-                    "error_type": type(e).__name__,
-                    "repository": "employee_training"
-                }
-            )
-            raise RepositoryError(f"Database error: {error_msg}")
-        except Exception as e:
-            self._session.rollback()
-            error_msg = sanitize_exception(e)
-            self.logger.error(
-                f"Unexpected error in employee training repository: {error_msg}",
-                extra={
-                    "event_type": "unexpected_error",
-                    "error_type": type(e).__name__,
-                    "repository": "employee_training"
-                }
-            )
-            raise RepositoryError(f"Repository error: {error_msg}")
-
     def add(self, training: EmployeeTraining) -> EmployeeTraining:
         """
         Add a new training record.
@@ -79,19 +43,22 @@ class SqlAlchemyEmployeeTrainingRepository(BaseSqlAlchemyRepository, EmployeeTra
 
         Returns:
             The added training record
-        """
-        try:
-            self.logger.info(
-                "Adding new employee training record",
-                extra={
-                    "event_type": "employee_training_add",
-                    "employee_id": training.employee_id,
-                    "workstation_id": training.workstation_id
-                }
-            )
 
+        Raises:
+            RepositoryError: If there was an error adding the training record
+        """
+        self.logger.info(
+            "Entering EmployeeTrainingRepository.add",
+            extra={
+                "event_type": "employee_training_add",
+                "employee_id": training.employee_id,
+                "workstation_id": training.workstation_id
+            }
+        )
+
+        try:
             with self.session_scope() as session:
-                model = self._to_model(training)
+                model = EmployeeTrainingFactory.create_from_entity(training)
                 session.add(model)
                 session.flush()  # Flush to get the ID
 
@@ -105,14 +72,14 @@ class SqlAlchemyEmployeeTrainingRepository(BaseSqlAlchemyRepository, EmployeeTra
                     }
                 )
 
-                return self._to_domain(model)
+                return EmployeeTrainingFactory.create_from_model(model)
         except RepositoryError:
             # This will be caught and logged by session_scope
             raise
         except Exception as e:
             error_msg = sanitize_exception(e)
             self.logger.error(
-                f"Error adding employee training record: {error_msg}",
+                f"Error in EmployeeTrainingRepository.add: {error_msg}",
                 extra={
                     "event_type": "employee_training_add_error",
                     "employee_id": training.employee_id,
@@ -132,18 +99,21 @@ class SqlAlchemyEmployeeTrainingRepository(BaseSqlAlchemyRepository, EmployeeTra
 
         Returns:
             The training record if found, None otherwise
-        """
-        try:
-            self.logger.info(
-                "Retrieving training record for employee and workstation",
-                extra={
-                    "event_type": "employee_training_lookup",
-                    "lookup_type": "employee_and_workstation",
-                    "employee_id": employee_id,
-                    "workstation_id": workstation_id
-                }
-            )
 
+        Raises:
+            RepositoryError: If there was an error retrieving the training record
+        """
+        self.logger.info(
+            "Entering EmployeeTrainingRepository.get_by_employee_and_workstation",
+            extra={
+                "event_type": "employee_training_lookup",
+                "lookup_type": "employee_and_workstation",
+                "employee_id": employee_id,
+                "workstation_id": workstation_id
+            }
+        )
+
+        try:
             model = self._session.query(EmployeeTrainingModel).filter(
                 and_(
                     EmployeeTrainingModel.employee_id == employee_id,
@@ -155,31 +125,30 @@ class SqlAlchemyEmployeeTrainingRepository(BaseSqlAlchemyRepository, EmployeeTra
                 self.logger.info(
                     "No training record found for employee and workstation",
                     extra={
-                        "event_type": "employee_training_lookup_failed",
+                        "event_type": "employee_training_lookup_result",
                         "lookup_type": "employee_and_workstation",
                         "employee_id": employee_id,
                         "workstation_id": workstation_id,
-                        "reason": "not_found"
+                        "result": "not_found"
                     }
                 )
                 return None
 
-            self.logger.info(
-                "Found training record for employee and workstation",
+            self.logger.debug(
+                f"Converting EmployeeTrainingModel [id={model.id}] to domain EmployeeTraining",
                 extra={
-                    "event_type": "employee_training_lookup_success",
-                    "lookup_type": "employee_and_workstation",
+                    "event_type": "model_to_domain_conversion",
+                    "entity_id": model.id,
                     "employee_id": employee_id,
-                    "workstation_id": workstation_id,
-                    "entity_id": model.id
+                    "workstation_id": workstation_id
                 }
             )
 
-            return self._to_domain(model)
+            return EmployeeTrainingFactory.create_from_model(model)
         except SQLAlchemyError as e:
             error_msg = sanitize_exception(e)
             self.logger.error(
-                f"Error retrieving training record for employee and workstation: {error_msg}",
+                f"Error in EmployeeTrainingRepository.get_by_employee_and_workstation: {error_msg}",
                 extra={
                     "event_type": "employee_training_lookup_error",
                     "lookup_type": "employee_and_workstation",
@@ -199,17 +168,20 @@ class SqlAlchemyEmployeeTrainingRepository(BaseSqlAlchemyRepository, EmployeeTra
 
         Returns:
             A list of training records
-        """
-        try:
-            self.logger.info(
-                "Retrieving training records for employee",
-                extra={
-                    "event_type": "employee_training_lookup",
-                    "lookup_type": "employee",
-                    "employee_id": employee_id
-                }
-            )
 
+        Raises:
+            RepositoryError: If there was an error retrieving the training records
+        """
+        self.logger.info(
+            "Entering EmployeeTrainingRepository.get_by_employee",
+            extra={
+                "event_type": "employee_training_lookup",
+                "lookup_type": "employee",
+                "employee_id": employee_id
+            }
+        )
+
+        try:
             models = self._session.query(EmployeeTrainingModel).filter(
                 EmployeeTrainingModel.employee_id == employee_id
             ).all()
@@ -218,18 +190,31 @@ class SqlAlchemyEmployeeTrainingRepository(BaseSqlAlchemyRepository, EmployeeTra
             self.logger.info(
                 f"Found {record_count} training records for employee",
                 extra={
-                    "event_type": "employee_training_lookup_success",
+                    "event_type": "employee_training_lookup_result",
                     "lookup_type": "employee",
                     "employee_id": employee_id,
                     "record_count": record_count
                 }
             )
 
-            return [self._to_domain(model) for model in models]
+            result = []
+            for model in models:
+                self.logger.debug(
+                    f"Converting EmployeeTrainingModel [id={model.id}] to domain EmployeeTraining",
+                    extra={
+                        "event_type": "model_to_domain_conversion",
+                        "entity_id": model.id,
+                        "employee_id": employee_id,
+                        "workstation_id": model.station_id
+                    }
+                )
+                result.append(EmployeeTrainingFactory.create_from_model(model))
+
+            return result
         except SQLAlchemyError as e:
             error_msg = sanitize_exception(e)
             self.logger.error(
-                f"Error retrieving training records for employee: {error_msg}",
+                f"Error in EmployeeTrainingRepository.get_by_employee: {error_msg}",
                 extra={
                     "event_type": "employee_training_lookup_error",
                     "lookup_type": "employee",
@@ -248,17 +233,20 @@ class SqlAlchemyEmployeeTrainingRepository(BaseSqlAlchemyRepository, EmployeeTra
 
         Returns:
             A list of training records
-        """
-        try:
-            self.logger.info(
-                "Retrieving training records for workstation",
-                extra={
-                    "event_type": "employee_training_lookup",
-                    "lookup_type": "workstation",
-                    "workstation_id": workstation_id
-                }
-            )
 
+        Raises:
+            RepositoryError: If there was an error retrieving the training records
+        """
+        self.logger.info(
+            "Entering EmployeeTrainingRepository.get_by_workstation",
+            extra={
+                "event_type": "employee_training_lookup",
+                "lookup_type": "workstation",
+                "workstation_id": workstation_id
+            }
+        )
+
+        try:
             models = self._session.query(EmployeeTrainingModel).filter(
                 EmployeeTrainingModel.station_id == workstation_id
             ).all()
@@ -267,18 +255,31 @@ class SqlAlchemyEmployeeTrainingRepository(BaseSqlAlchemyRepository, EmployeeTra
             self.logger.info(
                 f"Found {record_count} training records for workstation",
                 extra={
-                    "event_type": "employee_training_lookup_success",
+                    "event_type": "employee_training_lookup_result",
                     "lookup_type": "workstation",
                     "workstation_id": workstation_id,
                     "record_count": record_count
                 }
             )
 
-            return [self._to_domain(model) for model in models]
+            result = []
+            for model in models:
+                self.logger.debug(
+                    f"Converting EmployeeTrainingModel [id={model.id}] to domain EmployeeTraining",
+                    extra={
+                        "event_type": "model_to_domain_conversion",
+                        "entity_id": model.id,
+                        "employee_id": model.employee_id,
+                        "workstation_id": workstation_id
+                    }
+                )
+                result.append(EmployeeTrainingFactory.create_from_model(model))
+
+            return result
         except SQLAlchemyError as e:
             error_msg = sanitize_exception(e)
             self.logger.error(
-                f"Error retrieving training records for workstation: {error_msg}",
+                f"Error in EmployeeTrainingRepository.get_by_workstation: {error_msg}",
                 extra={
                     "event_type": "employee_training_lookup_error",
                     "lookup_type": "workstation",
@@ -297,17 +298,20 @@ class SqlAlchemyEmployeeTrainingRepository(BaseSqlAlchemyRepository, EmployeeTra
 
         Returns:
             A list of completed training records
-        """
-        try:
-            self.logger.info(
-                "Retrieving completed training records for employee",
-                extra={
-                    "event_type": "employee_training_lookup",
-                    "lookup_type": "completed_trainings",
-                    "employee_id": employee_id
-                }
-            )
 
+        Raises:
+            RepositoryError: If there was an error retrieving the training records
+        """
+        self.logger.info(
+            "Entering EmployeeTrainingRepository.get_completed_trainings",
+            extra={
+                "event_type": "employee_training_lookup",
+                "lookup_type": "completed_trainings",
+                "employee_id": employee_id
+            }
+        )
+
+        try:
             models = self._session.query(EmployeeTrainingModel).filter(
                 and_(
                     EmployeeTrainingModel.employee_id == employee_id,
@@ -319,18 +323,31 @@ class SqlAlchemyEmployeeTrainingRepository(BaseSqlAlchemyRepository, EmployeeTra
             self.logger.info(
                 f"Found {record_count} completed training records for employee",
                 extra={
-                    "event_type": "employee_training_lookup_success",
+                    "event_type": "employee_training_lookup_result",
                     "lookup_type": "completed_trainings",
                     "employee_id": employee_id,
                     "record_count": record_count
                 }
             )
 
-            return [self._to_domain(model) for model in models]
+            result = []
+            for model in models:
+                self.logger.debug(
+                    f"Converting EmployeeTrainingModel [id={model.id}] to domain EmployeeTraining",
+                    extra={
+                        "event_type": "model_to_domain_conversion",
+                        "entity_id": model.id,
+                        "employee_id": employee_id,
+                        "workstation_id": model.station_id
+                    }
+                )
+                result.append(EmployeeTrainingFactory.create_from_model(model))
+
+            return result
         except SQLAlchemyError as e:
             error_msg = sanitize_exception(e)
             self.logger.error(
-                f"Error retrieving completed training records for employee: {error_msg}",
+                f"Error in EmployeeTrainingRepository.get_completed_trainings: {error_msg}",
                 extra={
                     "event_type": "employee_training_lookup_error",
                     "lookup_type": "completed_trainings",
@@ -349,17 +366,20 @@ class SqlAlchemyEmployeeTrainingRepository(BaseSqlAlchemyRepository, EmployeeTra
 
         Returns:
             A list of required training records
-        """
-        try:
-            self.logger.info(
-                "Retrieving required training records for employee",
-                extra={
-                    "event_type": "employee_training_lookup",
-                    "lookup_type": "required_trainings",
-                    "employee_id": employee_id
-                }
-            )
 
+        Raises:
+            RepositoryError: If there was an error retrieving the training records
+        """
+        self.logger.info(
+            "Entering EmployeeTrainingRepository.get_required_trainings",
+            extra={
+                "event_type": "employee_training_lookup",
+                "lookup_type": "required_trainings",
+                "employee_id": employee_id
+            }
+        )
+
+        try:
             models = self._session.query(EmployeeTrainingModel).filter(
                 and_(
                     EmployeeTrainingModel.employee_id == employee_id,
@@ -371,18 +391,31 @@ class SqlAlchemyEmployeeTrainingRepository(BaseSqlAlchemyRepository, EmployeeTra
             self.logger.info(
                 f"Found {record_count} required training records for employee",
                 extra={
-                    "event_type": "employee_training_lookup_success",
+                    "event_type": "employee_training_lookup_result",
                     "lookup_type": "required_trainings",
                     "employee_id": employee_id,
                     "record_count": record_count
                 }
             )
 
-            return [self._to_domain(model) for model in models]
+            result = []
+            for model in models:
+                self.logger.debug(
+                    f"Converting EmployeeTrainingModel [id={model.id}] to domain EmployeeTraining",
+                    extra={
+                        "event_type": "model_to_domain_conversion",
+                        "entity_id": model.id,
+                        "employee_id": employee_id,
+                        "workstation_id": model.station_id
+                    }
+                )
+                result.append(EmployeeTrainingFactory.create_from_model(model))
+
+            return result
         except SQLAlchemyError as e:
             error_msg = sanitize_exception(e)
             self.logger.error(
-                f"Error retrieving required training records for employee: {error_msg}",
+                f"Error in EmployeeTrainingRepository.get_required_trainings: {error_msg}",
                 extra={
                     "event_type": "employee_training_lookup_error",
                     "lookup_type": "required_trainings",
@@ -405,17 +438,20 @@ class SqlAlchemyEmployeeTrainingRepository(BaseSqlAlchemyRepository, EmployeeTra
 
         Returns:
             The updated training record if found, None otherwise
-        """
-        try:
-            self.logger.info(
-                "Updating training status",
-                extra={
-                    "event_type": "employee_training_update",
-                    "employee_id": employee_id,
-                    "workstation_id": workstation_id
-                }
-            )
 
+        Raises:
+            RepositoryError: If there was an error updating the training record
+        """
+        self.logger.info(
+            "Entering EmployeeTrainingRepository.update_training_status",
+            extra={
+                "event_type": "employee_training_update",
+                "employee_id": employee_id,
+                "workstation_id": workstation_id
+            }
+        )
+
+        try:
             with self.session_scope() as session:
                 model = session.query(EmployeeTrainingModel).filter(
                     and_(
@@ -428,10 +464,10 @@ class SqlAlchemyEmployeeTrainingRepository(BaseSqlAlchemyRepository, EmployeeTra
                     self.logger.info(
                         "No training record found to update",
                         extra={
-                            "event_type": "employee_training_update_failed",
+                            "event_type": "employee_training_update_result",
                             "employee_id": employee_id,
                             "workstation_id": workstation_id,
-                            "reason": "not_found"
+                            "result": "not_found"
                         }
                     )
                     return None
@@ -477,14 +513,24 @@ class SqlAlchemyEmployeeTrainingRepository(BaseSqlAlchemyRepository, EmployeeTra
                     }
                 )
 
-                return self._to_domain(model)
+                self.logger.debug(
+                    f"Converting updated EmployeeTrainingModel [id={model.id}] to domain EmployeeTraining",
+                    extra={
+                        "event_type": "model_to_domain_conversion",
+                        "entity_id": model.id,
+                        "employee_id": employee_id,
+                        "workstation_id": workstation_id
+                    }
+                )
+
+                return EmployeeTrainingFactory.create_from_model(model)
         except RepositoryError:
             # This will be caught and logged by session_scope
             raise
         except Exception as e:
             error_msg = sanitize_exception(e)
             self.logger.error(
-                f"Error updating training status: {error_msg}",
+                f"Error in EmployeeTrainingRepository.update_training_status: {error_msg}",
                 extra={
                     "event_type": "employee_training_update_error",
                     "employee_id": employee_id,
@@ -504,17 +550,20 @@ class SqlAlchemyEmployeeTrainingRepository(BaseSqlAlchemyRepository, EmployeeTra
 
         Returns:
             True if deleted, False if not found
-        """
-        try:
-            self.logger.info(
-                "Deleting training record",
-                extra={
-                    "event_type": "employee_training_delete",
-                    "employee_id": employee_id,
-                    "workstation_id": workstation_id
-                }
-            )
 
+        Raises:
+            RepositoryError: If there was an error deleting the training record
+        """
+        self.logger.info(
+            "Entering EmployeeTrainingRepository.delete",
+            extra={
+                "event_type": "employee_training_delete",
+                "employee_id": employee_id,
+                "workstation_id": workstation_id
+            }
+        )
+
+        try:
             with self.session_scope() as session:
                 model = session.query(EmployeeTrainingModel).filter(
                     and_(
@@ -527,10 +576,10 @@ class SqlAlchemyEmployeeTrainingRepository(BaseSqlAlchemyRepository, EmployeeTra
                     self.logger.info(
                         "No training record found to delete",
                         extra={
-                            "event_type": "employee_training_delete_failed",
+                            "event_type": "employee_training_delete_result",
                             "employee_id": employee_id,
                             "workstation_id": workstation_id,
-                            "reason": "not_found"
+                            "result": "not_found"
                         }
                     )
                     return False
@@ -555,7 +604,7 @@ class SqlAlchemyEmployeeTrainingRepository(BaseSqlAlchemyRepository, EmployeeTra
         except Exception as e:
             error_msg = sanitize_exception(e)
             self.logger.error(
-                f"Error deleting training record: {error_msg}",
+                f"Error in EmployeeTrainingRepository.delete: {error_msg}",
                 extra={
                     "event_type": "employee_training_delete_error",
                     "employee_id": employee_id,
@@ -570,99 +619,44 @@ class SqlAlchemyEmployeeTrainingRepository(BaseSqlAlchemyRepository, EmployeeTra
         Get an entity by ID.
 
         This method is required by the BaseRepository interface but is not directly applicable
-        for EmployeeTraining since it's identified by a composite key.
+        for EmployeeTraining since it's identified by a composite key (employee_id, workstation_id).
+        Use get_by_employee_and_workstation instead.
 
         Args:
             id: The ID of the entity to retrieve
 
         Returns:
-            None (not directly applicable for EmployeeTraining)
+            The training record if found, None otherwise
         """
+        self.logger.info(
+            "Entering EmployeeTrainingRepository.get",
+            extra={
+                "event_type": "employee_training_lookup",
+                "lookup_type": "id",
+                "entity_id": id
+            }
+        )
+
         try:
-            self.logger.info(
-                f"Attempting to retrieve employee training by ID: {id}",
-                extra={
-                    "event_type": "employee_training_lookup",
-                    "lookup_type": "id",
-                    "entity_id": id
-                }
-            )
+            # Try to find by internal ID
+            model = self._session.query(EmployeeTrainingModel).filter(
+                EmployeeTrainingModel.id == id
+            ).first()
 
-            self.logger.info(
-                "Employee training is identified by composite key (employee_id, workstation_id), not by ID",
-                extra={
-                    "event_type": "employee_training_lookup_failed",
-                    "lookup_type": "id",
-                    "entity_id": id,
-                    "reason": "not_applicable"
-                }
-            )
+            if not model:
+                self.logger.info(
+                    "No training record found with the given ID",
+                    extra={
+                        "event_type": "employee_training_lookup_result",
+                        "lookup_type": "id",
+                        "entity_id": id,
+                        "result": "not_found"
+                    }
+                )
+                return None
 
-            return None
-        except Exception as e:
-            error_msg = sanitize_exception(e)
-            self.logger.error(
-                f"Error in get method: {error_msg}",
-                extra={
-                    "event_type": "employee_training_lookup_error",
-                    "lookup_type": "id",
-                    "entity_id": id,
-                    "error_type": type(e).__name__
-                }
-            )
-            return None
-
-    def get_all_entities(self) -> List[EmployeeTraining]:
-        """
-        Get all entities.
-
-        Returns:
-            A list of all training records
-        """
-        try:
-            self.logger.info(
-                "Retrieving all employee training records",
-                extra={
-                    "event_type": "employee_training_list_all"
-                }
-            )
-
-            models = self._session.query(EmployeeTrainingModel).all()
-
-            record_count = len(models)
-            self.logger.info(
-                f"Retrieved {record_count} employee training records",
-                extra={
-                    "event_type": "employee_training_list_all_success",
-                    "record_count": record_count
-                }
-            )
-
-            return [self._to_domain(model) for model in models]
-        except SQLAlchemyError as e:
-            error_msg = sanitize_exception(e)
-            self.logger.error(
-                f"Error retrieving all employee training records: {error_msg}",
-                extra={
-                    "event_type": "employee_training_list_all_error",
-                    "error_type": type(e).__name__
-                }
-            )
-            raise RepositoryError(f"Failed to get all training records: {error_msg}")
-
-    def _to_domain(self, model: EmployeeTrainingModel) -> EmployeeTraining:
-        """
-        Convert a SQLAlchemy model to a domain entity.
-
-        Args:
-            model: The SQLAlchemy model to convert.
-
-        Returns:
-            The domain entity.
-        """
-        try:
             self.logger.debug(
-                "Converting employee training model to domain entity",
+                f"Converting EmployeeTrainingModel [id={model.id}] to domain EmployeeTraining",
                 extra={
                     "event_type": "model_to_domain_conversion",
                     "entity_id": model.id,
@@ -671,148 +665,85 @@ class SqlAlchemyEmployeeTrainingRepository(BaseSqlAlchemyRepository, EmployeeTra
                 }
             )
 
-            training = EmployeeTraining(
-                employee_id=model.employee_id,
-                workstation_id=model.station_id,
-                required_training=model.required_training,
-                date_completed=model.date_completed
-            )
-
-            self.logger.debug(
-                "Successfully converted employee training model to domain entity",
-                extra={
-                    "event_type": "model_to_domain_conversion_success",
-                    "entity_id": model.id
-                }
-            )
-
-            return training
-        except Exception as e:
+            return EmployeeTrainingFactory.create_from_model(model)
+        except SQLAlchemyError as e:
             error_msg = sanitize_exception(e)
             self.logger.error(
-                f"Error converting employee training model to domain entity: {error_msg}",
+                f"Error in EmployeeTrainingRepository.get: {error_msg}",
                 extra={
-                    "event_type": "model_to_domain_conversion_error",
-                    "entity_id": model.id if model else None,
+                    "event_type": "employee_training_lookup_error",
+                    "lookup_type": "id",
+                    "entity_id": id,
                     "error_type": type(e).__name__
                 }
             )
-            raise
+            raise RepositoryError(f"Failed to get training record by ID: {error_msg}")
+        except Exception as e:
+            error_msg = sanitize_exception(e)
+            self.logger.error(
+                f"Unexpected error in EmployeeTrainingRepository.get: {error_msg}",
+                extra={
+                    "event_type": "employee_training_lookup_error",
+                    "lookup_type": "id",
+                    "entity_id": id,
+                    "error_type": type(e).__name__
+                }
+            )
+            raise RepositoryError(f"Unexpected error retrieving training record: {error_msg}")
 
-    def _to_model(self, entity: EmployeeTraining) -> EmployeeTrainingModel:
+    def get_all_entities(self) -> List[EmployeeTraining]:
         """
-        Convert a domain entity to a SQLAlchemy model.
-
-        Args:
-            entity: The domain entity to convert.
+        Get all training records.
 
         Returns:
-            The SQLAlchemy model.
+            A list of all training records
+
+        Raises:
+            RepositoryError: If there was an error retrieving the training records
         """
+        self.logger.info(
+            "Entering EmployeeTrainingRepository.get_all_entities",
+            extra={
+                "event_type": "employee_training_list_all"
+            }
+        )
+
         try:
-            self.logger.debug(
-                "Converting employee training domain entity to model",
+            models = self._session.query(EmployeeTrainingModel).all()
+
+            record_count = len(models)
+            self.logger.info(
+                f"Retrieved {record_count} employee training records",
                 extra={
-                    "event_type": "domain_to_model_conversion",
-                    "employee_id": entity.employee_id,
-                    "workstation_id": entity.workstation_id
+                    "event_type": "employee_training_list_all_result",
+                    "record_count": record_count
                 }
             )
 
-            model = EmployeeTrainingModel(
-                employee_id=entity.employee_id,
-                station_id=entity.workstation_id,
-                required_training=entity.required_training,
-                date_completed=entity.date_completed
-            )
+            result = []
+            for model in models:
+                self.logger.debug(
+                    f"Converting EmployeeTrainingModel [id={model.id}] to domain EmployeeTraining",
+                    extra={
+                        "event_type": "model_to_domain_conversion",
+                        "entity_id": model.id,
+                        "employee_id": model.employee_id,
+                        "workstation_id": model.station_id
+                    }
+                )
+                result.append(EmployeeTrainingFactory.create_from_model(model))
 
-            self.logger.debug(
-                "Successfully converted employee training domain entity to model",
-                extra={
-                    "event_type": "domain_to_model_conversion_success",
-                    "employee_id": entity.employee_id,
-                    "workstation_id": entity.workstation_id
-                }
-            )
-
-            return model
-        except Exception as e:
+            return result
+        except SQLAlchemyError as e:
             error_msg = sanitize_exception(e)
             self.logger.error(
-                f"Error converting employee training domain entity to model: {error_msg}",
+                f"Error in EmployeeTrainingRepository.get_all_entities: {error_msg}",
                 extra={
-                    "event_type": "domain_to_model_conversion_error",
-                    "employee_id": entity.employee_id if entity and hasattr(entity, 'employee_id') else None,
+                    "event_type": "employee_training_list_all_error",
                     "error_type": type(e).__name__
                 }
             )
-            raise
+            raise RepositoryError(f"Failed to get all training records: {error_msg}")
 
-    def _update_model(self, model: EmployeeTrainingModel, entity: EmployeeTraining) -> None:
-        """
-        Update a SQLAlchemy model with values from a domain entity.
-
-        Args:
-            model: The SQLAlchemy model to update.
-            entity: The domain entity with updated values.
-        """
-        try:
-            self.logger.debug(
-                "Updating employee training model from domain entity",
-                extra={
-                    "event_type": "employee_training_model_update",
-                    "entity_id": model.id,
-                    "employee_id": model.employee_id,
-                    "workstation_id": model.station_id
-                }
-            )
-
-            # Check for significant changes and log them
-            if model.required_training != entity.required_training:
-                self.logger.info(
-                    "Changing employee training required status",
-                    extra={
-                        "event_type": "employee_training_field_change",
-                        "entity_id": model.id,
-                        "field": "required_training",
-                        "old_value": model.required_training,
-                        "new_value": entity.required_training
-                    }
-                )
-
-            if model.date_completed != entity.date_completed:
-                self.logger.info(
-                    "Changing employee training completion date",
-                    extra={
-                        "event_type": "employee_training_field_change",
-                        "entity_id": model.id,
-                        "field": "date_completed",
-                        "old_value": model.date_completed.isoformat() if model.date_completed else None,
-                        "new_value": entity.date_completed.isoformat() if entity.date_completed else None
-                    }
-                )
-
-            # Update the model
-            model.employee_id = entity.employee_id
-            model.station_id = entity.workstation_id
-            model.required_training = entity.required_training
-            model.date_completed = entity.date_completed
-
-            self.logger.debug(
-                "Successfully updated employee training model",
-                extra={
-                    "event_type": "employee_training_model_update_success",
-                    "entity_id": model.id
-                }
-            )
-        except Exception as e:
-            error_msg = sanitize_exception(e)
-            self.logger.error(
-                f"Error updating employee training model: {error_msg}",
-                extra={
-                    "event_type": "employee_training_model_update_error",
-                    "entity_id": model.id if model else None,
-                    "error_type": type(e).__name__
-                }
-            )
-            raise
+    # The _to_domain, _to_model, and _update_model methods have been replaced by the EmployeeTrainingFactory
+    # which provides better separation of concerns and follows DDD principles

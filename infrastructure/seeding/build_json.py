@@ -118,7 +118,7 @@ if __name__ == "__main__":
                 associates_needed = num_employees - 2
                 for _ in range(associates_needed):
                     # Each associate knows a random subset of stations (at least 3, up to all)
-                    subset_size = random.randint(min(3, num_jobs), num_jobs)
+                    subset_size = random.randint(min((num_jobs-2), num_jobs), num_jobs)
                     known_stations = random.sample(station_names, subset_size)
                     employees.append(
                         {"name": fake.first_name(), "role": "Associate", "known_stations": known_stations}

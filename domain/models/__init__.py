@@ -17,6 +17,7 @@ from domain.models.EmployeeStationSkillModel import EmployeeStationSkillModel
 from domain.models.ScheduleModel import ScheduleModel
 from domain.models.WatcherHeartbeat import WatcherHeartbeatModel
 from domain.models.AROAssignmentModel import AROAssignmentModel
+from domain.models.TeamAroModel import TeamAroModel
 
 __all__ = [
     'Base',
@@ -37,5 +38,6 @@ __all__ = [
     'EmployeeStationSkillModel',
     'ScheduleModel',
     'WatcherHeartbeatModel',
-    'AROAssignmentModel'
+    'AROAssignmentModel',
+    'TeamAroModel'
 ]

@@ -1,167 +1,236 @@
 {
   "employees": [
     {
-      "name": "Leslie",
+      "name": "Theodore",
       "role": "Team Leader",
       "known_stations": []
     },
     {
-      "name": "Michael",
+      "name": "Tara",
       "role": "Backup",
       "known_stations": [
-        "TES030",
-        "TES060",
-        "TES070",
-        "TES140",
-        "TES190",
+        "TES020",
+        "TES050",
+        "TES120",
         "TES200",
         "TES210",
         "TES220",
         "TES230",
-        "TES260"
+        "TES250",
+        "TES270",
+        "TES290",
+        "TES300"
       ]
     },
     {
-      "name": "Katherine",
+      "name": "Monica",
       "role": "Associate",
       "known_stations": [
+        "TES270",
         "TES200",
-        "TES260",
-        "TES070",
-        "TES190",
-        "TES060",
+        "TES120",
+        "TES250",
+        "TES230",
+        "TES020",
         "TES210",
+        "TES300",
+        "TES290",
+        "TES220",
+        "TES050"
+      ]
+    },
+    {
+      "name": "Jonathan",
+      "role": "Associate",
+      "known_stations": [
+        "TES220",
+        "TES250",
+        "TES270",
+        "TES300",
+        "TES200",
+        "TES050",
+        "TES120",
+        "TES210",
+        "TES020",
+        "TES290",
         "TES230"
-      ]
-    },
-    {
-      "name": "Gregory",
-      "role": "Associate",
-      "known_stations": [
-        "TES230",
-        "TES190",
-        "TES140",
-        "TES200",
-        "TES070"
-      ]
-    },
-    {
-      "name": "Brian",
-      "role": "Associate",
-      "known_stations": [
-        "TES190",
-        "TES030",
-        "TES140",
-        "TES060",
-        "TES220"
-      ]
-    },
-    {
-      "name": "Angela",
-      "role": "Associate",
-      "known_stations": [
-        "TES190",
-        "TES140",
-        "TES060",
-        "TES200",
-        "TES220",
-        "TES070"
-      ]
-    },
-    {
-      "name": "Billy",
-      "role": "Associate",
-      "known_stations": [
-        "TES030",
-        "TES190",
-        "TES140",
-        "TES070",
-        "TES060",
-        "TES200",
-        "TES230",
-        "TES260",
-        "TES220",
-        "TES210"
-      ]
-    },
-    {
-      "name": "Tony",
-      "role": "Associate",
-      "known_stations": [
-        "TES210",
-        "TES060",
-        "TES140",
-        "TES260",
-        "TES220",
-        "TES230",
-        "TES070"
-      ]
-    },
-    {
-      "name": "David",
-      "role": "Associate",
-      "known_stations": [
-        "TES200",
-        "TES140",
-        "TES060"
-      ]
-    },
-    {
-      "name": "Morgan",
-      "role": "Associate",
-      "known_stations": [
-        "TES220",
-        "TES030",
-        "TES070",
-        "TES210"
-      ]
-    },
-    {
-      "name": "Darren",
-      "role": "Associate",
-      "known_stations": [
-        "TES140",
-        "TES210",
-        "TES190",
-        "TES200",
-        "TES230",
-        "TES220",
-        "TES070"
-      ]
-    },
-    {
-      "name": "Aaron",
-      "role": "Associate",
-      "known_stations": [
-        "TES260",
-        "TES070",
-        "TES230",
-        "TES190",
-        "TES210",
-        "TES060"
-      ]
-    },
-    {
-      "name": "James",
-      "role": "Associate",
-      "known_stations": [
-        "TES140",
-        "TES260",
-        "TES060",
-        "TES210",
-        "TES070",
-        "TES220"
       ]
     },
     {
       "name": "Tyler",
       "role": "Associate",
       "known_stations": [
-        "TES060",
+        "TES230",
+        "TES210",
+        "TES290",
+        "TES050",
+        "TES300",
+        "TES250",
         "TES220",
-        "TES190",
-        "TES260",
-        "TES030"
+        "TES120",
+        "TES020",
+        "TES270"
+      ]
+    },
+    {
+      "name": "Emily",
+      "role": "Associate",
+      "known_stations": [
+        "TES270",
+        "TES220",
+        "TES290",
+        "TES020",
+        "TES250",
+        "TES300",
+        "TES200",
+        "TES050",
+        "TES120"
+      ]
+    },
+    {
+      "name": "Sean",
+      "role": "Associate",
+      "known_stations": [
+        "TES230",
+        "TES300",
+        "TES210",
+        "TES220",
+        "TES270",
+        "TES120",
+        "TES290",
+        "TES200",
+        "TES050"
+      ]
+    },
+    {
+      "name": "Jordan",
+      "role": "Associate",
+      "known_stations": [
+        "TES230",
+        "TES050",
+        "TES210",
+        "TES200",
+        "TES120",
+        "TES290",
+        "TES250",
+        "TES220",
+        "TES270",
+        "TES300",
+        "TES020"
+      ]
+    },
+    {
+      "name": "Thomas",
+      "role": "Associate",
+      "known_stations": [
+        "TES230",
+        "TES200",
+        "TES120",
+        "TES210",
+        "TES250",
+        "TES020",
+        "TES290",
+        "TES220",
+        "TES270",
+        "TES300",
+        "TES050"
+      ]
+    },
+    {
+      "name": "John",
+      "role": "Associate",
+      "known_stations": [
+        "TES220",
+        "TES250",
+        "TES270",
+        "TES290",
+        "TES210",
+        "TES200",
+        "TES120",
+        "TES230",
+        "TES300",
+        "TES050"
+      ]
+    },
+    {
+      "name": "Joshua",
+      "role": "Associate",
+      "known_stations": [
+        "TES300",
+        "TES020",
+        "TES200",
+        "TES250",
+        "TES120",
+        "TES220",
+        "TES050",
+        "TES210",
+        "TES230",
+        "TES270",
+        "TES290"
+      ]
+    },
+    {
+      "name": "Jennifer",
+      "role": "Associate",
+      "known_stations": [
+        "TES300",
+        "TES230",
+        "TES290",
+        "TES250",
+        "TES220",
+        "TES050",
+        "TES270",
+        "TES200",
+        "TES210",
+        "TES120"
+      ]
+    },
+    {
+      "name": "William",
+      "role": "Associate",
+      "known_stations": [
+        "TES250",
+        "TES050",
+        "TES300",
+        "TES120",
+        "TES230",
+        "TES290",
+        "TES210",
+        "TES020",
+        "TES270"
+      ]
+    },
+    {
+      "name": "Craig",
+      "role": "Associate",
+      "known_stations": [
+        "TES120",
+        "TES250",
+        "TES220",
+        "TES050",
+        "TES020",
+        "TES200",
+        "TES290",
+        "TES210",
+        "TES300",
+        "TES230",
+        "TES270"
+      ]
+    },
+    {
+      "name": "Adrian",
+      "role": "Associate",
+      "known_stations": [
+        "TES200",
+        "TES290",
+        "TES230",
+        "TES210",
+        "TES250",
+        "TES050",
+        "TES270",
+        "TES300",
+        "TES220",
+        "TES120"
       ]
     }
   ]

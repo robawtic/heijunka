@@ -1,142 +1,154 @@
 {
   "employees": [
     {
-      "name": "Robert",
+      "name": "Kimberly",
       "role": "Team Leader",
       "known_stations": []
     },
     {
-      "name": "Garrett",
+      "name": "Aaron",
       "role": "Backup",
       "known_stations": [
+        "FIN020",
         "FIN060",
+        "FIN070",
         "FIN080",
-        "FIN090",
+        "FIN120",
         "FIN140",
-        "FIN210",
         "FIN230",
-        "FIN240",
-        "FIN270"
+        "FIN260"
       ]
     },
     {
-      "name": "Rebekah",
-      "role": "Associate",
-      "known_stations": [
-        "FIN270",
-        "FIN080",
-        "FIN230",
-        "FIN090",
-        "FIN210"
-      ]
-    },
-    {
-      "name": "Dana",
-      "role": "Associate",
-      "known_stations": [
-        "FIN240",
-        "FIN140",
-        "FIN230",
-        "FIN210",
-        "FIN270",
-        "FIN090",
-        "FIN060"
-      ]
-    },
-    {
-      "name": "Sandra",
-      "role": "Associate",
-      "known_stations": [
-        "FIN240",
-        "FIN140",
-        "FIN230",
-        "FIN090",
-        "FIN210"
-      ]
-    },
-    {
-      "name": "Ashley",
+      "name": "James",
       "role": "Associate",
       "known_stations": [
         "FIN140",
-        "FIN210",
-        "FIN270",
-        "FIN090",
+        "FIN260",
         "FIN060",
-        "FIN240",
+        "FIN070",
         "FIN230",
-        "FIN080"
-      ]
-    },
-    {
-      "name": "Kim",
-      "role": "Associate",
-      "known_stations": [
-        "FIN210",
-        "FIN270",
-        "FIN090",
         "FIN080",
-        "FIN060"
+        "FIN120",
+        "FIN020"
       ]
     },
     {
       "name": "Stephanie",
       "role": "Associate",
       "known_stations": [
-        "FIN060",
-        "FIN240",
-        "FIN090",
+        "FIN070",
         "FIN080",
-        "FIN270",
-        "FIN140"
-      ]
-    },
-    {
-      "name": "Rebecca",
-      "role": "Associate",
-      "known_stations": [
-        "FIN230",
-        "FIN090",
-        "FIN210",
         "FIN140",
-        "FIN240",
-        "FIN270"
+        "FIN020",
+        "FIN230",
+        "FIN060"
       ]
     },
     {
-      "name": "Mark",
+      "name": "Brandon",
       "role": "Associate",
       "known_stations": [
+        "FIN020",
+        "FIN140",
+        "FIN120",
+        "FIN070",
+        "FIN260",
         "FIN060",
-        "FIN240",
-        "FIN210",
-        "FIN270",
-        "FIN230",
-        "FIN140",
         "FIN080"
       ]
     },
     {
-      "name": "Miranda",
+      "name": "Albert",
       "role": "Associate",
       "known_stations": [
-        "FIN090",
-        "FIN230",
-        "FIN060",
         "FIN140",
-        "FIN210"
+        "FIN080",
+        "FIN120",
+        "FIN230",
+        "FIN070",
+        "FIN060",
+        "FIN260",
+        "FIN020"
       ]
     },
     {
-      "name": "Sarah",
+      "name": "Kathleen",
       "role": "Associate",
       "known_stations": [
-        "FIN240",
-        "FIN090",
-        "FIN230",
-        "FIN140",
         "FIN060",
-        "FIN210"
+        "FIN230",
+        "FIN020",
+        "FIN140",
+        "FIN120",
+        "FIN260",
+        "FIN070",
+        "FIN080"
+      ]
+    },
+    {
+      "name": "Matthew",
+      "role": "Associate",
+      "known_stations": [
+        "FIN140",
+        "FIN230",
+        "FIN080",
+        "FIN070",
+        "FIN020",
+        "FIN260",
+        "FIN120"
+      ]
+    },
+    {
+      "name": "Drew",
+      "role": "Associate",
+      "known_stations": [
+        "FIN120",
+        "FIN230",
+        "FIN080",
+        "FIN140",
+        "FIN070",
+        "FIN260",
+        "FIN020",
+        "FIN060"
+      ]
+    },
+    {
+      "name": "Lori",
+      "role": "Associate",
+      "known_stations": [
+        "FIN140",
+        "FIN230",
+        "FIN080",
+        "FIN070",
+        "FIN060",
+        "FIN020"
+      ]
+    },
+    {
+      "name": "Kelly",
+      "role": "Associate",
+      "known_stations": [
+        "FIN260",
+        "FIN080",
+        "FIN230",
+        "FIN120",
+        "FIN140",
+        "FIN020",
+        "FIN060",
+        "FIN070"
+      ]
+    },
+    {
+      "name": "Dennis",
+      "role": "Associate",
+      "known_stations": [
+        "FIN080",
+        "FIN230",
+        "FIN020",
+        "FIN140",
+        "FIN120",
+        "FIN070"
       ]
     }
   ]

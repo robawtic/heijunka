@@ -22,6 +22,7 @@ class EmployeeModel(Base):
     availability = relationship('EmployeeAvailabilityModel', back_populates='employee')
     teams = relationship('TeamMemberModel', back_populates='employee')
     station_skills = relationship('EmployeeStationSkillModel', back_populates='employee')
+    team_aros = relationship('TeamAroModel', back_populates='employee')
 
     def to_domain(self) -> 'Employee':
         """Convert this model to a domain entity using the factory."""

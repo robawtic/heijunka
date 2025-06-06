@@ -9,8 +9,8 @@ class MockAssignmentRepository(AssignmentRepositoryInterface):
     """
 
     def __init__(self):
-        self.assignments = {}  # Dictionary of assignments by ID
-        self.next_id = 1  # For generating IDs
+        self.assignments = {}
+        self.next_id = 1
 
     def get_by_id(self, entity_id: int) -> Optional[WorkAssignment]:
         """Retrieve an assignment by ID."""
@@ -22,8 +22,6 @@ class MockAssignmentRepository(AssignmentRepositoryInterface):
 
     def add(self, entity: WorkAssignment) -> WorkAssignment:
         """Add a new assignment."""
-        # In a real implementation, we would generate an ID
-        # For the mock, we'll use a simple counter
         entity_id = self.next_id
         self.next_id += 1
         self.assignments[entity_id] = entity
@@ -31,8 +29,6 @@ class MockAssignmentRepository(AssignmentRepositoryInterface):
 
     def update(self, entity: WorkAssignment) -> WorkAssignment:
         """Update an existing assignment."""
-        # In a real implementation, we would check if the entity exists
-        # For the mock, we'll just add it
         return self.add(entity)
 
     def delete(self, entity_id: int) -> bool:

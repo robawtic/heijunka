@@ -1,0 +1,221 @@
+@startuml
+skinparam packageStyle rect
+
+'====================================================
+' 1. Master Data Management
+'====================================================
+package "Master Data Management" {
+
+  class EmployeeManagement {
+    + create/update/delete employee records (personal info, status)
+    + maintain skill/qualification profiles
+    + track employment status (active, on leave, etc.)
+    + record seniority, shift-premium eligibility, labor-related attributes
+  }
+
+  class TeamDepartmentSetup {
+    + define organizational units (Powertrain, Body, Trim, Paint)
+    + assign employees to teams (including cross-training)
+    + map workstations to teams
+  }
+
+  class WorkstationConfiguration {
+    + create/update/delete workstation entries (name, type, line)
+    + tag workstations with attributes (heavy-lifting, precision, cycle time)
+    + optionally store fatigue factors or other meta-attributes
+  }
+
+  class ShiftPeriodDefinitions {
+    + define shift structure (periods per day, start/end times, breaks)
+    + set up calendars (holidays, plant shutdowns)
+  }
+
+}
+
+'====================================================
+' 2. Rules Management
+'====================================================
+package "Rules Management" {
+
+  class HardRules {
+    + availability constraints (employees cannot be scheduled when unavailable)
+    + qualification constraints (employees only at trained workstations)
+    + one-assignment-per-period (prevent double-booking)
+    + one-employee-per-station (prevent overstaffing)
+  }
+
+  class SoftRules {
+    + minimize same-station repeats within a day
+    + fatigue-based penalties (avoid back-to-back heavy stations)
+    + balancing overtime or weekend assignments
+  }
+
+  class RuleCRUDVersioning {
+    + add/edit/retire rules over time
+    + version control of rule weightings for audit/rollback
+  }
+
+}
+
+'====================================================
+' 3. Scheduling Operations
+'====================================================
+package "Scheduling Operations" {
+
+  class ScheduleGeneration {
+    + ingest demand/production targets
+    + run CP-SAT engine (OR-Tools) to assign employees → workstations
+    + enforce all hard rules and soft-rule penalties
+    + output a preliminary “proposed schedule”
+  }
+
+  class AutoReleasePublication {
+    + mark generated schedule as “published” (immutable snapshot)
+    + notify downstream systems (HR, time-clock) that schedule is final
+    + archive previous schedules for audit/history
+  }
+
+  class WhatIfSimulations {
+    + generate alternate schedules under different constraint weightings
+    + allow review without impacting the live published schedule
+  }
+
+}
+
+'====================================================
+' 4. Override & Exception Handling
+'====================================================
+package "Override & Exception Handling" {
+
+  class AROManagement {
+    + let supervisors force an employee to a specific station/period
+    + maintain a list of active ARO assignments (traceability)
+    + incorporate AROs into scheduling (treat as top-priority constraints)
+  }
+
+  class CallInHandling {
+    + record last-minute call-ins (absences) and veto those employees
+    + trigger re-scheduling or highlight open slots in published schedule
+    + queue backup/float employees to fill gaps
+  }
+
+  class RealTimeMonitoring {
+    + scan for rule violations (e.g., call-ins, no-shows)
+    + generate alerts (email/dashboard) if live schedule is breached
+  }
+
+  class ConflictDetection {
+    + detect conflicting overrides (e.g., two AROs for the same station)
+    + provide supervisors an interface to resolve manually or reprioritize
+  }
+
+}
+
+'====================================================
+' 5. User & Security Controls
+'====================================================
+package "User & Security Controls" {
+
+  class AuthZ {
+    + role-based access (Administrator, Supervisor, Viewer)
+    + granular permissions (who can edit rules, publish schedules, override assignments)
+  }
+
+  class AuditLogging {
+    + record who created/modified schedules, rules, or master data (timestamp, user ID)
+    + maintain an immutable trail for compliance (unions, regulatory)
+  }
+
+  class SessionPreferences {
+    + store user preferences (default shift view, notification settings)
+    + support multiple plants/sites with site-specific configurations
+  }
+
+}
+
+'====================================================
+' 6. Reporting & Analytics
+'====================================================
+package "Reporting & Analytics" {
+
+  class UtilizationReports {
+    + percent of workstations staffed per period
+    + employee utilization (assigned periods vs. available periods)
+  }
+
+  class FatigueAnalytics {
+    + distribution of high-fatigue assignments across employees
+    + detect imbalances or repeatedly undesirable assignments
+  }
+
+  class AdherenceTracking {
+    + compare planned schedule vs. actual attendance (via time-clock integration)
+    + flag chronically late or absent employees
+  }
+
+  class OvertimeEstimation {
+    + calculate projected overtime hours by period/employee
+    + estimate labor cost based on shift differentials, overtime premiums
+  }
+
+  class HistoricalForecasting {
+    + show schedule adherence trends over months
+    + feed into capacity planning (e.g., “Need 5 more line-trained employees next quarter”)
+  }
+
+}
+
+'====================================================
+' 7. Integrations & Data Exchange
+'====================================================
+package "Integrations & Data Exchange" {
+
+  class HRPayrollIntegration {
+    + sync employee roster, skills, hires/terminations
+    + export final schedules for payroll (hours worked, shift premiums)
+  }
+
+  class ERPIntegration {
+    + import production targets or takt times for throughput alignment
+    + push finalized staffing counts to Manufacturing Execution Systems (MES)
+  }
+
+  class TimeClockIntegration {
+    + fetch real-time clock-in/clock-out events to spot absenteeism
+    + reconcile actual attendance with planned schedule for adherence reports
+  }
+
+  class NotificationEngines {
+    + send email/SMS alerts on schedule publication, last-minute changes, coverage gaps
+  }
+
+}
+
+'====================================================
+' 8. Maintenance & Support
+'====================================================
+package "Maintenance & Support" {
+
+  class DataSeeding {
+    + seed initial teams, employees, workstations, and rules for a new plant
+    + import scripts (CSV/Excel) for migrating from legacy tools
+  }
+
+  class BackupRecovery {
+    + schedule regular database backups and define retention policies
+    + plan for high availability (failover databases if scheduler is down)
+  }
+
+  class ConfigManagement {
+    + version-control rule configurations and constraint weightings
+    + roll back to a prior rule-set if a new schedule causes floor issues
+  }
+
+  class HelpDocumentation {
+    + in-app help pages (explaining rule definitions, ARO workflows, call-in handling)
+    + training guides for supervisors on overrides and exception handling
+  }
+
+}
+
+@enduml

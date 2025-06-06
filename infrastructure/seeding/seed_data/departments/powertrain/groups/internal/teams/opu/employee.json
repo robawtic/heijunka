@@ -1,210 +1,206 @@
 {
   "employees": [
     {
-      "name": "Megan",
+      "name": "Christine",
       "role": "Team Leader",
       "known_stations": []
     },
     {
-      "name": "James",
+      "name": "Thomas",
       "role": "Backup",
       "known_stations": [
-        "OPU010",
         "OPU030",
         "OPU110",
-        "OPU120",
         "OPU140",
         "OPU150",
-        "OPU200",
-        "OPU210",
-        "OPU220",
+        "OPU170",
+        "OPU180",
+        "OPU190",
         "OPU240",
         "OPU250",
-        "OPU300"
+        "OPU280"
       ]
     },
     {
-      "name": "Lance",
-      "role": "Associate",
-      "known_stations": [
-        "OPU010",
-        "OPU220",
-        "OPU300",
-        "OPU120",
-        "OPU150",
-        "OPU030",
-        "OPU210",
-        "OPU240",
-        "OPU250",
-        "OPU200"
-      ]
-    },
-    {
-      "name": "Thomas",
-      "role": "Associate",
-      "known_stations": [
-        "OPU240",
-        "OPU010",
-        "OPU250",
-        "OPU140",
-        "OPU220",
-        "OPU200"
-      ]
-    },
-    {
-      "name": "Steven",
+      "name": "Brianna",
       "role": "Associate",
       "known_stations": [
         "OPU110",
-        "OPU120",
-        "OPU030",
+        "OPU140",
+        "OPU170",
         "OPU240",
-        "OPU140",
-        "OPU150",
-        "OPU220"
-      ]
-    },
-    {
-      "name": "Jerry",
-      "role": "Associate",
-      "known_stations": [
-        "OPU210",
-        "OPU220",
-        "OPU140",
-        "OPU010",
-        "OPU300"
-      ]
-    },
-    {
-      "name": "Michelle",
-      "role": "Associate",
-      "known_stations": [
-        "OPU010",
-        "OPU110",
-        "OPU210",
-        "OPU150",
-        "OPU220",
-        "OPU120",
-        "OPU250",
-        "OPU300",
-        "OPU140",
-        "OPU240",
-        "OPU030",
-        "OPU200"
-      ]
-    },
-    {
-      "name": "Daniel",
-      "role": "Associate",
-      "known_stations": [
-        "OPU110",
-        "OPU010",
-        "OPU120",
+        "OPU280",
+        "OPU190",
+        "OPU180",
         "OPU250",
         "OPU150",
-        "OPU220",
-        "OPU140",
         "OPU030"
       ]
     },
     {
-      "name": "Edwin",
+      "name": "Meghan",
       "role": "Associate",
       "known_stations": [
-        "OPU200",
-        "OPU210",
+        "OPU280",
+        "OPU140",
+        "OPU180",
+        "OPU240",
+        "OPU170",
+        "OPU150",
+        "OPU190",
+        "OPU110",
+        "OPU030"
+      ]
+    },
+    {
+      "name": "Rachel",
+      "role": "Associate",
+      "known_stations": [
         "OPU250",
-        "OPU300",
+        "OPU030",
+        "OPU240",
+        "OPU280",
+        "OPU190",
+        "OPU170",
+        "OPU110",
+        "OPU180",
+        "OPU140",
+        "OPU150"
+      ]
+    },
+    {
+      "name": "Randall",
+      "role": "Associate",
+      "known_stations": [
+        "OPU280",
+        "OPU140",
+        "OPU170",
+        "OPU110",
+        "OPU190",
+        "OPU240",
+        "OPU250",
+        "OPU150",
+        "OPU030",
+        "OPU180"
+      ]
+    },
+    {
+      "name": "Patricia",
+      "role": "Associate",
+      "known_stations": [
+        "OPU110",
+        "OPU030",
+        "OPU250",
+        "OPU150",
+        "OPU240",
+        "OPU140",
+        "OPU280",
+        "OPU170",
+        "OPU190"
+      ]
+    },
+    {
+      "name": "Howard",
+      "role": "Associate",
+      "known_stations": [
+        "OPU250",
+        "OPU110",
+        "OPU140",
+        "OPU030",
+        "OPU150",
+        "OPU190",
+        "OPU240",
+        "OPU280",
+        "OPU180"
+      ]
+    },
+    {
+      "name": "Lauren",
+      "role": "Associate",
+      "known_stations": [
+        "OPU170",
+        "OPU150",
+        "OPU140",
+        "OPU240",
+        "OPU190",
+        "OPU030",
+        "OPU180",
+        "OPU250",
         "OPU110"
       ]
     },
     {
-      "name": "Vanessa",
+      "name": "Larry",
       "role": "Associate",
       "known_stations": [
+        "OPU190",
         "OPU250",
-        "OPU030",
-        "OPU200",
-        "OPU010"
-      ]
-    },
-    {
-      "name": "Robert",
-      "role": "Associate",
-      "known_stations": [
-        "OPU220",
-        "OPU210",
-        "OPU150",
-        "OPU240",
-        "OPU300",
-        "OPU250"
-      ]
-    },
-    {
-      "name": "Jason",
-      "role": "Associate",
-      "known_stations": [
         "OPU110",
         "OPU150",
-        "OPU200"
-      ]
-    },
-    {
-      "name": "Jessica",
-      "role": "Associate",
-      "known_stations": [
-        "OPU200",
-        "OPU030",
-        "OPU250",
-        "OPU010",
-        "OPU220",
-        "OPU110",
-        "OPU150",
-        "OPU120",
-        "OPU300",
-        "OPU210"
-      ]
-    },
-    {
-      "name": "Crystal",
-      "role": "Associate",
-      "known_stations": [
-        "OPU120",
-        "OPU300",
+        "OPU280",
+        "OPU140",
         "OPU240",
-        "OPU220",
         "OPU030"
       ]
     },
     {
-      "name": "Amy",
+      "name": "Jennifer",
       "role": "Associate",
       "known_stations": [
+        "OPU280",
         "OPU030",
-        "OPU010",
-        "OPU250",
-        "OPU300",
         "OPU240",
-        "OPU120",
-        "OPU200"
+        "OPU150",
+        "OPU190",
+        "OPU250",
+        "OPU140",
+        "OPU170",
+        "OPU110"
       ]
     },
     {
-      "name": "John",
+      "name": "Danny",
       "role": "Associate",
       "known_stations": [
-        "OPU300",
-        "OPU030",
-        "OPU150",
-        "OPU010",
-        "OPU240",
-        "OPU120",
+        "OPU190",
         "OPU140",
-        "OPU210",
-        "OPU200",
-        "OPU220",
         "OPU110",
-        "OPU250"
+        "OPU030",
+        "OPU180",
+        "OPU250",
+        "OPU240",
+        "OPU280"
+      ]
+    },
+    {
+      "name": "Kayla",
+      "role": "Associate",
+      "known_stations": [
+        "OPU170",
+        "OPU150",
+        "OPU110",
+        "OPU240",
+        "OPU140",
+        "OPU180",
+        "OPU190",
+        "OPU250",
+        "OPU030"
+      ]
+    },
+    {
+      "name": "Lisa",
+      "role": "Associate",
+      "known_stations": [
+        "OPU170",
+        "OPU150",
+        "OPU280",
+        "OPU140",
+        "OPU030",
+        "OPU110",
+        "OPU180",
+        "OPU240",
+        "OPU250",
+        "OPU190"
       ]
     }
   ]

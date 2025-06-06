@@ -1,43 +1,34 @@
 {
   "workstations": [
     {
+      "name": "HEA060"
+    },
+    {
       "name": "HEA080"
     },
     {
       "name": "HEA090"
     },
     {
-      "name": "HEA100"
+      "name": "HEA110"
     },
     {
-      "name": "HEA120"
-    },
-    {
-      "name": "HEA130"
+      "name": "HEA150"
     },
     {
       "name": "HEA180"
     },
     {
-      "name": "HEA190"
-    },
-    {
       "name": "HEA200"
     },
     {
-      "name": "HEA240"
-    },
-    {
-      "name": "HEA250"
+      "name": "HEA230"
     },
     {
       "name": "HEA260"
     },
     {
-      "name": "HEA290"
-    },
-    {
-      "name": "HEA300"
+      "name": "HEA280"
     }
   ]
 }

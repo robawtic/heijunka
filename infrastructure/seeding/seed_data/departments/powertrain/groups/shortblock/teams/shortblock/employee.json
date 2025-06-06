@@ -1,158 +1,236 @@
 {
   "employees": [
     {
-      "name": "Renee",
+      "name": "Sean",
       "role": "Team Leader",
       "known_stations": []
     },
     {
-      "name": "Victoria",
+      "name": "Jason",
       "role": "Backup",
       "known_stations": [
-        "SB030",
-        "SB050",
+        "SB010",
+        "SB070",
         "SB100",
-        "SB110",
-        "SB170",
-        "SB230",
-        "SB250",
-        "SB290",
-        "SB300"
+        "SB130",
+        "SB150",
+        "SB160",
+        "SB180",
+        "SB190",
+        "SB200",
+        "SB260",
+        "SB270"
       ]
     },
     {
-      "name": "Claire",
+      "name": "Carmen",
       "role": "Associate",
       "known_stations": [
-        "SB290",
-        "SB050",
-        "SB170",
-        "SB100",
-        "SB110",
-        "SB030",
-        "SB300",
-        "SB230",
-        "SB250"
-      ]
-    },
-    {
-      "name": "Thomas",
-      "role": "Associate",
-      "known_stations": [
-        "SB170",
-        "SB250",
-        "SB230",
-        "SB300",
-        "SB100",
-        "SB290"
-      ]
-    },
-    {
-      "name": "Alicia",
-      "role": "Associate",
-      "known_stations": [
-        "SB110",
-        "SB100",
-        "SB030",
-        "SB290",
-        "SB230",
-        "SB300",
-        "SB250"
-      ]
-    },
-    {
-      "name": "Lauren",
-      "role": "Associate",
-      "known_stations": [
-        "SB250",
-        "SB300",
-        "SB170"
-      ]
-    },
-    {
-      "name": "Rachel",
-      "role": "Associate",
-      "known_stations": [
-        "SB050",
-        "SB170",
-        "SB290"
-      ]
-    },
-    {
-      "name": "Nichole",
-      "role": "Associate",
-      "known_stations": [
-        "SB050",
-        "SB030",
-        "SB300",
-        "SB100",
-        "SB290",
-        "SB230",
-        "SB110",
-        "SB170",
-        "SB250"
-      ]
-    },
-    {
-      "name": "Lynn",
-      "role": "Associate",
-      "known_stations": [
-        "SB290",
-        "SB030",
-        "SB300",
-        "SB050",
-        "SB100",
-        "SB170",
-        "SB250",
-        "SB110"
-      ]
-    },
-    {
-      "name": "Eric",
-      "role": "Associate",
-      "known_stations": [
-        "SB300",
-        "SB030",
-        "SB050",
-        "SB290",
-        "SB170",
-        "SB110",
-        "SB250",
+        "SB070",
+        "SB180",
+        "SB200",
+        "SB260",
+        "SB160",
+        "SB130",
+        "SB010",
+        "SB190",
+        "SB270",
         "SB100"
       ]
     },
     {
-      "name": "Tammy",
+      "name": "Daniel",
       "role": "Associate",
       "known_stations": [
-        "SB230",
-        "SB030",
-        "SB110",
-        "SB250",
-        "SB300"
-      ]
-    },
-    {
-      "name": "John",
-      "role": "Associate",
-      "known_stations": [
-        "SB230",
-        "SB290",
-        "SB110"
-      ]
-    },
-    {
-      "name": "Melanie",
-      "role": "Associate",
-      "known_stations": [
-        "SB250",
-        "SB290",
-        "SB170",
-        "SB230",
-        "SB300",
-        "SB030",
+        "SB260",
+        "SB070",
+        "SB010",
+        "SB200",
+        "SB150",
+        "SB130",
+        "SB160",
         "SB100",
-        "SB110"
+        "SB270",
+        "SB190"
+      ]
+    },
+    {
+      "name": "Laura",
+      "role": "Associate",
+      "known_stations": [
+        "SB070",
+        "SB200",
+        "SB130",
+        "SB150",
+        "SB100",
+        "SB190",
+        "SB180",
+        "SB010",
+        "SB260",
+        "SB160"
+      ]
+    },
+    {
+      "name": "Lisa",
+      "role": "Associate",
+      "known_stations": [
+        "SB160",
+        "SB190",
+        "SB070",
+        "SB130",
+        "SB150",
+        "SB010",
+        "SB180",
+        "SB200",
+        "SB260",
+        "SB270",
+        "SB100"
+      ]
+    },
+    {
+      "name": "Melissa",
+      "role": "Associate",
+      "known_stations": [
+        "SB150",
+        "SB010",
+        "SB160",
+        "SB130",
+        "SB260",
+        "SB190",
+        "SB070",
+        "SB100",
+        "SB270"
+      ]
+    },
+    {
+      "name": "Shannon",
+      "role": "Associate",
+      "known_stations": [
+        "SB270",
+        "SB160",
+        "SB010",
+        "SB190",
+        "SB200",
+        "SB100",
+        "SB260",
+        "SB130",
+        "SB180",
+        "SB150",
+        "SB070"
+      ]
+    },
+    {
+      "name": "Daniel",
+      "role": "Associate",
+      "known_stations": [
+        "SB270",
+        "SB130",
+        "SB150",
+        "SB100",
+        "SB070",
+        "SB180",
+        "SB260",
+        "SB190",
+        "SB010",
+        "SB160"
+      ]
+    },
+    {
+      "name": "Jeffrey",
+      "role": "Associate",
+      "known_stations": [
+        "SB070",
+        "SB150",
+        "SB190",
+        "SB200",
+        "SB260",
+        "SB010",
+        "SB160",
+        "SB270",
+        "SB100",
+        "SB180"
+      ]
+    },
+    {
+      "name": "Tyler",
+      "role": "Associate",
+      "known_stations": [
+        "SB190",
+        "SB100",
+        "SB130",
+        "SB180",
+        "SB160",
+        "SB070",
+        "SB150",
+        "SB270",
+        "SB200",
+        "SB010",
+        "SB260"
+      ]
+    },
+    {
+      "name": "Olivia",
+      "role": "Associate",
+      "known_stations": [
+        "SB130",
+        "SB010",
+        "SB150",
+        "SB070",
+        "SB180",
+        "SB200",
+        "SB100",
+        "SB160",
+        "SB260",
+        "SB190"
+      ]
+    },
+    {
+      "name": "Barry",
+      "role": "Associate",
+      "known_stations": [
+        "SB130",
+        "SB150",
+        "SB260",
+        "SB270",
+        "SB160",
+        "SB010",
+        "SB200",
+        "SB100",
+        "SB190",
+        "SB070",
+        "SB180"
+      ]
+    },
+    {
+      "name": "Pamela",
+      "role": "Associate",
+      "known_stations": [
+        "SB130",
+        "SB260",
+        "SB200",
+        "SB180",
+        "SB190",
+        "SB150",
+        "SB270",
+        "SB070",
+        "SB160",
+        "SB100",
+        "SB010"
+      ]
+    },
+    {
+      "name": "Jonathan",
+      "role": "Associate",
+      "known_stations": [
+        "SB130",
+        "SB100",
+        "SB070",
+        "SB200",
+        "SB190",
+        "SB010",
+        "SB180",
+        "SB160",
+        "SB150"
       ]
     }
   ]

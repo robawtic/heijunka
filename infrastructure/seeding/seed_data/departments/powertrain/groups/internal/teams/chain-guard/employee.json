@@ -1,242 +1,131 @@
 {
   "employees": [
     {
-      "name": "Karina",
+      "name": "April",
       "role": "Team Leader",
       "known_stations": []
     },
     {
-      "name": "Jason",
+      "name": "Jasmin",
       "role": "Backup",
       "known_stations": [
-        "CHA020",
         "CHA030",
-        "CHA060",
-        "CHA090",
-        "CHA120",
-        "CHA130",
+        "CHA100",
         "CHA140",
         "CHA150",
-        "CHA200",
-        "CHA210",
-        "CHA250",
-        "CHA270"
+        "CHA170",
+        "CHA180",
+        "CHA280"
       ]
     },
     {
-      "name": "Paul",
+      "name": "Denise",
       "role": "Associate",
       "known_stations": [
-        "CHA140",
-        "CHA020",
-        "CHA250",
-        "CHA200",
+        "CHA180",
+        "CHA150",
+        "CHA170",
+        "CHA280",
         "CHA030",
-        "CHA130",
-        "CHA090",
-        "CHA060",
-        "CHA120",
-        "CHA270"
+        "CHA140",
+        "CHA100"
       ]
     },
     {
-      "name": "Christopher",
+      "name": "John",
       "role": "Associate",
       "known_stations": [
-        "CHA210",
-        "CHA060",
-        "CHA130",
-        "CHA250",
-        "CHA150",
-        "CHA120",
+        "CHA170",
+        "CHA030",
+        "CHA100",
         "CHA140",
-        "CHA270"
+        "CHA280",
+        "CHA180",
+        "CHA150"
       ]
     },
     {
-      "name": "Ronald",
+      "name": "Michael",
       "role": "Associate",
       "known_stations": [
-        "CHA120",
-        "CHA130",
-        "CHA200",
-        "CHA250",
-        "CHA210",
-        "CHA090",
+        "CHA180",
+        "CHA140",
         "CHA030",
+        "CHA280",
+        "CHA100",
         "CHA150",
-        "CHA020",
-        "CHA270"
+        "CHA170"
       ]
     },
     {
-      "name": "Sara",
+      "name": "Thomas",
       "role": "Associate",
       "known_stations": [
-        "CHA270",
-        "CHA140",
         "CHA030",
-        "CHA250",
-        "CHA020",
-        "CHA200",
-        "CHA090",
-        "CHA120",
-        "CHA130",
-        "CHA150",
-        "CHA210",
-        "CHA060"
+        "CHA140",
+        "CHA100",
+        "CHA280",
+        "CHA170"
       ]
     },
     {
       "name": "Robert",
       "role": "Associate",
       "known_stations": [
-        "CHA020",
-        "CHA030",
-        "CHA150",
-        "CHA270",
-        "CHA120",
-        "CHA130",
-        "CHA060",
-        "CHA090",
-        "CHA250",
         "CHA140",
-        "CHA210",
-        "CHA200"
+        "CHA150",
+        "CHA170",
+        "CHA280",
+        "CHA180",
+        "CHA030"
       ]
     },
     {
-      "name": "Mary",
+      "name": "Gregory",
       "role": "Associate",
       "known_stations": [
-        "CHA020",
+        "CHA170",
         "CHA140",
-        "CHA060",
-        "CHA250",
-        "CHA210",
-        "CHA130",
+        "CHA180",
+        "CHA280",
         "CHA030",
-        "CHA120",
-        "CHA090",
-        "CHA270",
+        "CHA100"
+      ]
+    },
+    {
+      "name": "Julia",
+      "role": "Associate",
+      "known_stations": [
+        "CHA170",
+        "CHA140",
+        "CHA030",
+        "CHA280",
+        "CHA100",
+        "CHA180",
         "CHA150"
       ]
     },
     {
-      "name": "Lauren",
+      "name": "Benjamin",
       "role": "Associate",
       "known_stations": [
-        "CHA130",
-        "CHA020",
-        "CHA200",
         "CHA030",
-        "CHA250",
-        "CHA090"
+        "CHA280",
+        "CHA170",
+        "CHA180",
+        "CHA100",
+        "CHA150"
       ]
     },
     {
-      "name": "Steve",
+      "name": "Connie",
       "role": "Associate",
       "known_stations": [
-        "CHA250",
-        "CHA270",
-        "CHA090",
-        "CHA060",
-        "CHA020",
-        "CHA150",
-        "CHA200",
-        "CHA030",
-        "CHA120",
-        "CHA140"
-      ]
-    },
-    {
-      "name": "Shawn",
-      "role": "Associate",
-      "known_stations": [
-        "CHA270",
-        "CHA060",
-        "CHA140",
-        "CHA130",
-        "CHA020"
-      ]
-    },
-    {
-      "name": "Alison",
-      "role": "Associate",
-      "known_stations": [
-        "CHA120",
-        "CHA150",
-        "CHA210",
-        "CHA020",
-        "CHA250",
-        "CHA030",
-        "CHA270",
-        "CHA200",
-        "CHA130",
-        "CHA060",
-        "CHA140",
-        "CHA090"
-      ]
-    },
-    {
-      "name": "Elizabeth",
-      "role": "Associate",
-      "known_stations": [
-        "CHA200",
-        "CHA250",
-        "CHA140",
-        "CHA210",
-        "CHA270",
-        "CHA030",
-        "CHA090",
-        "CHA020",
-        "CHA130",
-        "CHA060",
-        "CHA120"
-      ]
-    },
-    {
-      "name": "Jennifer",
-      "role": "Associate",
-      "known_stations": [
-        "CHA210",
-        "CHA140",
-        "CHA030",
-        "CHA130",
-        "CHA120",
-        "CHA270",
-        "CHA150",
-        "CHA020",
-        "CHA090"
-      ]
-    },
-    {
-      "name": "Shannon",
-      "role": "Associate",
-      "known_stations": [
-        "CHA210",
-        "CHA020",
-        "CHA200",
-        "CHA060"
-      ]
-    },
-    {
-      "name": "Jon",
-      "role": "Associate",
-      "known_stations": [
-        "CHA130",
-        "CHA120",
-        "CHA250",
-        "CHA060",
-        "CHA090",
-        "CHA030",
-        "CHA270",
-        "CHA210",
-        "CHA200",
-        "CHA020",
-        "CHA150",
-        "CHA140"
+        "CHA280",
+        "CHA180",
+        "CHA100",
+        "CHA170",
+        "CHA150"
       ]
     }
   ]

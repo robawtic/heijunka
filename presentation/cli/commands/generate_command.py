@@ -393,7 +393,24 @@ def handle_generate(
                     # Need AROs - keep trying until we have enough or run out of options
                     while len(roster_ids) < len(workstations):
                         try:
-                            aro_candidate = aro_service.get_aro(team_id, period, start_date)
+                            # Find empty workstations for this team
+                            empty_workstations = []
+                            for ws in workstations:
+                                # Check if this workstation is already assigned to an employee
+                                is_assigned = False
+                                for emp_id in roster_ids:
+                                    if emp_id in employees_by_id:
+                                        emp = employees_by_id[emp_id]
+                                        if emp.can_work(ws) and emp.can_handle_workstation_type(ws):
+                                            is_assigned = True
+                                            break
+
+                                # If not assigned, add to empty workstations list
+                                if not is_assigned:
+                                    empty_workstations.append(ws)
+
+                            # Get ARO candidate considering empty workstations
+                            aro_candidate = aro_service.get_aro(team_id, period, start_date, empty_workstations)
                             if not aro_candidate:
                                 logger.warning(
                                     f"No ARO candidate available for team '{team.name}' period {period}", 
@@ -572,15 +589,15 @@ def handle_generate(
         print(f"\nPerformance: {query_count} queries executed in {execution_time:.2f} seconds")
         print(f"Generated {len(all_assignments)} assignments for {len(teams)} teams using batch processing")
 
-        # Display results
+        # Display the generated schedules
         display_generation_results(
-            all_assignments, 
-            teams, 
-            team_repository, 
-            employee_repository, 
-            workstation_repository, 
-            args, 
-            work_history_repository, 
+            all_assignments,
+            teams,
+            team_repository,
+            employee_repository,
+            workstation_repository,
+            args,
+            work_history_repository,
             start_date,
             aro_assignments_by_team,
             aro_assignments_by_team_period,
