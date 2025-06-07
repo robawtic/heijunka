@@ -82,10 +82,24 @@ class SecureLogFilter(logging.Filter):
             original_msg = record.msg
             # Redact the message
             result = redact_log_message(record.msg)
-            record.msg = result.message
+
+            # Store the redacted message in a new attribute instead of overwriting msg
+            record.redacted_message = result.message
+
+            # Use getMessage to get the formatted message with args applied
+            if hasattr(record, 'args') and record.args:
+                # If record has args, we need to format the message with them
+                try:
+                    record.redacted_message = record.redacted_message % record.args
+                except:
+                    # If formatting fails, just use the redacted message as is
+                    pass
+
+            # Replace the original message with the redacted one
+            record._message = record.redacted_message
 
             # Add redacted flag if message was changed
-            if record.msg != original_msg:
+            if result.message != original_msg:
                 record.redacted = True
                 # Add redacted fields to the record
                 record.redacted_fields = result.redacted_fields

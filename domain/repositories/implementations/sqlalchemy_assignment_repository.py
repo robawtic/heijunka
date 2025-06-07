@@ -68,8 +68,9 @@ class SqlAlchemyAssignmentRepository(BaseSqlAlchemyRepository[WorkAssignment, Em
             for model in models:
                 self.rate_limited_logger.debug(
                     f"Converting EmployeeWorkHistoryModel [id={model.id}] to domain WorkAssignment",
+                    event_type="model_to_domain_conversion",
+                    identifier=str(model.id),
                     extra={
-                        "event_type": "model_to_domain_conversion",
                         "entity_id": model.id
                     }
                 )
@@ -134,8 +135,9 @@ class SqlAlchemyAssignmentRepository(BaseSqlAlchemyRepository[WorkAssignment, Em
 
             self.rate_limited_logger.debug(
                 f"Converting EmployeeWorkHistoryModel [id={model.id}] to domain WorkAssignment",
+                event_type="model_to_domain_conversion",
+                identifier=str(model.id),
                 extra={
-                    "event_type": "model_to_domain_conversion",
                     "entity_id": model.id
                 }
             )
@@ -179,8 +181,9 @@ class SqlAlchemyAssignmentRepository(BaseSqlAlchemyRepository[WorkAssignment, Em
             with self.session_scope() as session:
                 self.rate_limited_logger.debug(
                     "Converting WorkAssignment to EmployeeWorkHistoryModel",
+                    event_type="domain_to_model_conversion",
+                    identifier=str(assignment.employee.id),
                     extra={
-                        "event_type": "domain_to_model_conversion",
                         "employee_id": assignment.employee.id,
                         "workstation_id": assignment.workstation.id
                     }
@@ -202,8 +205,9 @@ class SqlAlchemyAssignmentRepository(BaseSqlAlchemyRepository[WorkAssignment, Em
                 # Convert back to domain entity with updated metadata
                 self.rate_limited_logger.debug(
                     f"Converting EmployeeWorkHistoryModel [id={model.id}] to domain WorkAssignment",
+                    event_type="model_to_domain_conversion",
+                    identifier=str(model.id),
                     extra={
-                        "event_type": "model_to_domain_conversion",
                         "entity_id": model.id
                     }
                 )
@@ -280,8 +284,9 @@ class SqlAlchemyAssignmentRepository(BaseSqlAlchemyRepository[WorkAssignment, Em
 
                 self.rate_limited_logger.debug(
                     f"Updating EmployeeWorkHistoryModel [id={model.id}] from domain WorkAssignment",
+                    event_type="model_update",
+                    identifier=str(model.id),
                     extra={
-                        "event_type": "model_update",
                         "entity_id": model.id
                     }
                 )
@@ -297,8 +302,9 @@ class SqlAlchemyAssignmentRepository(BaseSqlAlchemyRepository[WorkAssignment, Em
 
                 self.rate_limited_logger.debug(
                     f"Converting EmployeeWorkHistoryModel [id={model.id}] to domain WorkAssignment",
+                    event_type="model_to_domain_conversion",
+                    identifier=str(model.id),
                     extra={
-                        "event_type": "model_to_domain_conversion",
                         "entity_id": model.id
                     }
                 )
@@ -419,8 +425,9 @@ class SqlAlchemyAssignmentRepository(BaseSqlAlchemyRepository[WorkAssignment, Em
             for model in models:
                 self.rate_limited_logger.debug(
                     f"Converting EmployeeWorkHistoryModel [id={model.id}] to domain WorkAssignment",
+                    event_type="model_to_domain_conversion",
+                    identifier=str(model.id),
                     extra={
-                        "event_type": "model_to_domain_conversion",
                         "entity_id": model.id
                     }
                 )
@@ -480,8 +487,9 @@ class SqlAlchemyAssignmentRepository(BaseSqlAlchemyRepository[WorkAssignment, Em
             for model in models:
                 self.rate_limited_logger.debug(
                     f"Converting EmployeeWorkHistoryModel [id={model.id}] to domain WorkAssignment",
+                    event_type="model_to_domain_conversion",
+                    identifier=str(model.id),
                     extra={
-                        "event_type": "model_to_domain_conversion",
                         "entity_id": model.id
                     }
                 )
@@ -541,8 +549,9 @@ class SqlAlchemyAssignmentRepository(BaseSqlAlchemyRepository[WorkAssignment, Em
             for model in models:
                 self.rate_limited_logger.debug(
                     f"Converting EmployeeWorkHistoryModel [id={model.id}] to domain WorkAssignment",
+                    event_type="model_to_domain_conversion",
+                    identifier=str(model.id),
                     extra={
-                        "event_type": "model_to_domain_conversion",
                         "entity_id": model.id
                     }
                 )
@@ -603,8 +612,9 @@ class SqlAlchemyAssignmentRepository(BaseSqlAlchemyRepository[WorkAssignment, Em
             for model in models:
                 self.rate_limited_logger.debug(
                     f"Converting EmployeeWorkHistoryModel [id={model.id}] to domain WorkAssignment",
+                    event_type="model_to_domain_conversion",
+                    identifier=str(model.id),
                     extra={
-                        "event_type": "model_to_domain_conversion",
                         "entity_id": model.id
                     }
                 )
@@ -670,8 +680,9 @@ class SqlAlchemyAssignmentRepository(BaseSqlAlchemyRepository[WorkAssignment, Em
             for model in models:
                 self.rate_limited_logger.debug(
                     f"Converting EmployeeWorkHistoryModel [id={model.id}] to domain WorkAssignment",
+                    event_type="model_to_domain_conversion",
+                    identifier=str(model.id),
                     extra={
-                        "event_type": "model_to_domain_conversion",
                         "entity_id": model.id
                     }
                 )
@@ -738,8 +749,9 @@ class SqlAlchemyAssignmentRepository(BaseSqlAlchemyRepository[WorkAssignment, Em
             for model in models:
                 self.rate_limited_logger.debug(
                     f"Converting EmployeeWorkHistoryModel [id={model.id}] to domain WorkAssignment",
+                    event_type="model_to_domain_conversion",
+                    identifier=str(model.id),
                     extra={
-                        "event_type": "model_to_domain_conversion",
                         "entity_id": model.id
                     }
                 )
@@ -808,8 +820,9 @@ class SqlAlchemyAssignmentRepository(BaseSqlAlchemyRepository[WorkAssignment, Em
             for model in models:
                 self.rate_limited_logger.debug(
                     f"Converting EmployeeWorkHistoryModel [id={model.id}] to domain WorkAssignment",
+                    event_type="model_to_domain_conversion",
+                    identifier=str(model.id),
                     extra={
-                        "event_type": "model_to_domain_conversion",
                         "entity_id": model.id
                     }
                 )
@@ -905,8 +918,9 @@ class SqlAlchemyAssignmentRepository(BaseSqlAlchemyRepository[WorkAssignment, Em
                         # Convert to model
                         self.rate_limited_logger.debug(
                             "Converting WorkAssignment to EmployeeWorkHistoryModel",
+                            event_type="domain_to_model_conversion",
+                            identifier=str(assignment.employee.id),
                             extra={
-                                "event_type": "domain_to_model_conversion",
                                 "employee_id": assignment.employee.id,
                                 "workstation_id": assignment.workstation.id
                             }

@@ -33,6 +33,7 @@ class RuleContext:
     employee_offline_periods: Optional[Dict[str, Set[int]]] = None  # Dict of employee name -> set of periods when offline
     employee_history_repo: Optional[EmployeeWorkHistoryRepositoryInterface] = None  # Repository for employee work history
     aro_data: Optional[Dict] = None  # Dictionary of ARO assignments by employee and period
+    current_period: Optional[int] = None  # The current period being processed (1-indexed)
 
     def __post_init__(self):
         """Initialize any collections that might be None."""

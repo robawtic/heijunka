@@ -60,7 +60,8 @@ class CPModelBuilder:
                 periods=1,  # We're only solving for one period at a time
                 start_date=start_date,
                 # Add any other data needed by rules
-                aro_data=aro_data
+                aro_data=aro_data,
+                current_period=period  # Pass the current period being processed
             )
 
             # Apply each rule to the context
