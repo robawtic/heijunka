@@ -63,6 +63,8 @@ class TestRuleContext(unittest.TestCase):
         # Verify that collections are initialized to empty
         self.assertEqual(ctx.offline_periods, {})
         self.assertEqual(ctx.scheduled, [])
+        self.assertEqual(ctx.employee_offline_periods, {})
+        self.assertEqual(ctx.aro_data, {})
 
     def test_headsub_rule_context(self):
         """Test that HeadsubRuleContext initializes correctly."""

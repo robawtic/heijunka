@@ -50,8 +50,8 @@ class Settings(BaseSettings):
     lookback: int = Field(3, env="LOOKBACK")
 
     # Logging settings
-    log_level: str = Field("CRITICAL", env="LOG_LEVEL")
-    redaction_level: str = Field("high", env="REDACTION_LEVEL")  # Options: "none", "low", "high"
+    log_level: str = Field("WARNING", env="LOG_LEVEL")
+    redaction_level: str = Field("none", env="REDACTION_LEVEL")  # Options: "none", "low", "high"
     include_redacted_metadata: bool = Field(False, env="LOG_INCLUDE_REDACTED_METADATA")
     log_dir: str = Field("logs", env="LOG_DIR")
     max_log_size_mb: int = Field(10, env="MAX_LOG_SIZE_MB")

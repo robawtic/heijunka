@@ -225,6 +225,16 @@ class Schedule:
         if prefetched_data and 'aro_assignments_by_employee' in prefetched_data:
             aro_data = prefetched_data['aro_assignments_by_employee']
 
+        # Get team name if available
+        team_name = None
+        if team_repository:
+            try:
+                team = team_repository.get(self.team_id)
+                if team:
+                    team_name = team.name
+            except Exception as e:
+                logger.warning(f"Could not get team name for team ID {self.team_id}: {str(e)}")
+
         # Generate assignments for each period
         all_assignments = []
         for period in range(1, self.periods_per_day + 1):
@@ -235,7 +245,8 @@ class Schedule:
                 period=period,
                 team_id=self.team_id,
                 start_date=self.start_date,
-                aro_data=aro_data
+                aro_data=aro_data,
+                team_name=team_name
             )
 
             if period_assignments:

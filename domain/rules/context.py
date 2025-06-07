@@ -32,6 +32,7 @@ class RuleContext:
     call_ins: Optional[List[str]] = None  # List of employee names who called in (unavailable)
     employee_offline_periods: Optional[Dict[str, Set[int]]] = None  # Dict of employee name -> set of periods when offline
     employee_history_repo: Optional[EmployeeWorkHistoryRepositoryInterface] = None  # Repository for employee work history
+    aro_data: Optional[Dict] = None  # Dictionary of ARO assignments by employee and period
 
     def __post_init__(self):
         """Initialize any collections that might be None."""
@@ -41,6 +42,8 @@ class RuleContext:
             self.scheduled = []
         if self.employee_offline_periods is None:
             self.employee_offline_periods = {}
+        if self.aro_data is None:
+            self.aro_data = {}
 
 
 # Team-specific context classes
@@ -113,6 +116,7 @@ def adapt_rule(rule_func: Callable) -> Callable[[RuleContext], Any]:
             'call_ins': ctx.call_ins,
             'employee_offline_periods': ctx.employee_offline_periods,
             'employee_history_repo': ctx.employee_history_repo,
+            'aro_data': ctx.aro_data,
             # Add more mappings as needed
         }
 

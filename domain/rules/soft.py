@@ -178,7 +178,7 @@ def add_lookback_same_period_penalties(ctx: RuleContext):
     return penalties
 
 
-@rule_metadata(uses=["model", "assign", "employees", "workstations", "periods", "start_date"])
+@rule_metadata(uses=["model", "assign", "employees", "workstations", "periods", "start_date", "aro_data"])
 def add_aro_reassignment_penalties(ctx: RuleContext):
     """
     Penalize reassigning employees who are already assigned as AROs.
@@ -197,7 +197,7 @@ def add_aro_reassignment_penalties(ctx: RuleContext):
     start_date = ctx.start_date
 
     # High weight for ARO reassignment penalties
-    weight = 5000  # Higher than other soft constraints
+    weight = 1  # Higher than other soft constraints
 
     penalties = []
 

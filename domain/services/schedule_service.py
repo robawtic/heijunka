@@ -326,7 +326,8 @@ class ScheduleService:
                 period=period,
                 team_id=team_id,
                 start_date=start_date,
-                aro_data=aro_data
+                aro_data=aro_data,
+                team_name=team_name
             )
 
             if assignments:

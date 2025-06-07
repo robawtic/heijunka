@@ -31,11 +31,13 @@ COMMON_HARD_RULES = [
 ]
 
 COMMON_SOFT_RULES = [
+    """
     add_same_day_repeat_penalties,
     add_lookback_any_period_penalties,
     add_lookback_same_period_penalties,
     add_aro_reassignment_penalties,
     # ...add more
+    """
 ]
 
 
