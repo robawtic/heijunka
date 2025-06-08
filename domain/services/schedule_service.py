@@ -191,7 +191,7 @@ class ScheduleService:
                           force_complete: bool = False, session: Any = None, team_repository: Optional[Any] = None,
                           aro_assignment_repository: Optional[Any] = None, schedule_repository: Optional[Any] = None,
                           aro_service: Optional[Any] = None, aro_graph_service: Optional[Any] = None,
-                          prefetched_data: Optional[Dict] = None) -> WorkAssignments:
+                          prefetched_data: Optional[Dict] = None, employee_history_repo: Optional[Any] = None) -> WorkAssignments:
         """
         Generate a schedule for the given employees, workstations, and time period
 
@@ -217,6 +217,7 @@ class ScheduleService:
             aro_service: Optional ARO service for finding and assigning AROs
             aro_graph_service: Optional ARO graph service for optimizing ARO assignments
             prefetched_data: Optional dictionary containing prefetched data to avoid database queries
+            employee_history_repo: Optional repository for employee work history (required for same-day repeat penalties)
 
         Returns:
             List of work assignments
@@ -256,7 +257,8 @@ class ScheduleService:
             team_repository=team_repository,
             aro_service=aro_service,
             aro_graph_service=aro_graph_service,
-            prefetched_data=prefetched_data
+            prefetched_data=prefetched_data,
+            employee_history_repo=employee_history_repo
         )
 
         # Update schedule status based on generation result
@@ -278,7 +280,7 @@ class ScheduleService:
             logger.warning(f"No solution found. Error: {schedule.error_message}")
             return []
 
-    def generate_period_schedule(self, team_id: int, cp_input: Dict) -> WorkAssignments:
+    def generate_period_schedule(self, team_id: int, cp_input: Dict, employee_history_repo=None) -> WorkAssignments:
         """
         Generate a schedule for a specific team and period.
 
@@ -294,6 +296,7 @@ class ScheduleService:
                 - start_date: The date of the schedule
                 - aro_data: Dictionary of ARO assignments by employee and period
                 - teams_by_id: Dictionary of teams by ID (optional)
+            employee_history_repo: Optional repository for employee work history (required for same-day repeat penalties)
 
         Returns:
             List of work assignments for the specified team and period
@@ -327,7 +330,8 @@ class ScheduleService:
                 team_id=team_id,
                 start_date=start_date,
                 aro_data=aro_data,
-                team_name=team_name
+                team_name=team_name,
+                employee_history_repo=employee_history_repo
             )
 
             if assignments:

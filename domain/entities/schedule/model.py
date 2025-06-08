@@ -189,7 +189,8 @@ class Schedule:
         aro_graph_service=None, 
         prefetched_data: Optional[Dict] = None,
         team_aro_repository=None,
-        cp_model_builder=None
+        cp_model_builder=None,
+        employee_history_repo=None
     ) -> bool:
         """
         Generate assignments for this schedule using constraint programming.
@@ -207,6 +208,7 @@ class Schedule:
             prefetched_data: Optional dictionary containing prefetched data to avoid database queries
             team_aro_repository: Optional repository for retrieving TeamAro relationships (not used with CPModelBuilder)
             cp_model_builder: Optional CPModelBuilder service to use for generating assignments
+            employee_history_repo: Optional repository for employee work history (required for same-day repeat penalties)
 
         Returns:
             True if assignments were successfully generated, False otherwise
@@ -246,7 +248,8 @@ class Schedule:
                 team_id=self.team_id,
                 start_date=self.start_date,
                 aro_data=aro_data,
-                team_name=team_name
+                team_name=team_name,
+                employee_history_repo=employee_history_repo
             )
 
             if period_assignments:
@@ -256,7 +259,20 @@ class Schedule:
                 for assignment in period_assignments:
                     try:
                         # Create and add assignment to schedule
-                        create_and_add_assignment(self, assignment.employee, assignment.workstation, assignment.period)
+                        new_assignment = create_and_add_assignment(self, assignment.employee, assignment.workstation, assignment.period)
+                        print(f"new assignment created: {new_assignment}")
+                        # Update work history repository if provided
+                        if employee_history_repo:
+                            from domain.value_objects.work_history_entry import WorkHistoryEntry
+                            # Create a work history entry for this assignment
+                            entry = WorkHistoryEntry(
+                                employee_id=assignment.employee.id,
+                                workstation_id=assignment.workstation.id,
+                                worked_date=self.start_date,
+                                work_period=assignment.period.period
+                            )
+                            # Add the entry to the repository
+                            employee_history_repo.add(entry)
                     except ValueError as e:
                         # Log error but continue with other assignments
                         logger.warning(f"Team {self.team_id}: Error creating assignment: {str(e)}")

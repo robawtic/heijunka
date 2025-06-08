@@ -15,7 +15,8 @@ logger = logging.getLogger(__name__)
 class CPModelBuilder:
     def build_model(self, employees: List[Employee], workstations: List[Workstation], 
                    period: int, team_id: int, aro_data: Dict, 
-                   start_date: date = None, team_name: str = None) -> Tuple[cp_model.CpModel, Dict]:
+                   start_date: date = None, team_name: str = None,
+                   employee_history_repo = None) -> Tuple[cp_model.CpModel, Dict]:
         """
         Build a CP model for the given employees, workstations, and period.
 
@@ -27,6 +28,7 @@ class CPModelBuilder:
             aro_data: Dictionary of ARO assignments by employee and period
             start_date: The date of the schedule (required for rule context)
             team_name: The name of the team (required for rule context)
+            employee_history_repo: Repository for employee work history (required for same-day repeat penalties)
 
         Returns:
             A tuple containing:
@@ -61,7 +63,9 @@ class CPModelBuilder:
                 start_date=start_date,
                 # Add any other data needed by rules
                 aro_data=aro_data,
-                current_period=period  # Pass the current period being processed
+                current_period=period,  # Pass the current period being processed
+                employee_history_repo=employee_history_repo,  # Pass the employee work history repository
+                lookback=7  # Default lookback window of 7 days
             )
 
             # Apply each rule to the context
@@ -73,7 +77,7 @@ class CPModelBuilder:
 
             # Add penalties to objective function if any
             if penalties:
-                model.Maximize(sum(penalties))
+                model.Minimize(sum(penalties))
             else:
                 # Fallback objective: maximize assignments
                 # Identify ARO employees (employees whose home team is not this team)
@@ -86,7 +90,7 @@ class CPModelBuilder:
                         weight = 2 if e in aro_employees else 1
                         objective_terms.append(weight * assign[(e, w, period-1)])
 
-                model.Maximize(sum(objective_terms))
+                model.Minimize(sum(objective_terms))
         else:
             # Fallback to existing hard-coded constraints for backward compatibility
 
@@ -152,7 +156,7 @@ class CPModelBuilder:
             # Identify ARO employees (employees whose home team is not this team)
             aro_employees = [e for e, employee in enumerate(employees) if employee.team_id != team_id]
 
-            # Objective: Maximize assignments with weights
+            # Objective: Minimize assignments with weights
             # Regular assignments have weight 1, ARO assignments have weight 2 to prioritize them
             objective_terms = []
             for e in range(len(employees)):
@@ -165,7 +169,7 @@ class CPModelBuilder:
                         weight = 1
                     objective_terms.append(weight * assign[(e, w, period-1)])
 
-            model.Maximize(sum(objective_terms))
+            model.Minimize(sum(objective_terms))
 
         return model, assign
 
@@ -219,7 +223,8 @@ class CPModelBuilder:
 
     def solve_one_period(self, employees: List[Employee], workstations: List[Workstation],
                         period: int, team_id: int, start_date: date, 
-                        aro_data: Dict, team_name: str = None) -> List[WorkAssignment]:
+                        aro_data: Dict, team_name: str = None,
+                        employee_history_repo = None) -> List[WorkAssignment]:
         """
         Build and solve a CP model for one period, returning work assignments.
 
@@ -233,6 +238,7 @@ class CPModelBuilder:
             start_date: The date of the schedule
             aro_data: Dictionary of ARO assignments by employee and period
             team_name: The name of the team (optional, for rule context)
+            employee_history_repo: Repository for employee work history (required for same-day repeat penalties)
 
         Returns:
             List of work assignments for the specified team and period
@@ -246,7 +252,8 @@ class CPModelBuilder:
                 team_id, 
                 aro_data, 
                 start_date=start_date, 
-                team_name=team_name
+                team_name=team_name,
+                employee_history_repo=employee_history_repo
             )
 
             # Solve the model

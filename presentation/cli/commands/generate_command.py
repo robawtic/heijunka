@@ -482,7 +482,8 @@ def handle_generate(
                     # Call the new helper that runs the solver for exactly (team, period)
                     period_assignments = schedule_service.generate_period_schedule(
                         team_id=infl_team_id,
-                        cp_input=cp_input
+                        cp_input=cp_input,
+                        employee_history_repo=work_history_repository
                     )
 
                     if period_assignments:
@@ -493,6 +494,28 @@ def handle_generate(
                         )
                         print(f"Generated {len(period_assignments)} assignments for team '{team_name}' period {period}")
                         all_assignments.extend(period_assignments)
+
+                        # Update work history repository with these assignments
+                        for assignment in period_assignments:
+                            try:
+                                work_history_repository.create(
+                                    employee_id=assignment.employee.id,
+                                    workstation_id=assignment.workstation.id,
+                                    date_obj=start_date,
+                                    period=assignment.period.period,
+                                    is_generated=True
+                                )
+                                logger.debug(
+                                    f"Added work history entry for employee {assignment.employee.id} at workstation {assignment.workstation.id} for period {assignment.period.period}",
+                                    event_type="work_history_entry_create",
+                                    identifier=f"employee_{assignment.employee.id}_period_{assignment.period.period}"
+                                )
+                            except Exception as e:
+                                logger.error(
+                                    f"Error adding work history entry: {e}",
+                                    event_type="work_history_entry_error",
+                                    identifier=f"employee_{assignment.employee.id}_period_{assignment.period.period}"
+                                )
                     else:
                         logger.warning(
                             f"No assignments generated for team '{team_name}' period {period}", 
@@ -538,7 +561,8 @@ def handle_generate(
                         # Call the new helper that runs the solver for exactly (team, period)
                         period_assignments = schedule_service.generate_period_schedule(
                             team_id=team.id,
-                            cp_input=cp_input
+                            cp_input=cp_input,
+                            employee_history_repo=work_history_repository
                         )
 
                         if period_assignments:
@@ -549,6 +573,28 @@ def handle_generate(
                             )
                             print(f"Generated {len(period_assignments)} assignments for team '{team.name}' period {period}")
                             all_assignments.extend(period_assignments)
+
+                            # Update work history repository with these assignments
+                            for assignment in period_assignments:
+                                try:
+                                    work_history_repository.create(
+                                        employee_id=assignment.employee.id,
+                                        workstation_id=assignment.workstation.id,
+                                        date_obj=start_date,
+                                        period=assignment.period.period,
+                                        is_generated=True
+                                    )
+                                    logger.debug(
+                                        f"Added work history entry for employee {assignment.employee.id} at workstation {assignment.workstation.id} for period {assignment.period.period}",
+                                        event_type="work_history_entry_create",
+                                        identifier=f"employee_{assignment.employee.id}_period_{assignment.period.period}"
+                                    )
+                                except Exception as e:
+                                    logger.error(
+                                        f"Error adding work history entry: {e}",
+                                        event_type="work_history_entry_error",
+                                        identifier=f"employee_{assignment.employee.id}_period_{assignment.period.period}"
+                                    )
                         else:
                             logger.warning(
                                 f"No assignments generated for team '{team.name}' period {period}", 

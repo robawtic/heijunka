@@ -14,6 +14,9 @@ def add_same_day_repeat_penalties(ctx: RuleContext):
     Returns:
         List of penalty variables to be added to the objective function
     """
+    import logging
+    logger = logging.getLogger(__name__)
+
     model = ctx.model
     assign = ctx.assign
     employees = ctx.employees
@@ -28,50 +31,65 @@ def add_same_day_repeat_penalties(ctx: RuleContext):
     # Default weight for same-day repeat penalties
     weight = 10000  # Higher weight to strongly discourage same-day repeats
 
-    if not start_date or not repo or current_period <= 1:
-        return []  # Can't check history without start date, repository, or for period 1
+    if not start_date:
+        logger.warning("Cannot apply same-day repeat penalties: start_date is missing")
+        return []
+
+    if not repo:
+        logger.warning("Cannot apply same-day repeat penalties: employee_history_repo is missing")
+        return []
+
+    if current_period <= 1:
+        logger.info("Skipping same-day repeat penalties for period 1 (no previous periods)")
+        return []
 
     penalties = []
     # map station_id -> index j
     ws_idx = {ws.id: j for j, ws in enumerate(workstations)}
 
-    for i, emp in enumerate(employees):
-        # Get all work history entries for this employee on the current day up to the current period
-        entries, _ = repo.get_filtered(
-            employee_id=emp.id,
-            start_date=start_date,
-            end_date=start_date,  # Same day
-            period=None  # All periods
-        )
+    try:
+        for i, emp in enumerate(employees):
+            # Get all work history entries for this employee on the current day up to the current period
+            entries, _ = repo.get_filtered(
+                employee_id=emp.id,
+                start_date=start_date,
+                end_date=start_date,  # Same day
+                period=None  # All periods
+            )
 
-        # Extract workstation IDs from previous periods on the same day
-        previous_stations = set()
-        for entry in entries:
-            # Only consider periods before the current one
-            if entry.period < current_period:
-                previous_stations.add(entry.workstation_id)
-
-        # Penalize assignments to stations the employee already worked at earlier today
-        for station_id in previous_stations:
-            j = ws_idx.get(station_id)
-            if j is None:
-                continue
+            # Extract workstation IDs from previous periods on the same day
+            previous_stations = set()
+            for entry in entries:
+                # Only consider periods before the current one
+                if entry.work_period < current_period:
+                    previous_stations.add(entry.workstation_id)
 
             # Penalize assignments to stations the employee already worked at earlier today
-            pen = model.NewIntVar(0, weight, f"same_day_repeat_e{i}_w{j}_p{current_period}")
-            indicator = model.NewBoolVar(f"same_day_repeat_indicator_e{i}_w{j}_p{current_period}")
+            for station_id in previous_stations:
+                j = ws_idx.get(station_id)
+                if j is None:
+                    continue
 
-            # indicator is true if employee is assigned to this station
-            model.Add(assign[(i, j, p)] == 1).OnlyEnforceIf(indicator)
-            model.Add(assign[(i, j, p)] == 0).OnlyEnforceIf(indicator.Not())
+                # Penalize assignments to stations the employee already worked at earlier today
+                pen = model.NewIntVar(0, weight, f"same_day_repeat_e{i}_w{j}_p{current_period}")
+                indicator = model.NewBoolVar(f"same_day_repeat_indicator_e{i}_w{j}_p{current_period}")
 
-            # Set penalty value based on indicator
-            model.Add(pen == weight).OnlyEnforceIf(indicator)
-            model.Add(pen == 0).OnlyEnforceIf(indicator.Not())
+                # indicator is true if employee is assigned to this station
+                model.Add(assign[(i, j, p)] == 1).OnlyEnforceIf(indicator)
+                model.Add(assign[(i, j, p)] == 0).OnlyEnforceIf(indicator.Not())
 
-            penalties.append(pen)
+                # Set penalty value based on indicator
+                model.Add(pen == weight).OnlyEnforceIf(indicator)
+                model.Add(pen == 0).OnlyEnforceIf(indicator.Not())
 
-    return penalties
+                penalties.append(pen)
+
+        logger.info(f"Added {len(penalties)} same-day repeat penalties for period {current_period}")
+        return penalties
+    except Exception as e:
+        logger.error(f"Error applying same-day repeat penalties: {str(e)}")
+        # Re-raise the exception to make failures visible
+        raise
 
 
 @rule_metadata(uses=["model", "assign", "employees", "workstations", "current_period", "start_date", "lookback", "employee_history_repo"])
@@ -86,6 +104,9 @@ def add_lookback_any_period_penalties(ctx: RuleContext):
     Returns:
         List of penalty variables to be added to the objective function
     """
+    import logging
+    logger = logging.getLogger(__name__)
+
     model = ctx.model
     assign = ctx.assign
     employees = ctx.employees
@@ -101,8 +122,17 @@ def add_lookback_any_period_penalties(ctx: RuleContext):
     # Default weight for lookback-any penalties
     weight = 10000
 
-    if not start_date or not repo or lookback == 0:
-        return []  # Can't check history without start date, repository, or with zero lookback
+    if not start_date:
+        logger.warning("Cannot apply lookback-any penalties: start_date is missing")
+        return []
+
+    if not repo:
+        logger.warning("Cannot apply lookback-any penalties: employee_history_repo is missing")
+        return []
+
+    if lookback == 0:
+        logger.info("Skipping lookback-any penalties: lookback window is zero")
+        return []
 
     penalties = []
     # map station_id -> index j
@@ -112,31 +142,38 @@ def add_lookback_any_period_penalties(ctx: RuleContext):
 
     # Calculate lookback window
     lookback_start = start_date - timedelta(days=lookback)
+    logger.info(f"Applying lookback-any penalties with {lookback} day window ({lookback_start} to {start_date})")
 
-    for i, emp in enumerate(employees):
-        # Get all distinct stations the employee worked at in the lookback window
-        worked_stations = repo.get_distinct_stations(emp.id, lookback_start, start_date)
+    try:
+        for i, emp in enumerate(employees):
+            # Get all distinct stations the employee worked at in the lookback window
+            worked_stations = repo.get_distinct_stations(emp.id, lookback_start, start_date)
 
-        for station_id in worked_stations:
-            j = ws_idx.get(station_id)
-            if j is None:
-                continue
+            for station_id in worked_stations:
+                j = ws_idx.get(station_id)
+                if j is None:
+                    continue
 
-            # Penalize assignments to stations the employee worked at in the lookback window
-            pen = model.NewIntVar(0, weight, f"lookback_any_e{i}_w{j}_p{current_period}")
-            indicator = model.NewBoolVar(f"lookback_any_indicator_e{i}_w{j}_p{current_period}")
+                # Penalize assignments to stations the employee worked at in the lookback window
+                pen = model.NewIntVar(0, weight, f"lookback_any_e{i}_w{j}_p{current_period}")
+                indicator = model.NewBoolVar(f"lookback_any_indicator_e{i}_w{j}_p{current_period}")
 
-            # indicator is true if employee is assigned to this station
-            model.Add(assign[(i, j, p)] == 1).OnlyEnforceIf(indicator)
-            model.Add(assign[(i, j, p)] == 0).OnlyEnforceIf(indicator.Not())
+                # indicator is true if employee is assigned to this station
+                model.Add(assign[(i, j, p)] == 1).OnlyEnforceIf(indicator)
+                model.Add(assign[(i, j, p)] == 0).OnlyEnforceIf(indicator.Not())
 
-            # Set penalty value based on indicator
-            model.Add(pen == weight).OnlyEnforceIf(indicator)
-            model.Add(pen == 0).OnlyEnforceIf(indicator.Not())
+                # Set penalty value based on indicator
+                model.Add(pen == weight).OnlyEnforceIf(indicator)
+                model.Add(pen == 0).OnlyEnforceIf(indicator.Not())
 
-            penalties.append(pen)
+                penalties.append(pen)
 
-    return penalties
+        logger.info(f"Added {len(penalties)} lookback-any penalties for period {current_period}")
+        return penalties
+    except Exception as e:
+        logger.error(f"Error applying lookback-any penalties: {str(e)}")
+        # Re-raise the exception to make failures visible
+        raise
 
 
 @rule_metadata(uses=["model", "assign", "employees", "workstations", "current_period", "start_date", "lookback", "employee_history_repo"])
@@ -151,6 +188,9 @@ def add_lookback_same_period_penalties(ctx: RuleContext):
     Returns:
         List of penalty variables to be added to the objective function
     """
+    import logging
+    logger = logging.getLogger(__name__)
+
     model = ctx.model
     assign = ctx.assign
     employees = ctx.employees
@@ -166,8 +206,17 @@ def add_lookback_same_period_penalties(ctx: RuleContext):
     # Default weight for lookback-same penalties
     weight = 10000  # Higher weight for same period repeats
 
-    if not start_date or not repo or lookback == 0:
-        return []  # Can't check history without start date, repository, or with zero lookback
+    if not start_date:
+        logger.warning("Cannot apply lookback-same-period penalties: start_date is missing")
+        return []
+
+    if not repo:
+        logger.warning("Cannot apply lookback-same-period penalties: employee_history_repo is missing")
+        return []
+
+    if lookback == 0:
+        logger.info("Skipping lookback-same-period penalties: lookback window is zero")
+        return []
 
     penalties = []
     # map station_id -> index j
@@ -177,32 +226,40 @@ def add_lookback_same_period_penalties(ctx: RuleContext):
 
     # Calculate lookback window
     lookback_start = start_date - timedelta(days=lookback)
+    logger.info(f"Applying lookback-same-period penalties with {lookback} day window ({lookback_start} to {start_date})")
 
-    for i, emp in enumerate(employees):
-        # Get all distinct (station_id, work_period) pairs the employee worked in the lookback window
-        station_period_pairs = repo.get_distinct_station_periods(emp.id, lookback_start, start_date)
+    try:
+        for i, emp in enumerate(employees):
+            # Get all distinct (station_id, work_period) pairs the employee worked in the lookback window
+            station_period_pairs = repo.get_distinct_station_periods(emp.id, lookback_start, start_date)
 
-        # Penalize assignments to (station, period) pairs the employee worked in the lookback window
-        for station_id, period_num in station_period_pairs:
-            j = ws_idx.get(station_id)
-            # Only consider if the period matches the current period we're processing
-            if j is None or period_num != current_period:
-                continue
+            # Penalize assignments to (station, period) pairs the employee worked in the lookback window
+            for station_id, period_num in station_period_pairs:
+                j = ws_idx.get(station_id)
+                # Only consider if the period matches the current period we're processing
+                # period_num is 0-indexed, so compare with p (0-indexed current_period)
+                if j is None or period_num != p:
+                    continue
 
-            pen = model.NewIntVar(0, weight, f"lookback_same_e{i}_w{j}_p{current_period}")
-            indicator = model.NewBoolVar(f"lookback_same_indicator_e{i}_w{j}_p{current_period}")
+                pen = model.NewIntVar(0, weight, f"lookback_same_e{i}_w{j}_p{current_period}")
+                indicator = model.NewBoolVar(f"lookback_same_indicator_e{i}_w{j}_p{current_period}")
 
-            # indicator is true if employee is assigned to this station-period pair
-            model.Add(assign[(i, j, p)] == 1).OnlyEnforceIf(indicator)
-            model.Add(assign[(i, j, p)] == 0).OnlyEnforceIf(indicator.Not())
+                # indicator is true if employee is assigned to this station-period pair
+                model.Add(assign[(i, j, p)] == 1).OnlyEnforceIf(indicator)
+                model.Add(assign[(i, j, p)] == 0).OnlyEnforceIf(indicator.Not())
 
-            # Set penalty value based on indicator
-            model.Add(pen == weight).OnlyEnforceIf(indicator)
-            model.Add(pen == 0).OnlyEnforceIf(indicator.Not())
+                # Set penalty value based on indicator
+                model.Add(pen == weight).OnlyEnforceIf(indicator)
+                model.Add(pen == 0).OnlyEnforceIf(indicator.Not())
 
-            penalties.append(pen)
+                penalties.append(pen)
 
-    return penalties
+        logger.info(f"Added {len(penalties)} lookback-same-period penalties for period {current_period}")
+        return penalties
+    except Exception as e:
+        logger.error(f"Error applying lookback-same-period penalties: {str(e)}")
+        # Re-raise the exception to make failures visible
+        raise
 
 
 @rule_metadata(uses=["model", "assign", "employees", "workstations", "current_period", "start_date", "aro_data"])
