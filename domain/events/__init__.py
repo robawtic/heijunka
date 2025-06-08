@@ -32,3 +32,6 @@ from .assignment import (
 from .aro import (
     AROAssignmentCreated, AROAssignmentRemoved, AROAssignmentUpdated
 )
+from .schedule_coordination import (
+    AROTransferRequested, ScheduleGenerationCompleted, ScheduleRegenerationNeeded
+)

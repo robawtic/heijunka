@@ -345,6 +345,64 @@ class ScheduleService:
             logger.error(f"Error generating period schedule for team {team_id}, period {cp_input.get('period')}: {str(e)}")
             return []
 
+    def generate_period_schedules(self, teams: List[Any], period: int, 
+                             available_by_team_and_period: Dict,
+                             prefetched_data: Dict) -> List[WorkAssignment]:
+        """Generate schedules for all teams for a specific period.
+
+        Args:
+            teams: List of teams to generate schedules for
+            period: The period to generate schedules for
+            available_by_team_and_period: Dictionary mapping team IDs to lists of available employees for each period
+            prefetched_data: Dictionary containing prefetched data to avoid database queries
+
+        Returns:
+            List of work assignments for all teams for the specified period
+        """
+        all_assignments = []
+
+        # Process each team for this period
+        for team in teams:
+            team_id = team.id
+
+            # Skip if no available employees for this team and period
+            if team_id not in available_by_team_and_period or period not in available_by_team_and_period[team_id]:
+                logger.info(f"No available employees for team {team_id} in period {period}, skipping")
+                continue
+
+            # Get available employees for this team and period
+            available_employees = available_by_team_and_period[team_id][period]
+
+            # Get workstations for this team
+            workstations = team.workstations
+
+            # Skip if no workstations
+            if not workstations:
+                logger.info(f"No workstations for team {team_id}, skipping")
+                continue
+
+            # Prepare input for CP model
+            cp_input = {
+                "employees": available_employees,
+                "workstations": workstations,
+                "period": period,
+                "start_date": prefetched_data.get("start_date"),
+                "aro_data": prefetched_data.get("aro_data", {}),
+                "teams_by_id": prefetched_data.get("teams_by_id", {})
+            }
+
+            # Generate schedule for this team and period
+            team_assignments = self.generate_period_schedule(
+                team_id=team_id,
+                cp_input=cp_input,
+                employee_history_repo=prefetched_data.get("employee_history_repo")
+            )
+
+            # Add assignments to the result
+            all_assignments.extend(team_assignments)
+
+        return all_assignments
+
     def add_constraint(self, constraint: ScheduleConstraint):
         """Add a constraint to the schedule service"""
         self.constraints.append(constraint)

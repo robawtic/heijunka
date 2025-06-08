@@ -66,7 +66,7 @@ def main():
 
         except Exception as e:
             error_msg = f"Error executing command: {e}"
-            logger.error(error_msg, event_type="command_execution", identifier=str(args.command), extra={"exception": str(e)})
+            logger.error(error_msg, event_type="command_execution", identifier=str(args.command))
             print(error_msg, file=sys.stderr)
             sys.exit(1)
         finally:
@@ -74,12 +74,12 @@ def main():
 
     except SQLAlchemyError as e:
         error_msg = f"Database error: {e}"
-        logger.error(error_msg, event_type="database_error", identifier="sqlalchemy", extra={"exception": str(e)})
+        logger.error(error_msg, event_type="database_error", identifier="sqlalchemy")
         print(error_msg, file=sys.stderr)
         sys.exit(1)
     except Exception as e:
         error_msg = f"Unexpected error: {e}"
-        logger.error(error_msg, event_type="unexpected_error", identifier="main", extra={"exception": str(e)})
+        logger.error(error_msg, event_type="unexpected_error", identifier="main")
         print(error_msg, file=sys.stderr)
         sys.exit(1)
     finally:

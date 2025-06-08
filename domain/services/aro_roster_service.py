@@ -12,11 +12,11 @@ class ARORosterService:
     def __init__(self, aro_assignment_repository=None, team_repository=None):
         self.aro_assignment_repository = aro_assignment_repository
         self.team_repository = team_repository
-    
+
     def handle_aro_assignments(self, employees: List[Employee], team_id: int,
                               start_date: date, prefetched_data: Optional[Dict] = None) -> List[Employee]:
         """
-        Handle ARO (Assigned Relief Operator) assignments by:
+        Handle ARO (Auxiliary  Relief Operator) assignments by:
         1. Removing employees leaving the team
         2. Adding employees joining the team
 
@@ -126,7 +126,7 @@ class ARORosterService:
             )
 
         return available_employees
-    
+
     def process_full_day_aro_assignments(
         self, 
         team_id: int, 
@@ -168,7 +168,7 @@ class ARORosterService:
 
             # Add employees joining as AROs
             self.add_aro_employees(aro_in_ids, available_employees, prefetched_data, processed_employees)
-    
+
     def process_period_specific_aro_assignments(
         self, 
         team_id: int, 
@@ -220,7 +220,7 @@ class ARORosterService:
 
                 # Add employees joining as AROs for this period
                 self.add_aro_employees(period_in_ids, available_employees, prefetched_data, processed_employees)
-    
+
     def add_aro_employees(
         self, 
         aro_ids: List[int], 
@@ -277,7 +277,7 @@ class ARORosterService:
                                     existing_employee_ids.add(emp.id)
                                     logger.debug(f"Added ARO employee {emp.name} (ID: {emp.id}) from team {from_team.name}")
                                     break
-                
+
                 # If not found in prefetched data but we have a team repository, try to find the employee
                 elif self.team_repository and self.aro_assignment_repository:
                     # Get the ARO assignment to find the from_team_id
@@ -298,3 +298,155 @@ class ARORosterService:
 
             except Exception as e:
                 logger.error(f"Error adding ARO employee {aro_id}: {str(e)}")
+
+    def handle_understaffed_teams(self, available_by_team_and_period: Dict, 
+                                 teams: List[Any], period: int, 
+                                 prefetched_data: Dict) -> Set[int]:
+        """
+        Handle understaffed teams by assigning AROs.
+
+        This method identifies teams that are understaffed for a specific period
+        and attempts to assign AROs from other teams with excess staff.
+
+        Args:
+            available_by_team_and_period: Dictionary mapping (team_id, period) to lists of available employees
+            teams: List of team objects
+            period: The current period being processed
+            prefetched_data: Dictionary containing prefetched data
+
+        Returns:
+            Set of team IDs that were influenced (either provided or received AROs)
+        """
+        influenced_teams = set()
+
+        # Create a mapping of team_id to team object for easier lookup
+        teams_by_id = {team.id: team for team in teams}
+
+        # Identify understaffed teams
+        understaffed_teams = {}
+        overstaffed_teams = {}
+
+        for team in teams:
+            team_id = team.id
+            key = (team_id, period)
+
+            if key not in available_by_team_and_period:
+                logger.warning(f"No availability data for team {team_id} in period {period}")
+                continue
+
+            available_employees = available_by_team_and_period[key]
+
+            # Get the number of workstations (required staff)
+            required_staff = len(team.workstations)
+            available_staff = len(available_employees)
+
+            # Calculate staffing difference
+            staffing_difference = available_staff - required_staff
+
+            if staffing_difference < 0:
+                # Team is understaffed
+                understaffed_teams[team_id] = {
+                    'team': team,
+                    'shortage': abs(staffing_difference),
+                    'available': available_employees
+                }
+                logger.info(f"Team {team.name} (ID: {team_id}) is understaffed by {abs(staffing_difference)} employees in period {period}")
+            elif staffing_difference > 0:
+                # Team has excess staff that could be used as AROs
+                overstaffed_teams[team_id] = {
+                    'team': team,
+                    'excess': staffing_difference,
+                    'available': available_employees
+                }
+                logger.info(f"Team {team.name} (ID: {team_id}) has {staffing_difference} excess employees in period {period}")
+
+        # If no understaffed teams, return empty set
+        if not understaffed_teams:
+            logger.info(f"No understaffed teams found for period {period}")
+            return influenced_teams
+
+        # If no overstaffed teams, return empty set
+        if not overstaffed_teams:
+            logger.warning(f"No overstaffed teams found to provide AROs for period {period}")
+            return influenced_teams
+
+        # Assign AROs from overstaffed teams to understaffed teams
+        for understaffed_id, understaffed_data in understaffed_teams.items():
+            shortage = understaffed_data['shortage']
+            understaffed_team = understaffed_data['team']
+
+            # Sort overstaffed teams by excess staff (descending)
+            sorted_overstaffed = sorted(
+                overstaffed_teams.items(),
+                key=lambda x: x[1]['excess'],
+                reverse=True
+            )
+
+            for overstaffed_id, overstaffed_data in sorted_overstaffed:
+                if shortage <= 0:
+                    break
+
+                excess = overstaffed_data['excess']
+                overstaffed_team = overstaffed_data['team']
+                available_employees = overstaffed_data['available']
+
+                # Determine how many AROs to assign from this team
+                aro_count = min(excess, shortage)
+
+                if aro_count <= 0:
+                    continue
+
+                # Select employees to assign as AROs (prefer those with most qualifications)
+                potential_aros = sorted(
+                    available_employees,
+                    key=lambda e: len(getattr(e, 'qualifications', [])),
+                    reverse=True
+                )[:aro_count]
+
+                # Create ARO assignments
+                for employee in potential_aros:
+                    try:
+                        # Check if we have the repository to create assignments
+                        if self.aro_assignment_repository:
+                            # Get the current date from prefetched data or use today's date
+                            assignment_date = prefetched_data.get('schedule_date', date.today())
+
+                            # Create a new ARO assignment
+                            aro_assignment = AROAssignment.create(
+                                employee_id=employee.id,
+                                from_team_id=overstaffed_id,
+                                to_team_id=understaffed_id,
+                                assignment_date=assignment_date,
+                                period=period
+                            )
+
+                            # Save the assignment
+                            self.aro_assignment_repository.add(aro_assignment)
+
+                            logger.info(
+                                f"Created ARO assignment: Employee {employee.name} (ID: {employee.id}) "
+                                f"from team {overstaffed_team.name} (ID: {overstaffed_id}) "
+                                f"to team {understaffed_team.name} (ID: {understaffed_id}) "
+                                f"for period {period}"
+                            )
+
+                            # Update the available employees for the understaffed team
+                            key = (understaffed_id, period)
+                            if key in available_by_team_and_period:
+                                available_by_team_and_period[key].append(employee)
+
+                            # Mark both teams as influenced
+                            influenced_teams.add(overstaffed_id)
+                            influenced_teams.add(understaffed_id)
+
+                            # Reduce the shortage and excess counts
+                            shortage -= 1
+                            overstaffed_data['excess'] -= 1
+
+                    except Exception as e:
+                        logger.error(
+                            f"Error creating ARO assignment for employee {employee.id} "
+                            f"from team {overstaffed_id} to team {understaffed_id}: {str(e)}"
+                        )
+
+        return influenced_teams

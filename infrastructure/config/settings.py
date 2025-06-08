@@ -50,7 +50,7 @@ class Settings(BaseSettings):
     lookback: int = Field(3, env="LOOKBACK")
 
     # Logging settings
-    log_level: str = Field("WARNING", env="LOG_LEVEL") # DEBUG,WARNING, ERROR, CRITICAL
+    log_level: str = Field("ERROR", env="LOG_LEVEL") # DEBUG, WARNING, ERROR, CRITICAL
     redaction_level: str = Field("none", env="REDACTION_LEVEL")  # Options: "none", "low", "high"
     include_redacted_metadata: bool = Field(False, env="LOG_INCLUDE_REDACTED_METADATA")
     log_dir: str = Field("logs", env="LOG_DIR")

@@ -72,7 +72,7 @@ if __name__ == '__main__':
         main()
     except Exception as e:
         error_msg = f"Unexpected error in main application: {e}"
-        logger.error(error_msg, event_type="application", identifier="error", extra={"exception": str(e)})
+        logger.error(error_msg, event_type="application", identifier="error")
         print(error_msg, file=sys.stderr)
         sys.exit(1)
     finally:

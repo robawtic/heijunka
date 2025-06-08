@@ -294,7 +294,7 @@ class AROService:
 
                 # Create a temporary AROAssignment object to return
                 # This doesn't persist to the database until assign_aro is called
-                return AROAssignment(
+                aro_candidate = AROAssignment(
                     id=None,  # No ID yet since it's not persisted
                     employee_id=best_candidate['employee'].id,
                     from_team_id=best_candidate['from_team_id'],
@@ -302,6 +302,18 @@ class AROService:
                     assignment_date=assignment_date,
                     period=period
                 )
+
+                # Publish an event to notify the system about this ARO transfer
+                if self.event_publisher:
+                    self.event_publisher.publish(AROTransferRequested(
+                        employee_id=aro_candidate.employee_id,
+                        from_team_id=aro_candidate.from_team_id,
+                        to_team_id=aro_candidate.to_team_id,
+                        assignment_date=aro_candidate.assignment_date,
+                        period=aro_candidate.period
+                    ))
+
+                return aro_candidate
 
             # No suitable ARO found
             logger.warning(f"No qualified ARO candidates found for team {team_id}, period {period}")
