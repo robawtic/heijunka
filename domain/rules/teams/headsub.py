@@ -216,8 +216,6 @@ def forbid_consecutive_special(ctx: RuleContext):
     This rule ensures that employees don't get assigned to physically demanding
     or skill-intensive stations in back-to-back periods, reducing fatigue and errors.
     """
-    # This rule is now enabled to prevent employees from working at special stations in consecutive periods
-    print("  NOTE: forbid_consecutive_special rule is now enabled")
 
     model = ctx.model
     assign = ctx.assign

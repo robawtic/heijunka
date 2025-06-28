@@ -25,11 +25,13 @@ class ScheduleCoordinator:
         self,
         schedule_handler: GenerateScheduleHandler,
         schedule_data_service,
-        event_publisher: DomainEventPublisher
+        event_publisher: DomainEventPublisher,
+        work_history_repository=None
     ):
         self.schedule_handler = schedule_handler
         self.schedule_data_service = schedule_data_service
         self.event_publisher = event_publisher
+        self.work_history_repository = work_history_repository
         self.active_schedules = {}  # team_id -> schedule info
         self.influenced_teams = set()  # Set of team IDs that need regeneration
 
@@ -86,6 +88,10 @@ class ScheduleCoordinator:
                 )
 
                 # Generate assignments for this period
+                # Set work_history_repository on handler if not already set
+                if hasattr(self, 'work_history_repository') and self.work_history_repository is not None:
+                    self.schedule_handler.work_history_repository = self.work_history_repository
+
                 period_assignments = self.schedule_handler.generate_with_prefetched_data(
                     command=command,
                     employees=team_data['employees'],
@@ -230,6 +236,10 @@ class ScheduleCoordinator:
                 )
 
             try:
+                # Set work_history_repository on handler if not already set
+                if hasattr(self, 'work_history_repository') and self.work_history_repository is not None:
+                    self.schedule_handler.work_history_repository = self.work_history_repository
+
                 # Generate assignments for this team and period
                 period_assignments = self.schedule_handler.generate_with_prefetched_data(
                     command=command,

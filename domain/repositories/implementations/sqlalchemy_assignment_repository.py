@@ -7,7 +7,7 @@ from sqlalchemy import and_
 
 from domain.value_objects.work_assignment import WorkAssignment
 from domain.value_objects.schedule_period import SchedulePeriod
-from domain.models.EmployeeWorkHistoryModel import EmployeeWorkHistoryModel
+from domain.models.EmployeeWorkHistoryModel import EmployeeWorkHistoryModel, WorkHistoryStatus
 from domain.repositories.interfaces.assignment_repository import AssignmentRepositoryInterface
 from domain.factories.work_assignment_factory import WorkAssignmentFactory
 from infrastructure.repositories.sqlalchemy.base_sqlalchemy_repository import BaseSqlAlchemyRepository
@@ -41,12 +41,16 @@ class SqlAlchemyAssignmentRepository(BaseSqlAlchemyRepository[WorkAssignment, Em
     # Core CRUD Operations
     # -------------------------------------------------------------------------
 
-    def get_all(self) -> List[WorkAssignment]:
+    def get_all(self, page: int = 1, page_size: int = 50) -> Tuple[List[WorkAssignment], int]:
         """
-        Retrieve all work assignments.
+        Retrieve work assignments with pagination.
+
+        Args:
+            page: The page number to retrieve (default: 1).
+            page_size: The number of assignments per page (default: 50).
 
         Returns:
-            A list of all work assignments.
+            A tuple of (assignments list, total count).
         """
         self.logger.info(
             "Entering AssignmentRepository.get_all",
@@ -54,31 +58,38 @@ class SqlAlchemyAssignmentRepository(BaseSqlAlchemyRepository[WorkAssignment, Em
         )
 
         try:
-            models = self._session.query(EmployeeWorkHistoryModel).all()
+            from sqlalchemy.orm import joinedload
+
+            # Calculate offset based on page number and page size
+            offset = (page - 1) * page_size
+
+            # Get total count
+            total_count = self._session.query(EmployeeWorkHistoryModel).count()
+
+            # Use eager loading to prevent N+1 query problems
+            # Apply pagination with offset and limit
+            models = self._session.query(EmployeeWorkHistoryModel).options(
+                joinedload(EmployeeWorkHistoryModel.employee),
+                joinedload(EmployeeWorkHistoryModel.station)
+            ).offset(offset).limit(page_size).all()
 
             self.logger.info(
-                f"Retrieved {len(models)} work assignments",
+                f"Retrieved {len(models)} work assignments (page {page} of {(total_count + page_size - 1) // page_size}, total: {total_count})",
                 extra={
                     "event_type": "assignments_list_all_success",
-                    "count": len(models)
+                    "count": len(models),
+                    "page": page,
+                    "page_size": page_size,
+                    "total_count": total_count,
+                    "total_pages": (total_count + page_size - 1) // page_size
                 }
             )
 
-            assignments = []
-            for model in models:
-                self.rate_limited_logger.debug(
-                    f"Converting EmployeeWorkHistoryModel [id={model.id}] to domain WorkAssignment",
-                    event_type="model_to_domain_conversion",
-                    identifier=str(model.id),
-                    extra={
-                        "entity_id": model.id
-                    }
-                )
-                assignment = self._to_domain(model)
-                if assignment:
-                    assignments.append(assignment)
+            # Use the helper method to convert models to domain entities
+            assignments = self._convert_models_to_domain(models)
 
-            return assignments
+            # Return tuple of assignments and total count
+            return assignments, total_count
         except SQLAlchemyError as e:
             error_msg = sanitize_exception(e)
             self.logger.error(
@@ -110,7 +121,7 @@ class SqlAlchemyAssignmentRepository(BaseSqlAlchemyRepository[WorkAssignment, Em
         )
 
         try:
-            model = self._session.query(EmployeeWorkHistoryModel).get(assignment_id)
+            model = self._session.get(EmployeeWorkHistoryModel, assignment_id)
 
             if not model:
                 self.logger.info(
@@ -241,9 +252,10 @@ class SqlAlchemyAssignmentRepository(BaseSqlAlchemyRepository[WorkAssignment, Em
         Raises:
             RepositoryError: If the assignment doesn't have an ID or doesn't exist.
         """
-        # Get the ID from metadata
+        # Get the ID and version from metadata
         metadata = getattr(assignment, '_metadata', {})
         assignment_id = metadata.get('id')
+        version = metadata.get('version')
 
         if not assignment_id:
             error_msg = "Cannot update assignment without ID"
@@ -268,19 +280,58 @@ class SqlAlchemyAssignmentRepository(BaseSqlAlchemyRepository[WorkAssignment, Em
 
         try:
             with self.session_scope() as session:
-                model = session.query(EmployeeWorkHistoryModel).get(assignment_id)
+                # If version is provided, use it for optimistic concurrency control
+                if version is not None:
+                    # Check if the entity exists with the specified ID and version
+                    model = session.query(EmployeeWorkHistoryModel).filter(
+                        EmployeeWorkHistoryModel.id == assignment_id,
+                        EmployeeWorkHistoryModel.version == version
+                    ).first()
 
-                if not model:
-                    error_msg = f"Work assignment with ID {assignment_id} not found"
-                    self.logger.warning(
-                        error_msg,
-                        extra={
-                            "event_type": "assignment_update_failed",
-                            "assignment_id": assignment_id,
-                            "reason": "not_found"
-                        }
-                    )
-                    raise RepositoryError(error_msg)
+                    if not model:
+                        # Check if the entity exists with a different version
+                        exists = session.query(EmployeeWorkHistoryModel).filter(
+                            EmployeeWorkHistoryModel.id == assignment_id
+                        ).first() is not None
+
+                        if exists:
+                            error_msg = f"Concurrent modification detected for work assignment with ID {assignment_id}"
+                            self.logger.warning(
+                                error_msg,
+                                extra={
+                                    "event_type": "assignment_update_failed",
+                                    "assignment_id": assignment_id,
+                                    "reason": "concurrent_modification",
+                                    "version": version
+                                }
+                            )
+                            raise RepositoryError(error_msg)
+                        else:
+                            error_msg = f"Work assignment with ID {assignment_id} not found"
+                            self.logger.warning(
+                                error_msg,
+                                extra={
+                                    "event_type": "assignment_update_failed",
+                                    "assignment_id": assignment_id,
+                                    "reason": "not_found"
+                                }
+                            )
+                            raise RepositoryError(error_msg)
+                else:
+                    # No version provided, just get the entity by ID
+                    model = session.get(EmployeeWorkHistoryModel, assignment_id)
+
+                    if not model:
+                        error_msg = f"Work assignment with ID {assignment_id} not found"
+                        self.logger.warning(
+                            error_msg,
+                            extra={
+                                "event_type": "assignment_update_failed",
+                                "assignment_id": assignment_id,
+                                "reason": "not_found"
+                            }
+                        )
+                        raise RepositoryError(error_msg)
 
                 self.rate_limited_logger.debug(
                     f"Updating EmployeeWorkHistoryModel [id={model.id}] from domain WorkAssignment",
@@ -344,7 +395,7 @@ class SqlAlchemyAssignmentRepository(BaseSqlAlchemyRepository[WorkAssignment, Em
 
         try:
             with self.session_scope() as session:
-                model = session.query(EmployeeWorkHistoryModel).get(assignment_id)
+                model = session.get(EmployeeWorkHistoryModel, assignment_id)
 
                 if not model:
                     self.logger.info(
@@ -407,7 +458,12 @@ class SqlAlchemyAssignmentRepository(BaseSqlAlchemyRepository[WorkAssignment, Em
         )
 
         try:
-            models = self._session.query(EmployeeWorkHistoryModel).filter(
+            from sqlalchemy.orm import joinedload
+
+            # Use eager loading to prevent N+1 query problems
+            models = self._session.query(EmployeeWorkHistoryModel).options(
+                joinedload(EmployeeWorkHistoryModel.station)
+            ).filter(
                 EmployeeWorkHistoryModel.employee_id == employee_id
             ).all()
 
@@ -421,21 +477,8 @@ class SqlAlchemyAssignmentRepository(BaseSqlAlchemyRepository[WorkAssignment, Em
                 }
             )
 
-            assignments = []
-            for model in models:
-                self.rate_limited_logger.debug(
-                    f"Converting EmployeeWorkHistoryModel [id={model.id}] to domain WorkAssignment",
-                    event_type="model_to_domain_conversion",
-                    identifier=str(model.id),
-                    extra={
-                        "entity_id": model.id
-                    }
-                )
-                assignment = self._to_domain(model)
-                if assignment:
-                    assignments.append(assignment)
-
-            return assignments
+            # Use the helper method to convert models to domain entities
+            return self._convert_models_to_domain(models)
         except SQLAlchemyError as e:
             error_msg = sanitize_exception(e)
             self.logger.error(
@@ -469,7 +512,12 @@ class SqlAlchemyAssignmentRepository(BaseSqlAlchemyRepository[WorkAssignment, Em
         )
 
         try:
-            models = self._session.query(EmployeeWorkHistoryModel).filter(
+            from sqlalchemy.orm import joinedload
+
+            # Use eager loading to prevent N+1 query problems
+            models = self._session.query(EmployeeWorkHistoryModel).options(
+                joinedload(EmployeeWorkHistoryModel.employee)
+            ).filter(
                 EmployeeWorkHistoryModel.station_id == workstation_id
             ).all()
 
@@ -483,21 +531,8 @@ class SqlAlchemyAssignmentRepository(BaseSqlAlchemyRepository[WorkAssignment, Em
                 }
             )
 
-            assignments = []
-            for model in models:
-                self.rate_limited_logger.debug(
-                    f"Converting EmployeeWorkHistoryModel [id={model.id}] to domain WorkAssignment",
-                    event_type="model_to_domain_conversion",
-                    identifier=str(model.id),
-                    extra={
-                        "entity_id": model.id
-                    }
-                )
-                assignment = self._to_domain(model)
-                if assignment:
-                    assignments.append(assignment)
-
-            return assignments
+            # Use the helper method to convert models to domain entities
+            return self._convert_models_to_domain(models)
         except SQLAlchemyError as e:
             error_msg = sanitize_exception(e)
             self.logger.error(
@@ -531,7 +566,13 @@ class SqlAlchemyAssignmentRepository(BaseSqlAlchemyRepository[WorkAssignment, Em
         )
 
         try:
-            models = self._session.query(EmployeeWorkHistoryModel).filter(
+            from sqlalchemy.orm import joinedload
+
+            # Use eager loading to prevent N+1 query problems
+            models = self._session.query(EmployeeWorkHistoryModel).options(
+                joinedload(EmployeeWorkHistoryModel.employee),
+                joinedload(EmployeeWorkHistoryModel.station)
+            ).filter(
                 EmployeeWorkHistoryModel.schedule_id == schedule_id
             ).all()
 
@@ -545,21 +586,8 @@ class SqlAlchemyAssignmentRepository(BaseSqlAlchemyRepository[WorkAssignment, Em
                 }
             )
 
-            assignments = []
-            for model in models:
-                self.rate_limited_logger.debug(
-                    f"Converting EmployeeWorkHistoryModel [id={model.id}] to domain WorkAssignment",
-                    event_type="model_to_domain_conversion",
-                    identifier=str(model.id),
-                    extra={
-                        "entity_id": model.id
-                    }
-                )
-                assignment = self._to_domain(model)
-                if assignment:
-                    assignments.append(assignment)
-
-            return assignments
+            # Use the helper method to convert models to domain entities
+            return self._convert_models_to_domain(models)
         except SQLAlchemyError as e:
             error_msg = sanitize_exception(e)
             self.logger.error(
@@ -588,12 +616,18 @@ class SqlAlchemyAssignmentRepository(BaseSqlAlchemyRepository[WorkAssignment, Em
             extra={
                 "event_type": "assignments_lookup",
                 "lookup_type": "date",
-                "date": assignment_date.isoformat() if hasattr(assignment_date, 'isoformat') else str(assignment_date)
+                "date": self._format_date(assignment_date)
             }
         )
 
         try:
-            models = self._session.query(EmployeeWorkHistoryModel).filter(
+            from sqlalchemy.orm import joinedload
+
+            # Use eager loading to prevent N+1 query problems
+            models = self._session.query(EmployeeWorkHistoryModel).options(
+                joinedload(EmployeeWorkHistoryModel.employee),
+                joinedload(EmployeeWorkHistoryModel.station)
+            ).filter(
                 EmployeeWorkHistoryModel.worked_date == assignment_date
             ).all()
 
@@ -602,27 +636,13 @@ class SqlAlchemyAssignmentRepository(BaseSqlAlchemyRepository[WorkAssignment, Em
                 extra={
                     "event_type": "assignments_lookup_success",
                     "lookup_type": "date",
-                    "date": assignment_date.isoformat() if hasattr(assignment_date, 'isoformat') else str(
-                        assignment_date),
+                    "date": self._format_date(assignment_date),
                     "count": len(models)
                 }
             )
 
-            assignments = []
-            for model in models:
-                self.rate_limited_logger.debug(
-                    f"Converting EmployeeWorkHistoryModel [id={model.id}] to domain WorkAssignment",
-                    event_type="model_to_domain_conversion",
-                    identifier=str(model.id),
-                    extra={
-                        "entity_id": model.id
-                    }
-                )
-                assignment = self._to_domain(model)
-                if assignment:
-                    assignments.append(assignment)
-
-            return assignments
+            # Use the helper method to convert models to domain entities
+            return self._convert_models_to_domain(models)
         except SQLAlchemyError as e:
             error_msg = sanitize_exception(e)
             self.logger.error(
@@ -630,8 +650,7 @@ class SqlAlchemyAssignmentRepository(BaseSqlAlchemyRepository[WorkAssignment, Em
                 extra={
                     "event_type": "assignments_lookup_error",
                     "lookup_type": "date",
-                    "date": assignment_date.isoformat() if hasattr(assignment_date, 'isoformat') else str(
-                        assignment_date),
+                    "date": self._format_date(assignment_date),
                     "error_type": type(e).__name__
                 }
             )
@@ -653,13 +672,19 @@ class SqlAlchemyAssignmentRepository(BaseSqlAlchemyRepository[WorkAssignment, Em
             extra={
                 "event_type": "assignments_lookup",
                 "lookup_type": "date_and_period",
-                "date": assignment_date.isoformat() if hasattr(assignment_date, 'isoformat') else str(assignment_date),
+                "date": self._format_date(assignment_date),
                 "period": period
             }
         )
 
         try:
-            models = self._session.query(EmployeeWorkHistoryModel).filter(
+            from sqlalchemy.orm import joinedload
+
+            # Use eager loading to prevent N+1 query problems
+            models = self._session.query(EmployeeWorkHistoryModel).options(
+                joinedload(EmployeeWorkHistoryModel.employee),
+                joinedload(EmployeeWorkHistoryModel.station)
+            ).filter(
                 EmployeeWorkHistoryModel.worked_date == assignment_date,
                 EmployeeWorkHistoryModel.work_period == period
             ).all()
@@ -669,28 +694,14 @@ class SqlAlchemyAssignmentRepository(BaseSqlAlchemyRepository[WorkAssignment, Em
                 extra={
                     "event_type": "assignments_lookup_success",
                     "lookup_type": "date_and_period",
-                    "date": assignment_date.isoformat() if hasattr(assignment_date, 'isoformat') else str(
-                        assignment_date),
+                    "date": self._format_date(assignment_date),
                     "period": period,
                     "count": len(models)
                 }
             )
 
-            assignments = []
-            for model in models:
-                self.rate_limited_logger.debug(
-                    f"Converting EmployeeWorkHistoryModel [id={model.id}] to domain WorkAssignment",
-                    event_type="model_to_domain_conversion",
-                    identifier=str(model.id),
-                    extra={
-                        "entity_id": model.id
-                    }
-                )
-                assignment = self._to_domain(model)
-                if assignment:
-                    assignments.append(assignment)
-
-            return assignments
+            # Use the helper method to convert models to domain entities
+            return self._convert_models_to_domain(models)
         except SQLAlchemyError as e:
             error_msg = sanitize_exception(e)
             self.logger.error(
@@ -698,8 +709,7 @@ class SqlAlchemyAssignmentRepository(BaseSqlAlchemyRepository[WorkAssignment, Em
                 extra={
                     "event_type": "assignments_lookup_error",
                     "lookup_type": "date_and_period",
-                    "date": assignment_date.isoformat() if hasattr(assignment_date, 'isoformat') else str(
-                        assignment_date),
+                    "date": self._format_date(assignment_date),
                     "period": period,
                     "error_type": type(e).__name__
                 }
@@ -723,12 +733,17 @@ class SqlAlchemyAssignmentRepository(BaseSqlAlchemyRepository[WorkAssignment, Em
                 "event_type": "assignments_lookup",
                 "lookup_type": "employee_and_date",
                 "employee_id": employee_id,
-                "date": assignment_date.isoformat() if hasattr(assignment_date, 'isoformat') else str(assignment_date)
+                "date": self._format_date(assignment_date)
             }
         )
 
         try:
-            models = self._session.query(EmployeeWorkHistoryModel).filter(
+            from sqlalchemy.orm import joinedload
+
+            # Use eager loading to prevent N+1 query problems
+            models = self._session.query(EmployeeWorkHistoryModel).options(
+                joinedload(EmployeeWorkHistoryModel.station)
+            ).filter(
                 EmployeeWorkHistoryModel.employee_id == employee_id,
                 EmployeeWorkHistoryModel.worked_date == assignment_date
             ).all()
@@ -739,27 +754,13 @@ class SqlAlchemyAssignmentRepository(BaseSqlAlchemyRepository[WorkAssignment, Em
                     "event_type": "assignments_lookup_success",
                     "lookup_type": "employee_and_date",
                     "employee_id": employee_id,
-                    "date": assignment_date.isoformat() if hasattr(assignment_date, 'isoformat') else str(
-                        assignment_date),
+                    "date": self._format_date(assignment_date),
                     "count": len(models)
                 }
             )
 
-            assignments = []
-            for model in models:
-                self.rate_limited_logger.debug(
-                    f"Converting EmployeeWorkHistoryModel [id={model.id}] to domain WorkAssignment",
-                    event_type="model_to_domain_conversion",
-                    identifier=str(model.id),
-                    extra={
-                        "entity_id": model.id
-                    }
-                )
-                assignment = self._to_domain(model)
-                if assignment:
-                    assignments.append(assignment)
-
-            return assignments
+            # Use the helper method to convert models to domain entities
+            return self._convert_models_to_domain(models)
         except SQLAlchemyError as e:
             error_msg = sanitize_exception(e)
             self.logger.error(
@@ -768,8 +769,7 @@ class SqlAlchemyAssignmentRepository(BaseSqlAlchemyRepository[WorkAssignment, Em
                     "event_type": "assignments_lookup_error",
                     "lookup_type": "employee_and_date",
                     "employee_id": employee_id,
-                    "date": assignment_date.isoformat() if hasattr(assignment_date, 'isoformat') else str(
-                        assignment_date),
+                    "date": self._format_date(assignment_date),
                     "error_type": type(e).__name__
                 }
             )
@@ -797,8 +797,14 @@ class SqlAlchemyAssignmentRepository(BaseSqlAlchemyRepository[WorkAssignment, Em
         )
 
         try:
+            from sqlalchemy.orm import joinedload
+
             # This requires a join with the employees table to filter by team
-            models = self._session.query(EmployeeWorkHistoryModel).join(
+            # Use eager loading to prevent N+1 query problems
+            models = self._session.query(EmployeeWorkHistoryModel).options(
+                joinedload(EmployeeWorkHistoryModel.employee),
+                joinedload(EmployeeWorkHistoryModel.station)
+            ).join(
                 EmployeeWorkHistoryModel.employee
             ).filter(
                 EmployeeWorkHistoryModel.station_id == workstation_id,
@@ -816,21 +822,8 @@ class SqlAlchemyAssignmentRepository(BaseSqlAlchemyRepository[WorkAssignment, Em
                 }
             )
 
-            assignments = []
-            for model in models:
-                self.rate_limited_logger.debug(
-                    f"Converting EmployeeWorkHistoryModel [id={model.id}] to domain WorkAssignment",
-                    event_type="model_to_domain_conversion",
-                    identifier=str(model.id),
-                    extra={
-                        "entity_id": model.id
-                    }
-                )
-                assignment = self._to_domain(model)
-                if assignment:
-                    assignments.append(assignment)
-
-            return assignments
+            # Use the helper method to convert models to domain entities
+            return self._convert_models_to_domain(models)
         except SQLAlchemyError as e:
             error_msg = sanitize_exception(e)
             self.logger.error(
@@ -849,15 +842,17 @@ class SqlAlchemyAssignmentRepository(BaseSqlAlchemyRepository[WorkAssignment, Em
     # Specialized Operations
     # -------------------------------------------------------------------------
 
-    def save_all(self, assignments: List[WorkAssignment]) -> bool:
+    def save_all(self, assignments: List[WorkAssignment], batch_size: int = 100) -> bool:
         """
         Save a list of work assignments.
 
         This method first deletes any existing entries for the dates in the assignments
-        to avoid duplicate schedules.
+        to avoid duplicate schedules. It processes assignments in batches to avoid
+        long-running transactions.
 
         Args:
             assignments: The list of work assignments to save.
+            batch_size: The number of assignments to process in a single batch (default: 100).
 
         Returns:
             True if all assignments were saved successfully, False otherwise.
@@ -892,6 +887,7 @@ class SqlAlchemyAssignmentRepository(BaseSqlAlchemyRepository[WorkAssignment, Em
         )
 
         # Delete existing entries for each date
+        failed_dates = []
         for date_obj in dates:
             try:
                 self.delete_existing_entries_for_date(date_obj)
@@ -901,63 +897,94 @@ class SqlAlchemyAssignmentRepository(BaseSqlAlchemyRepository[WorkAssignment, Em
                     f"Error deleting existing entries for date {date_obj}: {error_msg}",
                     extra={
                         "event_type": "assignments_save_error",
-                        "date": date_obj.isoformat() if hasattr(date_obj, 'isoformat') else str(date_obj),
+                        "date": self._format_date(date_obj),
                         "error_type": type(e).__name__
                     }
                 )
-                # Continue with the next date
+                failed_dates.append((date_obj, error_msg))
 
-        # Add all new assignments in a single transaction
+        # If there were any failures, raise an error with a summary
+        if failed_dates:
+            error_summary = "; ".join([f"{self._format_date(date)}: {error}" for date, error in failed_dates])
+            raise RepositoryError(f"Failed to delete existing entries for some dates: {error_summary}")
+
+        # Add assignments in batches to avoid long-running transactions
+        success_count = 0
+        failed_assignments = []
+
         try:
-            with self.session_scope() as session:
-                success_count = 0
-                failed_assignments = []
-
-                for assignment in assignments:
-                    try:
-                        # Convert to model
-                        self.rate_limited_logger.debug(
-                            "Converting WorkAssignment to EmployeeWorkHistoryModel",
-                            event_type="domain_to_model_conversion",
-                            identifier=str(assignment.employee.id),
-                            extra={
-                                "employee_id": assignment.employee.id,
-                                "workstation_id": assignment.workstation.id
-                            }
-                        )
-                        model = self._to_model(assignment)
-                        session.add(model)
-                        success_count += 1
-                    except Exception as e:
-                        error_msg = sanitize_exception(e)
-                        self.logger.error(
-                            f"Error saving assignment: {error_msg}",
-                            extra={
-                                "event_type": "assignment_save_error",
-                                "employee_id": assignment.employee.id,
-                                "workstation_id": assignment.workstation.id,
-                                "date": assignment.period.date.isoformat() if hasattr(assignment.period.date,
-                                                                                      'isoformat') else str(
-                                    assignment.period.date),
-                                "period": assignment.period.period,
-                                "error_type": type(e).__name__
-                            }
-                        )
-                        failed_assignments.append(assignment)
-
-                # Flush to ensure all assignments are saved
-                session.flush()
+            # Process assignments in batches
+            for i in range(0, len(assignments), batch_size):
+                batch = assignments[i:i+batch_size]
 
                 self.logger.info(
-                    f"Successfully saved {success_count} assignments, {len(failed_assignments)} failed",
+                    f"Processing batch {i//batch_size + 1} of {(len(assignments) + batch_size - 1) // batch_size} (size: {len(batch)})",
                     extra={
-                        "event_type": "assignments_save_result",
-                        "success_count": success_count,
-                        "failed_count": len(failed_assignments)
+                        "event_type": "assignments_batch_processing",
+                        "batch_number": i//batch_size + 1,
+                        "total_batches": (len(assignments) + batch_size - 1) // batch_size,
+                        "batch_size": len(batch)
                     }
                 )
 
-                return len(failed_assignments) == 0
+                with self.session_scope() as session:
+                    batch_success_count = 0
+
+                    for assignment in batch:
+                        try:
+                            # Convert to model
+                            self.rate_limited_logger.debug(
+                                "Converting WorkAssignment to EmployeeWorkHistoryModel",
+                                event_type="domain_to_model_conversion",
+                                identifier=str(assignment.employee.id),
+                                extra={
+                                    "employee_id": assignment.employee.id,
+                                    "workstation_id": assignment.workstation.id
+                                }
+                            )
+                            model = self._to_model(assignment)
+                            session.add(model)
+                            batch_success_count += 1
+                        except Exception as e:
+                            error_msg = sanitize_exception(e)
+                            self.logger.error(
+                                f"Error saving assignment: {error_msg}",
+                                extra={
+                                    "event_type": "assignment_save_error",
+                                    "employee_id": assignment.employee.id,
+                                    "workstation_id": assignment.workstation.id,
+                                    "date": self._format_date(assignment.period.date),
+                                    "period": assignment.period.period,
+                                    "error_type": type(e).__name__
+                                }
+                            )
+                            failed_assignments.append(assignment)
+
+                    # Flush to ensure all assignments in this batch are saved
+                    session.flush()
+
+                    self.logger.info(
+                        f"Batch {i//batch_size + 1}: Saved {batch_success_count} assignments, {len(batch) - batch_success_count} failed",
+                        extra={
+                            "event_type": "assignments_batch_result",
+                            "batch_number": i//batch_size + 1,
+                            "success_count": batch_success_count,
+                            "failed_count": len(batch) - batch_success_count
+                        }
+                    )
+
+                    success_count += batch_success_count
+
+            self.logger.info(
+                f"Total: Successfully saved {success_count} assignments, {len(failed_assignments)} failed",
+                extra={
+                    "event_type": "assignments_save_result",
+                    "success_count": success_count,
+                    "failed_count": len(failed_assignments)
+                }
+            )
+
+            return len(failed_assignments) == 0
         except RepositoryError:
             # This will be caught and logged by session_scope
             raise
@@ -997,8 +1024,7 @@ class SqlAlchemyAssignmentRepository(BaseSqlAlchemyRepository[WorkAssignment, Em
                 # Find all entries for the given date that were generated by the scheduler and are not temporary
                 query = session.query(EmployeeWorkHistoryModel).filter(
                     EmployeeWorkHistoryModel.worked_date == date_obj,
-                    EmployeeWorkHistoryModel.is_generated == True,
-                    EmployeeWorkHistoryModel.is_temporary == False
+                    EmployeeWorkHistoryModel.status == WorkHistoryStatus.GENERATED
                 )
 
                 # Get the count before deleting
@@ -1167,8 +1193,7 @@ class SqlAlchemyAssignmentRepository(BaseSqlAlchemyRepository[WorkAssignment, Em
                     worked_date=date_obj,
                     work_period=period,
                     end_flag=False,  # Default value
-                    is_generated=False,  # This is not generated by the scheduler
-                    is_temporary=True  # This is a temporary assignment
+                    status=WorkHistoryStatus.TEMPORARY  # This is a temporary assignment
                 )
                 session.add(model)
 
@@ -1195,13 +1220,54 @@ class SqlAlchemyAssignmentRepository(BaseSqlAlchemyRepository[WorkAssignment, Em
                     "event_type": "temporary_assignment_creation_error",
                     "employee_id": employee_id,
                     "workstation_id": workstation_id,
-                    "date": date_obj.isoformat() if hasattr(date_obj, 'isoformat') else str(date_obj),
+                    "date": self._format_date(date_obj),
                     "period": period,
                     "schedule_id": schedule_id,
                     "error_type": type(e).__name__
                 }
             )
-            return False
+            raise RepositoryError(f"Error creating temporary assignment: {error_msg}")
+
+    # -------------------------------------------------------------------------
+    # Helper Methods
+    # -------------------------------------------------------------------------
+
+    def _format_date(self, date_obj: date) -> str:
+        """
+        Format a date object to string, handling different date types.
+
+        Args:
+            date_obj: The date object to format.
+
+        Returns:
+            A string representation of the date.
+        """
+        return date_obj.isoformat() if hasattr(date_obj, 'isoformat') else str(date_obj)
+
+    def _convert_models_to_domain(self, models: List[EmployeeWorkHistoryModel]) -> List[WorkAssignment]:
+        """
+        Convert a list of models to domain entities.
+
+        Args:
+            models: The list of SQLAlchemy models to convert.
+
+        Returns:
+            A list of domain entities.
+        """
+        assignments = []
+        for model in models:
+            self.rate_limited_logger.debug(
+                f"Converting EmployeeWorkHistoryModel [id={model.id}] to domain WorkAssignment",
+                event_type="model_to_domain_conversion",
+                identifier=str(model.id),
+                extra={
+                    "entity_id": model.id
+                }
+            )
+            assignment = self._to_domain(model)
+            if assignment:
+                assignments.append(assignment)
+        return assignments
 
     # -------------------------------------------------------------------------
     # Conversion Helpers
@@ -1234,13 +1300,19 @@ class SqlAlchemyAssignmentRepository(BaseSqlAlchemyRepository[WorkAssignment, Em
 
         # Extract metadata values or use defaults
         schedule_id = metadata.get('schedule_id', None)
+        end_flag = metadata.get('end_flag', False)
+
+        # Get status from metadata if available
+        status = metadata.get('status', None)
+
+        # For backward compatibility, also pass the boolean flags
         is_temporary = metadata.get('is_temporary', False)
         is_generated = metadata.get('is_generated', True)
-        end_flag = metadata.get('end_flag', False)
 
         return WorkAssignmentFactory.create_model_from_entity(
             entity,
             schedule_id=schedule_id,
+            status=status,
             is_temporary=is_temporary,
             is_generated=is_generated,
             end_flag=end_flag,

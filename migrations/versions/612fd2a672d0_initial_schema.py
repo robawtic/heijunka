@@ -1,8 +1,8 @@
-"""Initial schema
+"""initial schema
 
-Revision ID: 03472447cb7a
+Revision ID: 612fd2a672d0
 Revises: 
-Create Date: 2025-06-05 03:36:31.069876
+Create Date: 2025-06-11 11:54:54.465961
 
 """
 from typing import Sequence, Union
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = '03472447cb7a'
+revision: str = '612fd2a672d0'
 down_revision: Union[str, None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -124,6 +124,15 @@ def upgrade() -> None:
     op.create_index(op.f('ix_schedules_status'), 'schedules', ['status'], unique=False)
     op.create_index(op.f('ix_schedules_task_id'), 'schedules', ['task_id'], unique=False)
     op.create_index(op.f('ix_schedules_team_id'), 'schedules', ['team_id'], unique=False)
+    op.create_table('team_aros',
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('employee_id', sa.Integer(), nullable=True),
+    sa.Column('team_id', sa.Integer(), nullable=True),
+    sa.Column('status', sa.Enum('ACTIVE', 'INACTIVE', name='aroteamstatus'), nullable=False),
+    sa.ForeignKeyConstraint(['employee_id'], ['employees.id'], name=op.f('fk_team_aros_employee_id_employees')),
+    sa.ForeignKeyConstraint(['team_id'], ['teams.id'], name=op.f('fk_team_aros_team_id_teams')),
+    sa.PrimaryKeyConstraint('id', name=op.f('pk_team_aros'))
+    )
     op.create_table('team_members',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('team_id', sa.Integer(), nullable=False),
@@ -178,8 +187,7 @@ def upgrade() -> None:
     sa.Column('worked_date', sa.Date(), nullable=False),
     sa.Column('work_period', sa.Integer(), nullable=False),
     sa.Column('end_flag', sa.Boolean(), nullable=False),
-    sa.Column('is_generated', sa.Boolean(), nullable=False),
-    sa.Column('is_temporary', sa.Boolean(), nullable=False),
+    sa.Column('status', sa.Enum('REGULAR', 'GENERATED', 'TEMPORARY', 'GENERATED_TEMPORARY', name='workhistorystatus'), nullable=False),
     sa.ForeignKeyConstraint(['employee_id'], ['employees.id'], name=op.f('fk_employee_work_history_employee_id_employees')),
     sa.ForeignKeyConstraint(['schedule_id'], ['schedules.id'], name=op.f('fk_employee_work_history_schedule_id_schedules')),
     sa.ForeignKeyConstraint(['station_id'], ['workstations.id'], name=op.f('fk_employee_work_history_station_id_workstations')),
@@ -214,6 +222,7 @@ def downgrade() -> None:
     op.drop_table('employee_station_skills')
     op.drop_table('workstations')
     op.drop_table('team_members')
+    op.drop_table('team_aros')
     op.drop_index(op.f('ix_schedules_team_id'), table_name='schedules')
     op.drop_index(op.f('ix_schedules_task_id'), table_name='schedules')
     op.drop_index(op.f('ix_schedules_status'), table_name='schedules')

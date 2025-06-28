@@ -19,7 +19,8 @@ class GenerateScheduleHandler:
                  schedule_repository=None,
                  session=None,
                  aro_service=None,
-                 aro_graph_service=None):
+                 aro_graph_service=None,
+                 work_history_repository=None):
         self.employee_repository = employee_repository
         self.workstation_repository = workstation_repository
         self.team_repository = team_repository
@@ -29,6 +30,7 @@ class GenerateScheduleHandler:
         self.session = session
         self.aro_service = aro_service
         self.aro_graph_service = aro_graph_service
+        self.work_history_repository = work_history_repository
 
     def handle(self, command: GenerateScheduleCommand) -> List[WorkAssignment]:
         """Generate and SAVE assignments for a single team (original behavior)."""
@@ -55,7 +57,8 @@ class GenerateScheduleHandler:
             team_repository=self.team_repository,
             schedule_repository=self.schedule_repository,
             aro_service=self.aro_service,
-            aro_graph_service=self.aro_graph_service
+            aro_graph_service=self.aro_graph_service,
+            employee_history_repo=self.work_history_repository
         )
 
         # Save assignments
@@ -88,7 +91,8 @@ class GenerateScheduleHandler:
             team_repository=self.team_repository,
             schedule_repository=self.schedule_repository,
             aro_service=self.aro_service,
-            aro_graph_service=self.aro_graph_service
+            aro_graph_service=self.aro_graph_service,
+            employee_history_repo=self.work_history_repository
         )
 
         return assignments
@@ -137,7 +141,8 @@ class GenerateScheduleHandler:
             schedule_repository=self.schedule_repository,
             aro_service=self.aro_service,
             aro_graph_service=self.aro_graph_service,
-            prefetched_data=prefetched_data
+            prefetched_data=prefetched_data,
+            employee_history_repo=self.work_history_repository
         )
 
         return assignments

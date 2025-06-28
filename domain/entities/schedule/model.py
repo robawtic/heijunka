@@ -178,6 +178,25 @@ class Schedule:
         if updated:
             self.register_domain_event(ScheduleUpdated(schedule_id=self.id))
 
+    def validate(self) -> bool:
+        """
+        Validates the schedule entity and its assignments.
+
+        Checks:
+        1. Basic schedule properties
+        2. Assignment overlaps (same employee assigned to multiple workstations in the same period)
+        3. Employee eligibility/qualification for assigned workstations
+        4. Valid date ranges and periods for assignments
+
+        Returns:
+            True if validation passes, False otherwise
+
+        Raises:
+            ValueError: If validation fails and force_complete is False
+        """
+        from domain.entities.schedule.validation import validate
+        return validate(self)
+
     def generate_assignments(
         self, 
         employees: List[Employee], 
@@ -260,7 +279,7 @@ class Schedule:
                     try:
                         # Create and add assignment to schedule
                         new_assignment = create_and_add_assignment(self, assignment.employee, assignment.workstation, assignment.period)
-                        print(f"new assignment created: {new_assignment}")
+
                         # Update work history repository if provided
                         if employee_history_repo:
                             from domain.value_objects.work_history_entry import WorkHistoryEntry

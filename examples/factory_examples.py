@@ -83,7 +83,7 @@ def demonstrate_schedule_factory():
         periods_per_day=4,
         status="pending"
     )
-    print(f"Created schedule for team {schedule.team_id} starting on {schedule.start_date}")
+    print(f"Created schedule: for team {schedule.team_id} starting on {schedule.start_date}")
     
     # Create a schedule with call-ins and offline periods
     schedule_with_call_ins = ScheduleFactory.create_schedule(

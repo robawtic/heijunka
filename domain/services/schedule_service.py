@@ -1,7 +1,9 @@
 # heijunka/domain/services/schedule_service.py
 from typing import List, Dict, Set, Optional, Tuple, Any, TypeVar, cast
-from datetime import date, timedelta
+from datetime import date, timedelta, datetime
 import logging
+import time
+import sys
 
 from domain.entities.employee import Employee
 from domain.entities.workstation import Workstation
@@ -13,6 +15,10 @@ from domain.rules.context import RuleContext
 from domain.services.cp_model_builder import CPModelBuilder
 from domain.services.aro_roster_service import ARORosterService
 from domain.services.team_lookup_service import TeamLookupService
+from domain.events.publisher import DomainEventPublisher
+from application.commands.generate_schedule_command import GenerateScheduleCommand
+from infrastructure.scheduling.schedule_data_service import ScheduleDataService
+from domain.models.EmployeeWorkHistoryModel import WorkHistoryStatus
 
 # Type aliases for improved readability
 WorkAssignments = List[WorkAssignment]
@@ -406,3 +412,206 @@ class ScheduleService:
     def add_constraint(self, constraint: ScheduleConstraint):
         """Add a constraint to the schedule service"""
         self.constraints.append(constraint)
+
+    def _get_teams_for_generation(self, args: Any, team_repository: Any) -> List[Any]:
+        """
+        Get teams based on the provided arguments.
+
+        Args:
+            args: Command line arguments or API request parameters
+            team_repository: Repository for team data
+
+        Returns:
+            List of teams to generate schedules for
+        """
+        teams = []
+
+        if hasattr(args, 'team') and args.team:
+            # Get team by name
+            try:
+                team = team_repository.get_by_name(args.team)
+                if not team:
+                    return []
+                teams = [team]
+            except ValueError:
+                return []
+        elif hasattr(args, 'group') and args.group:
+            # Get teams by group name
+            teams = team_repository.get_by_group_name(args.group)
+            if not teams:
+                return []
+        elif hasattr(args, 'department') and args.department:
+            # Get teams by department name
+            teams = team_repository.get_by_department_name(args.department)
+            if not teams:
+                return []
+
+        return teams
+
+    def generate_schedule_flow(
+        self,
+        args: Any,
+        session: Any,
+        employee_repository: Any,
+        workstation_repository: Any,
+        team_repository: Any,
+        assignment_repository: Any,
+        work_history_repository: Any,
+        aro_repository: Any,
+        aro_service: Any,
+        aro_graph_service: Any,
+        schedule_repository: Any
+    ) -> Dict[str, Any]:
+        """
+        Orchestrate the complete schedule generation flow.
+
+        This method handles:
+        - Argument validation
+        - Team lookup
+        - Schedule generation
+        - Work history updates
+        - Performance metrics collection
+
+        Args:
+            args: Command line arguments or API request parameters
+            session: Database session
+            employee_repository: Repository for employee data
+            workstation_repository: Repository for workstation data
+            team_repository: Repository for team data
+            assignment_repository: Repository for assignment data
+            work_history_repository: Repository for work history data
+            aro_repository: Repository for ARO assignment data
+            aro_service: Service for ARO operations
+            aro_graph_service: Service for ARO graph operations
+            schedule_repository: Repository for schedule data
+
+        Returns:
+            Dictionary containing:
+            - success: Boolean indicating if the operation was successful
+            - assignments: List of generated assignments
+            - teams: List of teams for which schedules were generated
+            - metrics: Performance metrics
+            - error: Error message if any
+            - prefetched_data: Prefetched data for display or further processing
+        """
+        result = {
+            "success": False,
+            "assignments": [],
+            "teams": [],
+            "metrics": {},
+            "error": None,
+            "prefetched_data": {}
+        }
+
+        start_time = time.time()
+        query_count = 0  # This would be tracked properly in a real implementation
+
+        try:
+            # Parse start_date if it's a string
+            start_date = args.start_date
+            if isinstance(start_date, str):
+                try:
+                    start_date = datetime.strptime(start_date, "%Y-%m-%d").date()
+                except ValueError:
+                    result["error"] = "Invalid start date format. Use YYYY-MM-DD"
+                    return result
+
+            # Get teams based on the provided arguments
+            teams = self._get_teams_for_generation(args, team_repository)
+            if not teams:
+                result["error"] = f"No teams found for the specified criteria"
+                return result
+
+            result["teams"] = teams
+
+            # Create a domain event publisher
+            event_publisher = DomainEventPublisher()
+
+            # Create a schedule data service
+            schedule_data_service = ScheduleDataService(
+                employee_repository=employee_repository,
+                workstation_repository=workstation_repository,
+                team_repository=team_repository,
+                aro_repository=aro_repository,
+                session=session
+            )
+            # Import handler and coordinator here to avoid circular import
+            from application.commands.generate_schedule_handler import GenerateScheduleHandler
+
+            # Create a handler
+            handler = GenerateScheduleHandler(
+                employee_repository=employee_repository,
+                workstation_repository=workstation_repository,
+                team_repository=team_repository,
+                assignment_repository=assignment_repository,
+                schedule_service=self,
+                schedule_repository=schedule_repository,
+                session=session,
+                aro_service=aro_service,
+                aro_graph_service=aro_graph_service,
+                work_history_repository=work_history_repository
+            )
+
+            # Import coordinator here to avoid circular import
+            from infrastructure.scheduling.schedule_coordinator import ScheduleCoordinator
+
+            # Create a schedule coordinator
+            coordinator = ScheduleCoordinator(
+                schedule_handler=handler,
+                schedule_data_service=schedule_data_service,
+                event_publisher=event_publisher,
+                work_history_repository=work_history_repository
+            )
+
+            # Create commands for each team
+            commands = []
+            for team in teams:
+                command = GenerateScheduleCommand(
+                    team_id=team.id,
+                    start_date=start_date,
+                    periods_per_day=args.periods,
+                    call_ins=args.call_ins,
+                    offline=args.offline,
+                    force_complete=args.force_complete
+                )
+                commands.append(command)
+
+            # Generate schedules using the coordinator
+            all_assignments_by_team = coordinator.generate_schedules(commands)
+
+            # Flatten assignments for saving
+            all_assignments = []
+            for team_assignments in all_assignments_by_team.values():
+                all_assignments.extend(team_assignments)
+
+            result["assignments"] = all_assignments
+
+            # Save all assignments in a single batch
+            save_success = assignment_repository.save_all(all_assignments)
+
+            # Calculate performance metrics
+            end_time = time.time()
+            execution_time = end_time - start_time
+
+            result["metrics"] = {
+                "query_count": query_count,
+                "execution_time": execution_time,
+                "assignment_count": len(all_assignments),
+                "team_count": len(teams)
+            }
+
+            # Prefetch data for display or further processing
+            prefetched_data = schedule_data_service.prefetch_for_teams(
+                team_ids=[team.id for team in teams],
+                start_date=start_date,
+                periods=args.periods
+            )
+
+            result["prefetched_data"] = prefetched_data
+            result["success"] = True
+
+            return result
+
+        except Exception as e:
+            result["error"] = f"Error generating schedule: {str(e)}"
+            return result
