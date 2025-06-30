@@ -24,14 +24,14 @@ class ScenarioSimulator:
         team_repository: TeamRepositoryInterface,
         schedule_service: ScheduleService,
         schedule_repository: Optional[ScheduleRepositoryInterface] = None,
-        session=None
+        session_factory=None
     ):
         self.employee_repository = employee_repository
         self.workstation_repository = workstation_repository
         self.team_repository = team_repository
         self.schedule_service = schedule_service
         self.schedule_repository = schedule_repository
-        self.session = session
+        self.session_factory = session_factory
         self.results = {}  # Store scenario results
 
     def run_scenario(self, scenario: Scenario) -> Dict[str, Any]:
@@ -52,19 +52,31 @@ class ScenarioSimulator:
         logger.debug(f"Found {len(employees)} employees and {len(workstations)} workstations for team {team.name}")
 
         # Generate schedule
-        assignments = self.schedule_service.generate_schedule(
-            employees=employees,
-            workstations=workstations,
-            start_date=scenario.start_date,
-            periods_per_day=scenario.periods_per_day,
-            team_name=team.name,
-            call_ins=scenario.call_ins,
-            offline=scenario.offline,
-            force_complete=scenario.force_complete,
-            session=self.session,
-            team_repository=self.team_repository,
-            schedule_repository=self.schedule_repository
-        )
+        # Create a new session if a session factory is provided
+        session = self.session_factory() if self.session_factory else None
+
+        try:
+            assignments = self.schedule_service.generate_schedule(
+                employees=employees,
+                workstations=workstations,
+                start_date=scenario.start_date,
+                periods_per_day=scenario.periods_per_day,
+                team_name=team.name,
+                call_ins=scenario.call_ins,
+                offline=scenario.offline,
+                force_complete=scenario.force_complete,
+                session=session,
+                team_repository=self.team_repository,
+                schedule_repository=self.schedule_repository
+            )
+
+            # Commit the session if it was created here
+            if session:
+                session.commit()
+        finally:
+            # Close the session if it was created here
+            if session:
+                session.close()
 
         # Calculate metrics
         metrics = self._calculate_metrics(assignments, employees, workstations)

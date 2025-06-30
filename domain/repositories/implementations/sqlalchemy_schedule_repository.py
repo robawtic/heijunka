@@ -19,50 +19,17 @@ class SqlAlchemyScheduleRepository(BaseSqlAlchemyRepository[Schedule, ScheduleMo
     SQLAlchemy implementation of the ScheduleRepositoryInterface.
     """
 
-    @contextmanager
-    def session_scope(self) -> Generator[Session, None, None]:
-        """
-        Provide a transactional scope around a series of operations.
+    # Using the base class session_scope implementation which correctly uses session factory
+    # No need to override this method
 
-        Yields:
-            The SQLAlchemy session.
-        """
-        try:
-            yield self._session
-            self._session.commit()
-        except SQLAlchemyError as e:
-            self._session.rollback()
-            error_msg = sanitize_exception(e)
-            self.logger.error(
-                f"Database operation failed: {error_msg}",
-                extra={
-                    "event_type": "database_error",
-                    "error_type": type(e).__name__,
-                    "repository": "schedule"
-                }
-            )
-            raise RepositoryError(f"Database error: {error_msg}")
-        except Exception as e:
-            self._session.rollback()
-            error_msg = sanitize_exception(e)
-            self.logger.error(
-                f"Unexpected error in schedule repository: {error_msg}",
-                extra={
-                    "event_type": "unexpected_error",
-                    "error_type": type(e).__name__,
-                    "repository": "schedule"
-                }
-            )
-            raise RepositoryError(f"Repository error: {error_msg}")
-
-    def __init__(self, session: Session):
+    def __init__(self, session_factory):
         """
         Initialize the repository with a SQLAlchemy session.
 
         Args:
-            session: The SQLAlchemy session to use for database operations.
+            session_factory: The SQLAlchemy session factory to use for database operations.
         """
-        super().__init__(session, ScheduleModel, Schedule)
+        super().__init__(session_factory, ScheduleModel, Schedule)
         self.logger = get_logger("heijunka.repositories.schedule")
         self.rate_limited_logger = get_logger("heijunka.repositories.schedule", rate_limit=True)
 
@@ -86,23 +53,27 @@ class SqlAlchemyScheduleRepository(BaseSqlAlchemyRepository[Schedule, ScheduleMo
                 }
             )
 
-            model = self._session.query(ScheduleModel).filter(ScheduleModel.task_id == task_id).options(
-                joinedload(ScheduleModel.team),
-                joinedload(ScheduleModel.work_history_entries).joinedload(EmployeeWorkHistoryModel.employee),
-                joinedload(ScheduleModel.work_history_entries).joinedload(EmployeeWorkHistoryModel.station)
-            ).first()
+            with self.session_scope() as session:
+                model = session.query(ScheduleModel).filter(ScheduleModel.task_id == task_id).options(
+                    joinedload(ScheduleModel.team),
+                    joinedload(ScheduleModel.work_history_entries).joinedload(EmployeeWorkHistoryModel.employee),
+                    joinedload(ScheduleModel.work_history_entries).joinedload(EmployeeWorkHistoryModel.station)
+                ).first()
 
-            if model is None:
-                self.logger.info(
-                    f"No schedule found with task ID: {task_id}",
-                    extra={
-                        "event_type": "schedule_lookup_failed",
-                        "lookup_type": "task_id",
-                        "task_id": task_id,
-                        "reason": "not_found"
-                    }
-                )
-                return None
+                if model is None:
+                    self.logger.info(
+                        f"No schedule found with task ID: {task_id}",
+                        extra={
+                            "event_type": "schedule_lookup_failed",
+                            "lookup_type": "task_id",
+                            "task_id": task_id,
+                            "reason": "not_found"
+                        }
+                    )
+                    return None
+
+                # Convert to domain entity inside the session scope
+                entity = self._to_domain(model)
 
             self.logger.info(
                 f"Found schedule with task ID: {task_id}",
@@ -110,12 +81,12 @@ class SqlAlchemyScheduleRepository(BaseSqlAlchemyRepository[Schedule, ScheduleMo
                     "event_type": "schedule_lookup_success",
                     "lookup_type": "task_id",
                     "task_id": task_id,
-                    "schedule_id": model.id,
-                    "team_id": model.team_id
+                    "schedule_id": entity.id,
+                    "team_id": entity.team_id
                 }
             )
 
-            return self._to_domain(model)
+            return entity
         except SQLAlchemyError as e:
             error_msg = sanitize_exception(e)
             self.logger.error(
@@ -161,27 +132,31 @@ class SqlAlchemyScheduleRepository(BaseSqlAlchemyRepository[Schedule, ScheduleMo
                 }
             )
 
-            query = self._session.query(ScheduleModel).filter(ScheduleModel.team_id == team_id)
+            with self.session_scope() as session:
+                query = session.query(ScheduleModel).filter(ScheduleModel.team_id == team_id)
 
-            if start_date is not None:
-                query = query.filter(ScheduleModel.start_date >= start_date)
+                if start_date is not None:
+                    query = query.filter(ScheduleModel.start_date >= start_date)
 
-            if end_date is not None:
-                query = query.filter(ScheduleModel.start_date <= end_date)
+                if end_date is not None:
+                    query = query.filter(ScheduleModel.start_date <= end_date)
 
-            if status is not None:
-                query = query.filter(ScheduleModel.status == status)
+                if status is not None:
+                    query = query.filter(ScheduleModel.status == status)
 
-            # Use eager loading to avoid N+1 queries
-            query = query.options(
-                joinedload(ScheduleModel.team),
-                joinedload(ScheduleModel.work_history_entries).joinedload(EmployeeWorkHistoryModel.employee),
-                joinedload(ScheduleModel.work_history_entries).joinedload(EmployeeWorkHistoryModel.station)
-            )
+                # Use eager loading to avoid N+1 queries
+                query = query.options(
+                    joinedload(ScheduleModel.team),
+                    joinedload(ScheduleModel.work_history_entries).joinedload(EmployeeWorkHistoryModel.employee),
+                    joinedload(ScheduleModel.work_history_entries).joinedload(EmployeeWorkHistoryModel.station)
+                )
 
-            models = query.order_by(ScheduleModel.created_at.desc()).offset(skip).limit(limit).all()
+                models = query.order_by(ScheduleModel.created_at.desc()).offset(skip).limit(limit).all()
 
-            count = len(models)
+                # Convert to domain entities inside the session scope
+                entities = [self._to_domain(model) for model in models]
+
+            count = len(entities)
             self.logger.info(
                 f"Retrieved {count} schedules for team ID: {team_id}",
                 extra={
@@ -192,7 +167,7 @@ class SqlAlchemyScheduleRepository(BaseSqlAlchemyRepository[Schedule, ScheduleMo
                 }
             )
 
-            return [self._to_domain(model) for model in models]
+            return entities
         except SQLAlchemyError as e:
             error_msg = sanitize_exception(e)
             self.logger.error(
@@ -416,21 +391,22 @@ class SqlAlchemyScheduleRepository(BaseSqlAlchemyRepository[Schedule, ScheduleMo
                 }
             )
 
-            query = self._session.query(ScheduleModel)
+            with self.session_scope() as session:
+                query = session.query(ScheduleModel)
 
-            if team_id is not None:
-                query = query.filter(ScheduleModel.team_id == team_id)
+                if team_id is not None:
+                    query = query.filter(ScheduleModel.team_id == team_id)
 
-            if start_date is not None:
-                query = query.filter(ScheduleModel.start_date >= start_date)
+                if start_date is not None:
+                    query = query.filter(ScheduleModel.start_date >= start_date)
 
-            if end_date is not None:
-                query = query.filter(ScheduleModel.start_date <= end_date)
+                if end_date is not None:
+                    query = query.filter(ScheduleModel.start_date <= end_date)
 
-            if status is not None:
-                query = query.filter(ScheduleModel.status == status)
+                if status is not None:
+                    query = query.filter(ScheduleModel.status == status)
 
-            count = query.count()
+                count = query.count()
 
             self.logger.info(
                 f"Counted {count} schedules matching filters",

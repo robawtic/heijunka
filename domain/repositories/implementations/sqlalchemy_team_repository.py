@@ -28,14 +28,14 @@ class SqlAlchemyTeamRepository(BaseSqlAlchemyRepository[Team, TeamModel], TeamRe
     Team entities in the database using SQLAlchemy.
     """
 
-    def __init__(self, session: Session):
+    def __init__(self, session_factory):
         """
         Initialize the repository with a SQLAlchemy session.
 
         Args:
-            session: The SQLAlchemy session to use for database operations.
+            session_factory: The SQLAlchemy session factory to use for database operations.
         """
-        super().__init__(session, TeamModel, Team)
+        super().__init__(session_factory, TeamModel, Team)
         self.logger = get_logger("heijunka.repositories.team")
         self.rate_limited_logger = get_logger("heijunka.repositories.team", rate_limit=True)
 
@@ -82,33 +82,34 @@ class SqlAlchemyTeamRepository(BaseSqlAlchemyRepository[Team, TeamModel], TeamRe
                 }
             )
 
-            team_model = self._session.query(TeamModel).filter(
-                func.lower(TeamModel.name) == func.lower(name)
-            ).first()
+            with self.session_scope() as session:
+                team_model = session.query(TeamModel).filter(
+                    func.lower(TeamModel.name) == func.lower(name)
+                ).first()
 
-            if team_model is None:
+                if team_model is None:
+                    self.logger.info(
+                        f"No team found with name: {name}",
+                        extra={
+                            "event_type": "team_lookup_failed",
+                            "lookup_type": "name",
+                            "team_name": name,
+                            "reason": "not_found"
+                        }
+                    )
+                    return None
+
                 self.logger.info(
-                    f"No team found with name: {name}",
+                    f"Found team with name: {name}",
                     extra={
-                        "event_type": "team_lookup_failed",
+                        "event_type": "team_lookup_success",
                         "lookup_type": "name",
                         "team_name": name,
-                        "reason": "not_found"
+                        "team_id": team_model.id
                     }
                 )
-                return None
 
-            self.logger.info(
-                f"Found team with name: {name}",
-                extra={
-                    "event_type": "team_lookup_success",
-                    "lookup_type": "name",
-                    "team_name": name,
-                    "team_id": team_model.id
-                }
-            )
-
-            return self._to_domain(team_model)
+                return self._to_domain(team_model)
         except SQLAlchemyError as e:
             error_msg = sanitize_exception(e)
             self.logger.error(
@@ -293,35 +294,36 @@ class SqlAlchemyTeamRepository(BaseSqlAlchemyRepository[Team, TeamModel], TeamRe
                 }
             )
 
-            team = self._session.query(TeamModel).get(team_id)
-            if not team:
+            with self.session_scope() as session:
+                team = session.query(TeamModel).get(team_id)
+                if not team:
+                    self.logger.info(
+                        f"No team found with ID: {team_id}",
+                        extra={
+                            "event_type": "team_members_lookup_failed",
+                            "team_id": team_id,
+                            "reason": "team_not_found"
+                        }
+                    )
+                    return []
+
+                members = []
+                for member in team.members:
+                    if member.employee:
+                        employee = EmployeeFactory.create_from_model(member.employee)
+                        members.append(employee)
+
+                member_count = len(members)
                 self.logger.info(
-                    f"No team found with ID: {team_id}",
+                    f"Retrieved {member_count} members for team ID: {team_id}",
                     extra={
-                        "event_type": "team_members_lookup_failed",
+                        "event_type": "team_members_lookup_success",
                         "team_id": team_id,
-                        "reason": "team_not_found"
+                        "member_count": member_count
                     }
                 )
-                return []
 
-            members = []
-            for member in team.members:
-                if member.employee:
-                    employee = EmployeeFactory.create_from_model(member.employee)
-                    members.append(employee)
-
-            member_count = len(members)
-            self.logger.info(
-                f"Retrieved {member_count} members for team ID: {team_id}",
-                extra={
-                    "event_type": "team_members_lookup_success",
-                    "team_id": team_id,
-                    "member_count": member_count
-                }
-            )
-
-            return members
+                return members
         except SQLAlchemyError as e:
             error_msg = sanitize_exception(e)
             self.logger.error(
@@ -519,21 +521,25 @@ class SqlAlchemyTeamRepository(BaseSqlAlchemyRepository[Team, TeamModel], TeamRe
                 }
             )
 
-            workstations = self._session.query(WorkstationModel).filter(
-                WorkstationModel.team_id == team_id
-            ).all()
+            result = []
+            with self.session_scope() as session:
+                workstations = session.query(WorkstationModel).filter(
+                    WorkstationModel.team_id == team_id
+                ).all()
 
-            workstation_count = len(workstations)
-            self.logger.info(
-                f"Retrieved {workstation_count} workstations for team ID: {team_id}",
-                extra={
-                    "event_type": "team_workstations_lookup_success",
-                    "team_id": team_id,
-                    "workstation_count": workstation_count
-                }
-            )
+                workstation_count = len(workstations)
+                self.logger.info(
+                    f"Retrieved {workstation_count} workstations for team ID: {team_id}",
+                    extra={
+                        "event_type": "team_workstations_lookup_success",
+                        "team_id": team_id,
+                        "workstation_count": workstation_count
+                    }
+                )
 
-            return [WorkstationFactory.create_from_model(ws) for ws in workstations]
+                result = [WorkstationFactory.create_from_model(ws) for ws in workstations]
+
+            return result
         except SQLAlchemyError as e:
             error_msg = sanitize_exception(e)
             self.logger.error(
@@ -569,35 +575,38 @@ class SqlAlchemyTeamRepository(BaseSqlAlchemyRepository[Team, TeamModel], TeamRe
 
             from domain.models.GroupModel import GroupModel
 
-            # Find the group by name (case-insensitive)
-            group = self._session.query(GroupModel).filter(
-                func.lower(GroupModel.name) == func.lower(group_name)).first()
-            if not group:
+            with self.session_scope() as session:
+                # Find the group by name (case-insensitive)
+                group = session.query(GroupModel).filter(
+                    func.lower(GroupModel.name) == func.lower(group_name)).first()
+                if not group:
+                    self.logger.info(
+                        f"No group found with name: {group_name}",
+                        extra={
+                            "event_type": "teams_by_group_lookup_failed",
+                            "group_name": group_name,
+                            "reason": "group_not_found"
+                        }
+                    )
+                    return []
+
+                # Get all teams that belong to this group
+                team_models = session.query(TeamModel).filter(TeamModel.group_id == group.id).all()
+
+                team_count = len(team_models)
                 self.logger.info(
-                    f"No group found with name: {group_name}",
+                    f"Retrieved {team_count} teams for group name: {group_name}",
                     extra={
-                        "event_type": "teams_by_group_lookup_failed",
+                        "event_type": "teams_by_group_lookup_success",
                         "group_name": group_name,
-                        "reason": "group_not_found"
+                        "group_id": group.id,
+                        "team_count": team_count
                     }
                 )
-                return []
 
-            # Get all teams that belong to this group
-            team_models = self._session.query(TeamModel).filter(TeamModel.group_id == group.id).all()
+                result = [self._to_domain(team_model) for team_model in team_models]
 
-            team_count = len(team_models)
-            self.logger.info(
-                f"Retrieved {team_count} teams for group name: {group_name}",
-                extra={
-                    "event_type": "teams_by_group_lookup_success",
-                    "group_name": group_name,
-                    "group_id": group.id,
-                    "team_count": team_count
-                }
-            )
-
-            return [self._to_domain(team_model) for team_model in team_models]
+                return result
         except SQLAlchemyError as e:
             error_msg = sanitize_exception(e)
             self.logger.error(
@@ -632,52 +641,55 @@ class SqlAlchemyTeamRepository(BaseSqlAlchemyRepository[Team, TeamModel], TeamRe
             from domain.models.DepartmentModel import DepartmentModel
             from domain.models.GroupModel import GroupModel
 
-            # Find the department by name (case-insensitive)
-            department = self._session.query(DepartmentModel).filter(
-                func.lower(DepartmentModel.name) == func.lower(department_name)).first()
-            if not department:
-                self.logger.info(
-                    f"No department found with name: {department_name}",
-                    extra={
-                        "event_type": "teams_by_department_lookup_failed",
-                        "department_name": department_name,
-                        "reason": "department_not_found"
-                    }
-                )
-                return []
+            with self.session_scope() as session:
+                # Find the department by name (case-insensitive)
+                department = session.query(DepartmentModel).filter(
+                    func.lower(DepartmentModel.name) == func.lower(department_name)).first()
+                if not department:
+                    self.logger.info(
+                        f"No department found with name: {department_name}",
+                        extra={
+                            "event_type": "teams_by_department_lookup_failed",
+                            "department_name": department_name,
+                            "reason": "department_not_found"
+                        }
+                    )
+                    return []
 
-            # Get all groups that belong to this department
-            groups = self._session.query(GroupModel).filter(GroupModel.department_id == department.id).all()
-            if not groups:
+                # Get all groups that belong to this department
+                groups = session.query(GroupModel).filter(GroupModel.department_id == department.id).all()
+                if not groups:
+                    self.logger.info(
+                        f"No groups found for department: {department_name}",
+                        extra={
+                            "event_type": "teams_by_department_lookup_failed",
+                            "department_name": department_name,
+                            "department_id": department.id,
+                            "reason": "no_groups"
+                        }
+                    )
+                    return []
+
+                # Get all teams that belong to any of these groups
+                group_ids = [group.id for group in groups]
+                team_models = session.query(TeamModel).filter(TeamModel.group_id.in_(group_ids)).all()
+
+                team_count = len(team_models)
+                group_count = len(groups)
                 self.logger.info(
-                    f"No groups found for department: {department_name}",
+                    f"Retrieved {team_count} teams from {group_count} groups for department: {department_name}",
                     extra={
-                        "event_type": "teams_by_department_lookup_failed",
+                        "event_type": "teams_by_department_lookup_success",
                         "department_name": department_name,
                         "department_id": department.id,
-                        "reason": "no_groups"
+                        "group_count": group_count,
+                        "team_count": team_count
                     }
                 )
-                return []
 
-            # Get all teams that belong to any of these groups
-            group_ids = [group.id for group in groups]
-            team_models = self._session.query(TeamModel).filter(TeamModel.group_id.in_(group_ids)).all()
+                result = [self._to_domain(team_model) for team_model in team_models]
 
-            team_count = len(team_models)
-            group_count = len(groups)
-            self.logger.info(
-                f"Retrieved {team_count} teams from {group_count} groups for department: {department_name}",
-                extra={
-                    "event_type": "teams_by_department_lookup_success",
-                    "department_name": department_name,
-                    "department_id": department.id,
-                    "group_count": group_count,
-                    "team_count": team_count
-                }
-            )
-
-            return [self._to_domain(team_model) for team_model in team_models]
+                return result
         except SQLAlchemyError as e:
             error_msg = sanitize_exception(e)
             self.logger.error(
@@ -711,36 +723,39 @@ class SqlAlchemyTeamRepository(BaseSqlAlchemyRepository[Team, TeamModel], TeamRe
 
             from domain.models.GroupModel import GroupModel
 
-            # Get all groups that belong to this department
-            groups = self._session.query(GroupModel).filter(GroupModel.department_id == department_id).all()
-            if not groups:
+            with self.session_scope() as session:
+                # Get all groups that belong to this department
+                groups = session.query(GroupModel).filter(GroupModel.department_id == department_id).all()
+                if not groups:
+                    self.logger.info(
+                        f"No groups found for department ID: {department_id}",
+                        extra={
+                            "event_type": "teams_by_department_lookup_failed",
+                            "department_id": department_id,
+                            "reason": "no_groups"
+                        }
+                    )
+                    return []
+
+                # Get all teams that belong to any of these groups
+                group_ids = [group.id for group in groups]
+                team_models = session.query(TeamModel).filter(TeamModel.group_id.in_(group_ids)).all()
+
+                team_count = len(team_models)
+                group_count = len(groups)
                 self.logger.info(
-                    f"No groups found for department ID: {department_id}",
+                    f"Retrieved {team_count} teams from {group_count} groups for department ID: {department_id}",
                     extra={
-                        "event_type": "teams_by_department_lookup_failed",
+                        "event_type": "teams_by_department_lookup_success",
                         "department_id": department_id,
-                        "reason": "no_groups"
+                        "group_count": group_count,
+                        "team_count": team_count
                     }
                 )
-                return []
 
-            # Get all teams that belong to any of these groups
-            group_ids = [group.id for group in groups]
-            team_models = self._session.query(TeamModel).filter(TeamModel.group_id.in_(group_ids)).all()
+                result = [self._to_domain(team_model) for team_model in team_models]
 
-            team_count = len(team_models)
-            group_count = len(groups)
-            self.logger.info(
-                f"Retrieved {team_count} teams from {group_count} groups for department ID: {department_id}",
-                extra={
-                    "event_type": "teams_by_department_lookup_success",
-                    "department_id": department_id,
-                    "group_count": group_count,
-                    "team_count": team_count
-                }
-            )
-
-            return [self._to_domain(team_model) for team_model in team_models]
+                return result
         except SQLAlchemyError as e:
             error_msg = sanitize_exception(e)
             self.logger.error(
@@ -772,40 +787,43 @@ class SqlAlchemyTeamRepository(BaseSqlAlchemyRepository[Team, TeamModel], TeamRe
                 }
             )
 
-            team_model = self._session.query(TeamModel).get(team_id)
-            if not team_model:
+            with self.session_scope() as session:
+                team_model = session.query(TeamModel).get(team_id)
+                if not team_model:
+                    self.logger.info(
+                        f"No team found with ID: {team_id}",
+                        extra={
+                            "event_type": "team_group_lookup_failed",
+                            "team_id": team_id,
+                            "reason": "team_not_found"
+                        }
+                    )
+                    return None
+
+                if not team_model.group:
+                    self.logger.info(
+                        f"Team with ID: {team_id} does not belong to any group",
+                        extra={
+                            "event_type": "team_group_lookup_failed",
+                            "team_id": team_id,
+                            "reason": "no_group"
+                        }
+                    )
+                    return None
+
                 self.logger.info(
-                    f"No team found with ID: {team_id}",
+                    f"Found group ID: {team_model.group.id} for team ID: {team_id}",
                     extra={
-                        "event_type": "team_group_lookup_failed",
+                        "event_type": "team_group_lookup_success",
                         "team_id": team_id,
-                        "reason": "team_not_found"
+                        "group_id": team_model.group.id,
+                        "group_name": team_model.group.name
                     }
                 )
-                return None
 
-            if not team_model.group:
-                self.logger.info(
-                    f"Team with ID: {team_id} does not belong to any group",
-                    extra={
-                        "event_type": "team_group_lookup_failed",
-                        "team_id": team_id,
-                        "reason": "no_group"
-                    }
-                )
-                return None
+                result = team_model.group.to_domain() if hasattr(team_model.group, 'to_domain') else team_model.group
 
-            self.logger.info(
-                f"Found group ID: {team_model.group.id} for team ID: {team_id}",
-                extra={
-                    "event_type": "team_group_lookup_success",
-                    "team_id": team_id,
-                    "group_id": team_model.group.id,
-                    "group_name": team_model.group.name
-                }
-            )
-
-            return team_model.group.to_domain() if hasattr(team_model.group, 'to_domain') else team_model.group
+                return result
         except SQLAlchemyError as e:
             error_msg = sanitize_exception(e)
             self.logger.error(
@@ -838,29 +856,34 @@ class SqlAlchemyTeamRepository(BaseSqlAlchemyRepository[Team, TeamModel], TeamRe
             )
 
             from domain.models.DepartmentModel import DepartmentModel
+            from domain.factories.department_factory import DepartmentFactory
 
-            department_model = self._session.query(DepartmentModel).filter(DepartmentModel.id == department_id).first()
-            if not department_model:
+            with self.session_scope() as session:
+                department_model = session.query(DepartmentModel).filter(DepartmentModel.id == department_id).first()
+                if not department_model:
+                    self.logger.info(
+                        f"No department found with ID: {department_id}",
+                        extra={
+                            "event_type": "department_lookup_failed",
+                            "department_id": department_id,
+                            "reason": "not_found"
+                        }
+                    )
+                    return None
+
                 self.logger.info(
-                    f"No department found with ID: {department_id}",
+                    f"Found department with ID: {department_id}",
                     extra={
-                        "event_type": "department_lookup_failed",
+                        "event_type": "department_lookup_success",
                         "department_id": department_id,
-                        "reason": "not_found"
+                        "department_name": department_model.name
                     }
                 )
-                return None
 
-            self.logger.info(
-                f"Found department with ID: {department_id}",
-                extra={
-                    "event_type": "department_lookup_success",
-                    "department_id": department_id,
-                    "department_name": department_model.name
-                }
-            )
+                # Convert the model to a domain entity to ensure it doesn't depend on the session
+                result = DepartmentFactory.create_from_model(department_model)
 
-            return department_model
+                return result
         except SQLAlchemyError as e:
             error_msg = sanitize_exception(e)
             self.logger.error(
@@ -895,51 +918,52 @@ class SqlAlchemyTeamRepository(BaseSqlAlchemyRepository[Team, TeamModel], TeamRe
                 }
             )
 
-            result = self._session.query(
-                TeamModel,
-                func.count(distinct(EmployeeModel.id)).label('employee_count'),
-                func.count(distinct(WorkstationModel.id)).label('workstation_count')
-            ).outerjoin(
-                TeamMemberModel, TeamMemberModel.team_id == TeamModel.id
-            ).outerjoin(
-                EmployeeModel, EmployeeModel.id == TeamMemberModel.employee_id
-            ).outerjoin(
-                WorkstationModel, WorkstationModel.team_id == TeamModel.id
-            ).filter(
-                TeamModel.id == team_id
-            ).group_by(
-                TeamModel.id
-            ).first()
+            with self.session_scope() as session:
+                result = session.query(
+                    TeamModel,
+                    func.count(distinct(EmployeeModel.id)).label('employee_count'),
+                    func.count(distinct(WorkstationModel.id)).label('workstation_count')
+                ).outerjoin(
+                    TeamMemberModel, TeamMemberModel.team_id == TeamModel.id
+                ).outerjoin(
+                    EmployeeModel, EmployeeModel.id == TeamMemberModel.employee_id
+                ).outerjoin(
+                    WorkstationModel, WorkstationModel.team_id == TeamModel.id
+                ).filter(
+                    TeamModel.id == team_id
+                ).group_by(
+                    TeamModel.id
+                ).first()
 
-            if not result:
+                if not result:
+                    self.logger.info(
+                        f"No team found with ID: {team_id}",
+                        extra={
+                            "event_type": "team_with_counts_lookup_failed",
+                            "team_id": team_id,
+                            "reason": "team_not_found"
+                        }
+                    )
+                    return None
+
+                team, employee_count, workstation_count = result
+
                 self.logger.info(
-                    f"No team found with ID: {team_id}",
+                    f"Retrieved team with counts for team ID: {team_id}",
                     extra={
-                        "event_type": "team_with_counts_lookup_failed",
+                        "event_type": "team_with_counts_lookup_success",
                         "team_id": team_id,
-                        "reason": "team_not_found"
+                        "team_name": team.name,
+                        "employee_count": employee_count,
+                        "workstation_count": workstation_count
                     }
                 )
-                return None
 
-            team, employee_count, workstation_count = result
-
-            self.logger.info(
-                f"Retrieved team with counts for team ID: {team_id}",
-                extra={
-                    "event_type": "team_with_counts_lookup_success",
-                    "team_id": team_id,
-                    "team_name": team.name,
-                    "employee_count": employee_count,
-                    "workstation_count": workstation_count
+                return {
+                    'team': self._to_domain(team),
+                    'employee_count': employee_count,
+                    'workstation_count': workstation_count
                 }
-            )
-
-            return {
-                'team': self._to_domain(team),
-                'employee_count': employee_count,
-                'workstation_count': workstation_count
-            }
         except SQLAlchemyError as e:
             error_msg = sanitize_exception(e)
             self.logger.error(

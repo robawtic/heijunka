@@ -55,7 +55,7 @@ class RegressionTestService:
         team_repository: TeamRepositoryInterface,
         schedule_service: ScheduleService,
         schedule_repository: Optional[ScheduleRepositoryInterface] = None,
-        session=None
+        session_factory=None
     ):
         self.simulator = ScenarioSimulator(
             employee_repository=employee_repository,
@@ -63,9 +63,9 @@ class RegressionTestService:
             team_repository=team_repository,
             schedule_service=schedule_service,
             schedule_repository=schedule_repository,
-            session=session
+            session_factory=session_factory
         )
-        self.session = session
+        self.session_factory = session_factory
 
     def run_regression_tests(self, scenarios: List[RegressionTestScenario]) -> List[RegressionTestResult]:
         """

@@ -16,7 +16,7 @@ class CPModelBuilder:
     def build_model(self, employees: List[Employee], workstations: List[Workstation], 
                    period: int, team_id: int, aro_data: Dict, 
                    start_date: date = None, team_name: str = None,
-                   employee_history_repo = None) -> Tuple[cp_model.CpModel, Dict]:
+                   work_history_data: Dict = None, employee_history_repo = None) -> Tuple[cp_model.CpModel, Dict]:
         """
         Build a CP model for the given employees, workstations, and period.
 
@@ -28,7 +28,8 @@ class CPModelBuilder:
             aro_data: Dictionary of ARO assignments by employee and period
             start_date: The date of the schedule (required for rule context)
             team_name: The name of the team (required for rule context)
-            employee_history_repo: Repository for employee work history (required for same-day repeat penalties)
+            work_history_data: Dictionary containing work history data for employees (preferred over repository)
+            employee_history_repo: Repository for employee work history (deprecated, use work_history_data instead)
 
         Returns:
             A tuple containing:
@@ -64,7 +65,8 @@ class CPModelBuilder:
                 # Add any other data needed by rules
                 aro_data=aro_data,
                 current_period=period,  # Pass the current period being processed
-                employee_history_repo=employee_history_repo,  # Pass the employee work history repository
+                work_history_data=work_history_data,  # Pass work history data directly
+                employee_history_repo=employee_history_repo,  # For backward compatibility
                 lookback=7  # Default lookback window of 7 days
             )
 
@@ -224,7 +226,7 @@ class CPModelBuilder:
     def solve_one_period(self, employees: List[Employee], workstations: List[Workstation],
                         period: int, team_id: int, start_date: date, 
                         aro_data: Dict, team_name: str = None,
-                        employee_history_repo = None) -> List[WorkAssignment]:
+                        work_history_data: Dict = None, employee_history_repo = None) -> List[WorkAssignment]:
         """
         Build and solve a CP model for one period, returning work assignments.
 
@@ -238,7 +240,8 @@ class CPModelBuilder:
             start_date: The date of the schedule
             aro_data: Dictionary of ARO assignments by employee and period
             team_name: The name of the team (optional, for rule context)
-            employee_history_repo: Repository for employee work history (required for same-day repeat penalties)
+            work_history_data: Dictionary containing work history data for employees (preferred over repository)
+            employee_history_repo: Repository for employee work history (deprecated, use work_history_data instead)
 
         Returns:
             List of work assignments for the specified team and period
@@ -253,6 +256,7 @@ class CPModelBuilder:
                 aro_data, 
                 start_date=start_date, 
                 team_name=team_name,
+                work_history_data=work_history_data,
                 employee_history_repo=employee_history_repo
             )
 

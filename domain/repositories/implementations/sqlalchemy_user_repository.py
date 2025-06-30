@@ -19,9 +19,9 @@ class SqlAlchemyUserRepository(BaseSqlAlchemyRepository[User, UserModel], UserRe
     SQLAlchemy implementation of the user repository interface.
     """
 
-    def __init__(self, session: Session):
+    def __init__(self, session_factory):
         """Initialize with SQLAlchemy session."""
-        super().__init__(session, UserModel, User)
+        super().__init__(session_factory, UserModel, User)
         self.logger = get_logger("heijunka.repositories.user")
         self.rate_limited_logger = get_logger("heijunka.repositories.user", rate_limit=True)
 

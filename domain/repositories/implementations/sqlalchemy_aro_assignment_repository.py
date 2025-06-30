@@ -18,52 +18,19 @@ class SqlAlchemyAROAssignmentRepository(BaseSqlAlchemyRepository[AROAssignment, 
     SQLAlchemy implementation of the AROAssignmentRepository interface.
     """
 
-    def __init__(self, session: Session):
+    def __init__(self, session_factory):
         """
-        Initialize the repository with a SQLAlchemy session.
+        Initialize the repository with a SQLAlchemy session factory.
 
         Args:
-            session: The SQLAlchemy session to use for database operations.
+            session_factory: The SQLAlchemy session factory to use for database operations.
         """
-        super().__init__(session, AROAssignmentModel, AROAssignment)
+        super().__init__(session_factory, AROAssignmentModel, AROAssignment)
         self.logger = get_logger("heijunka.repositories.aro_assignment")
-        self.rate_limited_logger = get_logger("heijunka.repositories.aro_assignment", rate_limit=False)
+        self.rate_limited_logger = get_logger("heijunka.repositories.aro_assignment", rate_limit=True)
 
-    @contextmanager
-    def session_scope(self) -> Generator[Session, None, None]:
-        """
-        Provide a transactional scope around a series of operations.
-
-        Yields:
-            The SQLAlchemy session.
-        """
-        try:
-            yield self._session
-            self._session.commit()
-        except SQLAlchemyError as e:
-            self._session.rollback()
-            error_msg = sanitize_exception(e)
-            self.logger.error(
-                f"Database operation failed: {error_msg}",
-                extra={
-                    "event_type": "database_error",
-                    "error_type": type(e).__name__,
-                    "repository": "aro_assignment"
-                }
-            )
-            raise RepositoryError(f"Database error: {error_msg}")
-        except Exception as e:
-            self._session.rollback()
-            error_msg = sanitize_exception(e)
-            self.logger.error(
-                f"Unexpected error in ARO assignment repository: {error_msg}",
-                extra={
-                    "event_type": "unexpected_error",
-                    "error_type": type(e).__name__,
-                    "repository": "aro_assignment"
-                }
-            )
-            raise RepositoryError(f"Repository error: {error_msg}")
+    # Using the base class session_scope implementation which correctly uses session factory
+    # No need to override this method
 
     def get_by_date(self, assignment_date: date) -> List[AROAssignment]:
         """
@@ -85,11 +52,15 @@ class SqlAlchemyAROAssignmentRepository(BaseSqlAlchemyRepository[AROAssignment, 
                 }
             )
 
-            models = self._session.query(AROAssignmentModel).filter(
-                AROAssignmentModel.assignment_date == assignment_date
-            ).all()
+            with self.session_scope() as session:
+                models = session.query(AROAssignmentModel).filter(
+                    AROAssignmentModel.assignment_date == assignment_date
+                ).all()
 
-            assignment_count = len(models)
+                # Convert to domain entities inside the session scope
+                entities = [self._to_domain(model) for model in models]
+
+            assignment_count = len(entities)
             self.logger.info(
                 f"Found {assignment_count} ARO assignments for date: {assignment_date}",
                 extra={
@@ -100,7 +71,7 @@ class SqlAlchemyAROAssignmentRepository(BaseSqlAlchemyRepository[AROAssignment, 
                 }
             )
 
-            return [self._to_domain(model) for model in models]
+            return entities
         except SQLAlchemyError as e:
             error_msg = sanitize_exception(e)
             self.logger.error(
@@ -144,15 +115,20 @@ class SqlAlchemyAROAssignmentRepository(BaseSqlAlchemyRepository[AROAssignment, 
                     extra=log_context
                 )
 
-            query = self._session.query(AROAssignmentModel).filter(
-                AROAssignmentModel.employee_id == employee_id
-            )
+            with self.session_scope() as session:
+                query = session.query(AROAssignmentModel).filter(
+                    AROAssignmentModel.employee_id == employee_id
+                )
 
-            if assignment_date:
-                query = query.filter(AROAssignmentModel.assignment_date == assignment_date)
+                if assignment_date:
+                    query = query.filter(AROAssignmentModel.assignment_date == assignment_date)
 
-            models = query.all()
-            assignment_count = len(models)
+                models = query.all()
+
+                # Convert to domain entities inside the session scope
+                entities = [self._to_domain(model) for model in models]
+
+            assignment_count = len(entities)
 
             success_context = {
                 "event_type": "aro_assignments_lookup_success",
@@ -173,7 +149,7 @@ class SqlAlchemyAROAssignmentRepository(BaseSqlAlchemyRepository[AROAssignment, 
                     extra=success_context
                 )
 
-            return [self._to_domain(model) for model in models]
+            return entities
         except SQLAlchemyError as e:
             error_msg = sanitize_exception(e)
             error_context = {
@@ -214,14 +190,18 @@ class SqlAlchemyAROAssignmentRepository(BaseSqlAlchemyRepository[AROAssignment, 
                 }
             )
 
-            models = self._session.query(AROAssignmentModel).filter(
-                and_(
-                    AROAssignmentModel.from_team_id == team_id,
-                    AROAssignmentModel.assignment_date == assignment_date
-                )
-            ).all()
+            with self.session_scope() as session:
+                models = session.query(AROAssignmentModel).filter(
+                    and_(
+                        AROAssignmentModel.from_team_id == team_id,
+                        AROAssignmentModel.assignment_date == assignment_date
+                    )
+                ).all()
 
-            assignment_count = len(models)
+                # Convert to domain entities inside the session scope
+                entities = [self._to_domain(model) for model in models]
+
+            assignment_count = len(entities)
             self.logger.info(
                 f"Found {assignment_count} ARO assignments for employees leaving team ID: {team_id} on date: {assignment_date}",
                 extra={
@@ -233,7 +213,7 @@ class SqlAlchemyAROAssignmentRepository(BaseSqlAlchemyRepository[AROAssignment, 
                 }
             )
 
-            return [self._to_domain(model) for model in models]
+            return entities
         except SQLAlchemyError as e:
             error_msg = sanitize_exception(e)
             self.logger.error(
@@ -270,14 +250,18 @@ class SqlAlchemyAROAssignmentRepository(BaseSqlAlchemyRepository[AROAssignment, 
                 }
             )
 
-            models = self._session.query(AROAssignmentModel).filter(
-                and_(
-                    AROAssignmentModel.to_team_id == team_id,
-                    AROAssignmentModel.assignment_date == assignment_date
-                )
-            ).all()
+            with self.session_scope() as session:
+                models = session.query(AROAssignmentModel).filter(
+                    and_(
+                        AROAssignmentModel.to_team_id == team_id,
+                        AROAssignmentModel.assignment_date == assignment_date
+                    )
+                ).all()
 
-            assignment_count = len(models)
+                # Convert to domain entities inside the session scope
+                entities = [self._to_domain(model) for model in models]
+
+            assignment_count = len(entities)
             self.logger.info(
                 f"Found {assignment_count} ARO assignments for employees joining team ID: {team_id} on date: {assignment_date}",
                 extra={
@@ -289,7 +273,7 @@ class SqlAlchemyAROAssignmentRepository(BaseSqlAlchemyRepository[AROAssignment, 
                 }
             )
 
-            return [self._to_domain(model) for model in models]
+            return entities
         except SQLAlchemyError as e:
             error_msg = sanitize_exception(e)
             self.logger.error(
@@ -335,22 +319,24 @@ class SqlAlchemyAROAssignmentRepository(BaseSqlAlchemyRepository[AROAssignment, 
                     extra=log_context
                 )
 
-            query = self._session.query(AROAssignmentModel.employee_id).filter(
-                and_(
-                    AROAssignmentModel.from_team_id == team_id,
-                    AROAssignmentModel.assignment_date == assignment_date
-                )
-            )
-
-            if period is not None:
-                query = query.filter(
-                    or_(
-                        AROAssignmentModel.period == period,
-                        AROAssignmentModel.period == None  # Full-day assignments
+            with self.session_scope() as session:
+                query = session.query(AROAssignmentModel.employee_id).filter(
+                    and_(
+                        AROAssignmentModel.from_team_id == team_id,
+                        AROAssignmentModel.assignment_date == assignment_date
                     )
                 )
 
-            result = [employee_id for (employee_id,) in query.all()]
+                if period is not None:
+                    query = query.filter(
+                        or_(
+                            AROAssignmentModel.period == period,
+                            AROAssignmentModel.period == None  # Full-day assignments
+                        )
+                    )
+
+                result = [employee_id for (employee_id,) in query.all()]
+
             employee_count = len(result)
 
             success_context = {
@@ -422,22 +408,24 @@ class SqlAlchemyAROAssignmentRepository(BaseSqlAlchemyRepository[AROAssignment, 
                     extra=log_context
                 )
 
-            query = self._session.query(AROAssignmentModel.employee_id).filter(
-                and_(
-                    AROAssignmentModel.to_team_id == team_id,
-                    AROAssignmentModel.assignment_date == assignment_date
-                )
-            )
-
-            if period is not None:
-                query = query.filter(
-                    or_(
-                        AROAssignmentModel.period == period,
-                        AROAssignmentModel.period == None  # Full-day assignments
+            with self.session_scope() as session:
+                query = session.query(AROAssignmentModel.employee_id).filter(
+                    and_(
+                        AROAssignmentModel.to_team_id == team_id,
+                        AROAssignmentModel.assignment_date == assignment_date
                     )
                 )
 
-            result = [employee_id for (employee_id,) in query.all()]
+                if period is not None:
+                    query = query.filter(
+                        or_(
+                            AROAssignmentModel.period == period,
+                            AROAssignmentModel.period == None  # Full-day assignments
+                        )
+                    )
+
+                result = [employee_id for (employee_id,) in query.all()]
+
             employee_count = len(result)
 
             success_context = {

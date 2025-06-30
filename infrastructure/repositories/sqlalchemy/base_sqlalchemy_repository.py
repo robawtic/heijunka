@@ -19,16 +19,16 @@ class BaseSqlAlchemyRepository(Generic[T, M], BaseRepository[T]):
     for all SQLAlchemy-backed repositories.
     """
 
-    def __init__(self, session: Session, model_class: Type[M], entity_class: Type[T]):
+    def __init__(self, session_factory, model_class: Type[M], entity_class: Type[T]):
         """
-        Initialize the repository with a SQLAlchemy session and model class.
+        Initialize the repository with a SQLAlchemy session factory and model class.
 
         Args:
-            session: The SQLAlchemy session to use for database operations.
+            session_factory: The SQLAlchemy session factory to use for database operations.
             model_class: The SQLAlchemy model class.
             entity_class: The domain entity class.
         """
-        self._session = session
+        self._session_factory = session_factory
         self._model_class = model_class
         self._entity_class = entity_class
 
@@ -44,11 +44,12 @@ class BaseSqlAlchemyRepository(Generic[T, M], BaseRepository[T]):
         Yields:
             The SQLAlchemy session.
         """
+        session = self._session_factory()
         try:
-            yield self._session
-            self._session.commit()
+            yield session
+            session.commit()
         except SQLAlchemyError as e:
-            self._session.rollback()
+            session.rollback()
             error_msg = sanitize_exception(e)
             self.logger.error(
                 f"Database operation failed: {error_msg}",
@@ -60,7 +61,7 @@ class BaseSqlAlchemyRepository(Generic[T, M], BaseRepository[T]):
             )
             raise RepositoryError(f"Database error: {error_msg}")
         except Exception as e:
-            self._session.rollback()
+            session.rollback()
             error_msg = sanitize_exception(e)
             self.logger.error(
                 f"Unexpected error in repository: {error_msg}",
@@ -71,6 +72,8 @@ class BaseSqlAlchemyRepository(Generic[T, M], BaseRepository[T]):
                 }
             )
             raise RepositoryError(f"Repository error: {error_msg}")
+        finally:
+            session.close()
 
     def get_by_id(self, entity_id: int) -> Optional[T]:
         """
@@ -93,31 +96,35 @@ class BaseSqlAlchemyRepository(Generic[T, M], BaseRepository[T]):
                 }
             )
 
-            model = self._session.get(self._model_class, entity_id)
+            result = None
+            with self.session_scope() as session:
+                model = session.get(self._model_class, entity_id)
 
-            if model is None:
+                if model is None:
+                    self.logger.info(
+                        f"No {self._model_class.__name__} found with ID: {entity_id}",
+                        extra={
+                            "event_type": "entity_lookup_failed",
+                            "lookup_type": "id",
+                            "entity_type": self._model_class.__name__,
+                            "entity_id": entity_id
+                        }
+                    )
+                    return None
+
                 self.logger.info(
-                    f"No {self._model_class.__name__} found with ID: {entity_id}",
+                    f"Found {self._model_class.__name__} with ID: {entity_id}",
                     extra={
-                        "event_type": "entity_lookup_failed",
+                        "event_type": "entity_lookup_success",
                         "lookup_type": "id",
                         "entity_type": self._model_class.__name__,
                         "entity_id": entity_id
                     }
                 )
-                return None
 
-            self.logger.info(
-                f"Found {self._model_class.__name__} with ID: {entity_id}",
-                extra={
-                    "event_type": "entity_lookup_success",
-                    "lookup_type": "id",
-                    "entity_type": self._model_class.__name__,
-                    "entity_id": entity_id
-                }
-            )
+                result = self._to_domain(model)
 
-            return self._to_domain(model)
+            return result
         except SQLAlchemyError as e:
             error_msg = sanitize_exception(e)
             self.logger.error(
@@ -161,29 +168,30 @@ class BaseSqlAlchemyRepository(Generic[T, M], BaseRepository[T]):
                 }
             )
 
-            models = self._session.query(self._model_class).all()
-            count = len(models)
-
-            self.logger.info(
-                f"Retrieved {count} {self._model_class.__name__} entities",
-                extra={
-                    "event_type": "entity_list_all_success",
-                    "entity_type": self._model_class.__name__,
-                    "count": count
-                }
-            )
-
             entities = []
-            for model in models:
-                self.rate_limited_logger.debug(
-                    f"Converting {self._model_class.__name__} [id={model.id}] to domain entity",
+            with self.session_scope() as session:
+                models = session.query(self._model_class).all()
+                count = len(models)
+
+                self.logger.info(
+                    f"Retrieved {count} {self._model_class.__name__} entities",
                     extra={
-                        "event_type": "model_to_domain_conversion",
-                        "entity_id": model.id,
-                        "entity_type": self._model_class.__name__
+                        "event_type": "entity_list_all_success",
+                        "entity_type": self._model_class.__name__,
+                        "count": count
                     }
                 )
-                entities.append(self._to_domain(model))
+
+                for model in models:
+                    self.rate_limited_logger.debug(
+                        f"Converting {self._model_class.__name__} [id={model.id}] to domain entity",
+                        extra={
+                            "event_type": "model_to_domain_conversion",
+                            "entity_id": model.id,
+                            "entity_type": self._model_class.__name__
+                        }
+                    )
+                    entities.append(self._to_domain(model))
             return entities
         except SQLAlchemyError as e:
             error_msg = sanitize_exception(e)
@@ -498,41 +506,45 @@ class BaseSqlAlchemyRepository(Generic[T, M], BaseRepository[T]):
                 }
             )
 
-            model = self._session.query(self._model_class).filter_by(**kwargs).first()
+            result = None
+            with self.session_scope() as session:
+                model = session.query(self._model_class).filter_by(**kwargs).first()
 
-            if model is None:
+                if model is None:
+                    self.logger.info(
+                        f"No {self._model_class.__name__} found matching criteria",
+                        extra={
+                            "event_type": "entity_lookup_failed",
+                            "lookup_type": "filter",
+                            "entity_type": self._model_class.__name__,
+                            "criteria": str(kwargs),
+                            "reason": "not_found"
+                        }
+                    )
+                    return None
+
                 self.logger.info(
-                    f"No {self._model_class.__name__} found matching criteria",
+                    f"Found {self._model_class.__name__} with ID: {model.id}",
                     extra={
-                        "event_type": "entity_lookup_failed",
+                        "event_type": "entity_lookup_success",
                         "lookup_type": "filter",
                         "entity_type": self._model_class.__name__,
-                        "criteria": str(kwargs),
-                        "reason": "not_found"
+                        "entity_id": model.id
                     }
                 )
-                return None
 
-            self.logger.info(
-                f"Found {self._model_class.__name__} with ID: {model.id}",
-                extra={
-                    "event_type": "entity_lookup_success",
-                    "lookup_type": "filter",
-                    "entity_type": self._model_class.__name__,
-                    "entity_id": model.id
-                }
-            )
+                self.rate_limited_logger.debug(
+                    f"Converting {self._model_class.__name__} [id={model.id}] to domain entity",
+                    extra={
+                        "event_type": "model_to_domain_conversion",
+                        "entity_id": model.id,
+                        "entity_type": self._model_class.__name__
+                    }
+                )
 
-            self.rate_limited_logger.debug(
-                f"Converting {self._model_class.__name__} [id={model.id}] to domain entity",
-                extra={
-                    "event_type": "model_to_domain_conversion",
-                    "entity_id": model.id,
-                    "entity_type": self._model_class.__name__
-                }
-            )
+                result = self._to_domain(model)
 
-            return self._to_domain(model)
+            return result
         except SQLAlchemyError as e:
             error_msg = sanitize_exception(e)
             self.logger.error(

@@ -43,28 +43,123 @@ class GenerateScheduleHandler:
         if not team:
             raise ValueError(f"Team with ID {command.team_id} not found")
 
+        # Get work history data if needed
+        work_history_data = None
+        if self.work_history_repository:
+            # Fetch work history data for the employees
+            work_history_data = self._fetch_work_history_data(employees, command.start_date)
+
         # Generate schedule
-        assignments = self.schedule_service.generate_schedule(
+        assignments, schedule_metadata = self.schedule_service.generate_schedule(
             employees=employees,
             workstations=workstations,
             start_date=command.start_date,
             periods_per_day=command.periods_per_day,
             team_name=team.name,
+            team_id=team.id,
             call_ins=command.call_ins,
             offline=command.offline,
-            force_complete=command.force_complete,
-            session=self.session,
-            team_repository=self.team_repository,
-            schedule_repository=self.schedule_repository,
-            aro_service=self.aro_service,
-            aro_graph_service=self.aro_graph_service,
-            employee_history_repo=self.work_history_repository
+            force_complete=command.force_complete
         )
 
+        # Save schedule if repository is available
+        if self.schedule_repository and schedule_metadata:
+            self._save_schedule(schedule_metadata)
+
+        # Save work history entries if needed
+        if self.work_history_repository and assignments:
+            self._save_work_history(assignments, command.start_date)
+
         # Save assignments
-        self.assignment_repository.save_all(assignments)
+        if assignments:
+            self.assignment_repository.save_all(assignments)
 
         return assignments
+
+    def _fetch_work_history_data(self, employees, start_date):
+        """
+        Fetch work history data for the given employees and date.
+
+        Args:
+            employees: List of employees to fetch work history for
+            start_date: The date to fetch work history for
+
+        Returns:
+            Dictionary mapping employee IDs to their work history entries
+        """
+        work_history_data = {}
+        if self.work_history_repository:
+            # Get employee IDs
+            employee_ids = [employee.id for employee in employees]
+
+            # Fetch work history for these employees
+            # This is a simplified example - actual implementation would depend on the repository interface
+            entries = self.work_history_repository.get_by_employee_ids(employee_ids, start_date)
+
+            # Organize by employee ID
+            for entry in entries:
+                if entry.employee_id not in work_history_data:
+                    work_history_data[entry.employee_id] = []
+                work_history_data[entry.employee_id].append(entry)
+
+        return work_history_data
+
+    def _save_schedule(self, schedule_metadata):
+        """
+        Save or update a schedule based on metadata.
+
+        Args:
+            schedule_metadata: Dictionary containing schedule metadata
+        """
+        if not self.schedule_repository:
+            return
+
+        # Check if schedule exists
+        schedule_id = schedule_metadata.get("id")
+        if schedule_id:
+            # Update existing schedule
+            self.schedule_repository.update_status(
+                schedule_id, 
+                schedule_metadata.get("status", "completed"),
+                schedule_metadata.get("error_message")
+            )
+        else:
+            # Create new schedule
+            self.schedule_repository.create_schedule(
+                team_id=schedule_metadata.get("team_id"),
+                start_date=schedule_metadata.get("start_date"),
+                periods_per_day=schedule_metadata.get("periods_per_day"),
+                status=schedule_metadata.get("status", "completed"),
+                error_message=schedule_metadata.get("error_message")
+            )
+
+    def _save_work_history(self, assignments, start_date):
+        """
+        Save work history entries for the given assignments.
+
+        Args:
+            assignments: List of work assignments
+            start_date: The date of the assignments
+        """
+        if not self.work_history_repository or not assignments:
+            return
+
+        # Create work history entries
+        from domain.value_objects.work_history_entry import WorkHistoryEntry
+
+        entries = []
+        for assignment in assignments:
+            entry = WorkHistoryEntry(
+                employee_id=assignment.employee.id,
+                workstation_id=assignment.workstation.id,
+                worked_date=start_date,
+                work_period=assignment.period.period
+            )
+            entries.append(entry)
+
+        # Save entries
+        for entry in entries:
+            self.work_history_repository.add(entry)
 
     def generate_only(self, command: GenerateScheduleCommand) -> List[WorkAssignment]:
         """Generate assignments for a single team, but DO NOT SAVE them."""
@@ -77,22 +172,22 @@ class GenerateScheduleHandler:
         if not team:
             raise ValueError(f"Team with ID {command.team_id} not found")
 
+        # Get work history data if needed
+        work_history_data = None
+        if self.work_history_repository:
+            work_history_data = self._fetch_work_history_data(employees, command.start_date)
+
         # Generate schedule
-        assignments = self.schedule_service.generate_schedule(
+        assignments, _ = self.schedule_service.generate_schedule(
             employees=employees,
             workstations=workstations,
             start_date=command.start_date,
             periods_per_day=command.periods_per_day,
             team_name=team.name,
+            team_id=team.id,
             call_ins=command.call_ins,
             offline=command.offline,
-            force_complete=command.force_complete,
-            session=self.session,
-            team_repository=self.team_repository,
-            schedule_repository=self.schedule_repository,
-            aro_service=self.aro_service,
-            aro_graph_service=self.aro_graph_service,
-            employee_history_repo=self.work_history_repository
+            force_complete=command.force_complete
         )
 
         return assignments
@@ -126,23 +221,25 @@ class GenerateScheduleHandler:
         if not team:
             raise ValueError(f"Team with ID {command.team_id} not found")
 
+        # Get work history data if needed (use prefetched data if available)
+        work_history_data = None
+        if prefetched_data and 'work_history_data' in prefetched_data:
+            work_history_data = prefetched_data['work_history_data']
+        elif self.work_history_repository:
+            work_history_data = self._fetch_work_history_data(employees, command.start_date)
+
         # Generate schedule
-        assignments = self.schedule_service.generate_schedule(
+        assignments, schedule_metadata = self.schedule_service.generate_schedule(
             employees=employees,
             workstations=workstations,
             start_date=command.start_date,
             periods_per_day=command.periods_per_day,
             team_name=team.name,
+            team_id=team.id,
             call_ins=command.call_ins,
             offline=command.offline,
             force_complete=command.force_complete,
-            session=self.session,
-            team_repository=self.team_repository,
-            schedule_repository=self.schedule_repository,
-            aro_service=self.aro_service,
-            aro_graph_service=self.aro_graph_service,
-            prefetched_data=prefetched_data,
-            employee_history_repo=self.work_history_repository
+            prefetched_data=prefetched_data
         )
 
         return assignments

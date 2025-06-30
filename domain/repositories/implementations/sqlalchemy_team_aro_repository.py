@@ -16,16 +16,16 @@ class SqlAlchemyTeamAroRepository(BaseSqlAlchemyRepository[TeamAro, TeamAroModel
     SQLAlchemy implementation of the TeamAroRepository interface.
     """
 
-    def __init__(self, session: Session):
+    def __init__(self, session_factory):
         """
-        Initialize the repository with a SQLAlchemy session.
+        Initialize the repository with a SQLAlchemy session factory.
 
         Args:
-            session: The SQLAlchemy session to use for database operations.
+            session_factory: The SQLAlchemy session factory to use for database operations.
         """
-        super().__init__(session, TeamAroModel, TeamAro)
+        super().__init__(session_factory, TeamAroModel, TeamAro)
         self.logger = get_logger("heijunka.repositories.team_aro")
-        self.rate_limited_logger = get_logger("heijunka.repositories.team_aro", rate_limit=False)
+        self.rate_limited_logger = get_logger("heijunka.repositories.team_aro", rate_limit=True)
 
     @contextmanager
     def session_scope(self) -> Generator[Session, None, None]:

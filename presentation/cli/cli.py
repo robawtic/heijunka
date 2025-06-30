@@ -43,23 +43,24 @@ def main():
 
         # Setup dependencies
         dependencies = setup_dependencies()
-        session = dependencies[0]  # Extract session from dependencies tuple
+        session_factory = dependencies[0]  # Extract session factory from dependencies tuple
+        session = session_factory()  # Create a session from the factory
 
         try:
             # Execute the appropriate command
             if args.command == 'generate':
                 handle_generate(args, dependencies, query_count)
             elif args.command == 'assign':
-                handle_manual_assignment(args, session)
+                handle_manual_assignment(args, session_factory)
             elif args.command == 'simulate':
-                handle_simulation(args, session)
+                handle_simulation(args, session_factory)
             elif args.command == 'regression-test':
-                handle_regression_test(args, session)
+                handle_regression_test(args, session_factory)
             elif args.command == 'aro':
                 if not hasattr(args, 'aro_command') or not args.aro_command:
                     print("Error: No ARO command specified. Use 'aro assign', 'aro remove', or 'aro optimize'.", file=sys.stderr)
                     sys.exit(1)
-                handle_aro_assignment(args, session, dependencies[8], dependencies[9])  # Pass aro_service and aro_graph_service
+                handle_aro_assignment(args, session_factory, dependencies[8], dependencies[9])  # Pass aro_service and aro_graph_service
             else:
                 print("Error: No command specified. Use 'generate', 'assign', 'simulate', 'regression-test', or 'aro'.", file=sys.stderr)
                 sys.exit(1)

@@ -1,0 +1,49 @@
+@startuml
+' Title
+title Heijunka System Bounded Contexts
+
+' Bounded Contexts as components
+package "Heijunka System" {
+    [Scheduling Context] as Scheduling
+    [Operator Context] as Operator
+    [Notification & Coordination] as Notification
+    [Rules & Policy] as Rules
+    [Reporting & Analytics] as Analytics
+}
+
+' Relationships
+Scheduling --> Operator : retrieves skills, availability, ARO status
+Scheduling --> Rules : validates fairness, compliance
+Scheduling --> Notification : notifies assignments, changes
+Scheduling --> Analytics : sends scheduling data
+Operator --> Notification : receives assignment notifications
+Rules --> Notification : alerts on rule exceptions
+Analytics --> Scheduling : provides historical feedback
+
+' Notes
+note right of Scheduling
+    - Generates & manages schedules
+    - Handles rotations & constraints
+end note
+
+note right of Operator
+    - Manages employee data
+    - Tracks skills, memberships, AROs
+end note
+
+note right of Notification
+    - Notifies teams & operators
+    - Coordinates changes (e.g., ARO assignments)
+end note
+
+note right of Rules
+    - Stores business rules & policies
+    - Validates scheduling operations
+end note
+
+note right of Analytics
+    - Provides reports & metrics
+    - Analyzes schedule fairness & utilization
+end note
+
+@enduml

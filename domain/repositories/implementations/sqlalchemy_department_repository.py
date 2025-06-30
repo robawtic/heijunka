@@ -27,14 +27,14 @@ class SqlAlchemyDepartmentRepository(BaseSqlAlchemyRepository[Department, Depart
     It does not contain any business logic, which is encapsulated in the domain entities.
     """
 
-    def __init__(self, session: Session):
+    def __init__(self, session_factory):
         """
-        Initialize the repository with a SQLAlchemy session.
+        Initialize the repository with a SQLAlchemy session factory.
 
         Args:
-            session: The SQLAlchemy session to use for database operations.
+            session_factory: The SQLAlchemy session factory to use for database operations.
         """
-        super().__init__(session, DepartmentModel, Department)
+        super().__init__(session_factory, DepartmentModel, Department)
         self.logger = get_logger("heijunka.repositories.department")
         self.rate_limited_logger = get_logger("heijunka.repositories.department", rate_limit=True)
 
@@ -61,42 +61,43 @@ class SqlAlchemyDepartmentRepository(BaseSqlAlchemyRepository[Department, Depart
                 }
             )
 
-            department_model = self._session.query(DepartmentModel).filter(
-                func.lower(DepartmentModel.name) == func.lower(department_name)
-            ).first()
+            with self.session_scope() as session:
+                department_model = session.query(DepartmentModel).filter(
+                    func.lower(DepartmentModel.name) == func.lower(department_name)
+                ).first()
 
-            if department_model is None:
+                if department_model is None:
+                    self.logger.info(
+                        f"No department found with name: {department_name}",
+                        extra={
+                            "event_type": "department_lookup_failed",
+                            "lookup_type": "name",
+                            "department_name": department_name,
+                            "reason": "not_found"
+                        }
+                    )
+                    return None
+
                 self.logger.info(
-                    f"No department found with name: {department_name}",
+                    f"Found department with ID: {department_model.id}",
                     extra={
-                        "event_type": "department_lookup_failed",
+                        "event_type": "department_lookup_success",
                         "lookup_type": "name",
                         "department_name": department_name,
-                        "reason": "not_found"
+                        "department_id": department_model.id
                     }
                 )
-                return None
 
-            self.logger.info(
-                f"Found department with ID: {department_model.id}",
-                extra={
-                    "event_type": "department_lookup_success",
-                    "lookup_type": "name",
-                    "department_name": department_name,
-                    "department_id": department_model.id
-                }
-            )
+                self.logger.debug(
+                    f"Converting DepartmentModel [id={department_model.id}] to domain Department",
+                    extra={
+                        "event_type": "model_to_domain_conversion",
+                        "entity_id": department_model.id,
+                        "entity_type": "Department"
+                    }
+                )
 
-            self.logger.debug(
-                f"Converting DepartmentModel [id={department_model.id}] to domain Department",
-                extra={
-                    "event_type": "model_to_domain_conversion",
-                    "entity_id": department_model.id,
-                    "entity_type": "Department"
-                }
-            )
-
-            return DepartmentFactory.create_from_model(department_model)
+                return DepartmentFactory.create_from_model(department_model)
         except SQLAlchemyError as e:
             error_msg = sanitize_exception(e)
             self.logger.error(
@@ -140,42 +141,43 @@ class SqlAlchemyDepartmentRepository(BaseSqlAlchemyRepository[Department, Depart
                 }
             )
 
-            department_models = self._session.query(DepartmentModel).all()
+            with self.session_scope() as session:
+                department_models = session.query(DepartmentModel).all()
 
-            department_count = len(department_models)
-            self.logger.info(
-                f"Found {department_count} departments",
-                extra={
-                    "event_type": "departments_with_groups_lookup_success",
-                    "department_count": department_count
-                }
-            )
-
-            departments = []
-            for department_model in department_models:
-                self.logger.debug(
-                    f"Converting DepartmentModel [id={department_model.id}] to domain Department",
+                department_count = len(department_models)
+                self.logger.info(
+                    f"Found {department_count} departments",
                     extra={
-                        "event_type": "model_to_domain_conversion",
-                        "entity_id": department_model.id,
-                        "entity_type": "Department"
+                        "event_type": "departments_with_groups_lookup_success",
+                        "department_count": department_count
                     }
                 )
 
-                department = DepartmentFactory.create_from_model(department_model)
-                departments.append(department)
+                departments = []
+                for department_model in department_models:
+                    self.logger.debug(
+                        f"Converting DepartmentModel [id={department_model.id}] to domain Department",
+                        extra={
+                            "event_type": "model_to_domain_conversion",
+                            "entity_id": department_model.id,
+                            "entity_type": "Department"
+                        }
+                    )
 
-                self.rate_limited_logger.debug(
-                    f"Processed department: {department.name}",
-                    event_type="department_processed",
-                    identifier=str(department.id),
-                    extra={
-                        "department_id": department.id,
-                        "department_name": department.name
-                    }
-                )
+                    department = DepartmentFactory.create_from_model(department_model)
+                    departments.append(department)
 
-            return departments
+                    self.rate_limited_logger.debug(
+                        f"Processed department: {department.name}",
+                        event_type="department_processed",
+                        identifier=str(department.id),
+                        extra={
+                            "department_id": department.id,
+                            "department_name": department.name
+                        }
+                    )
+
+                return departments
         except SQLAlchemyError as e:
             error_msg = sanitize_exception(e)
             self.logger.error(

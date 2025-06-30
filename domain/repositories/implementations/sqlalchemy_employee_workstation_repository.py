@@ -24,14 +24,14 @@ class SqlAlchemyEmployeeWorkstationRepository(BaseSqlAlchemyRepository[Workstati
     employee workstation assignments in the database using SQLAlchemy.
     """
 
-    def __init__(self, session: Session):
+    def __init__(self, session_factory):
         """
-        Initialize the repository with a SQLAlchemy session.
+        Initialize the repository with a SQLAlchemy session factory.
 
         Args:
-            session: The SQLAlchemy session to use for database operations.
+            session_factory: The SQLAlchemy session factory to use for database operations.
         """
-        super().__init__(session, EmployeeWorkstationModel, WorkstationAssignment)
+        super().__init__(session_factory, EmployeeWorkstationModel, WorkstationAssignment)
         self.logger = get_logger("heijunka.repositories.employee_workstation")
         self.rate_limited_logger = get_logger("heijunka.repositories.employee_workstation", rate_limit=True)
 
@@ -116,48 +116,49 @@ class SqlAlchemyEmployeeWorkstationRepository(BaseSqlAlchemyRepository[Workstati
         )
 
         try:
-            model = self._session.query(EmployeeWorkstationModel).filter(
-                and_(
-                    EmployeeWorkstationModel.employee_id == employee_id,
-                    EmployeeWorkstationModel.station_id == workstation_id
-                )
-            ).first()
+            with self.session_scope() as session:
+                model = session.query(EmployeeWorkstationModel).filter(
+                    and_(
+                        EmployeeWorkstationModel.employee_id == employee_id,
+                        EmployeeWorkstationModel.station_id == workstation_id
+                    )
+                ).first()
 
-            if not model:
-                self.logger.info(
-                    "No workstation assignment found for employee and workstation",
+                if not model:
+                    self.logger.info(
+                        "No workstation assignment found for employee and workstation",
+                        extra={
+                            "event_type": "workstation_assignment_lookup_failed",
+                            "lookup_type": "employee_and_workstation",
+                            "employee_id": employee_id,
+                            "workstation_id": workstation_id,
+                            "reason": "not_found"
+                        }
+                    )
+                    return None
+
+                self.logger.debug(
+                    f"Converting EmployeeWorkstationModel [id={model.id}] to domain WorkstationAssignment",
                     extra={
-                        "event_type": "workstation_assignment_lookup_failed",
+                        "event_type": "model_to_domain_conversion",
+                        "entity_id": model.id,
+                        "employee_id": employee_id,
+                        "workstation_id": workstation_id
+                    }
+                )
+
+                result = WorkstationAssignmentFactory.create_from_model_with_session(model, session)
+
+                self.logger.info(
+                    "Found workstation assignment for employee and workstation",
+                    extra={
+                        "event_type": "workstation_assignment_lookup_success",
                         "lookup_type": "employee_and_workstation",
                         "employee_id": employee_id,
                         "workstation_id": workstation_id,
-                        "reason": "not_found"
+                        "workstation_name": result.workstation_name
                     }
                 )
-                return None
-
-            self.logger.debug(
-                f"Converting EmployeeWorkstationModel [id={model.id}] to domain WorkstationAssignment",
-                extra={
-                    "event_type": "model_to_domain_conversion",
-                    "entity_id": model.id,
-                    "employee_id": employee_id,
-                    "workstation_id": workstation_id
-                }
-            )
-
-            result = WorkstationAssignmentFactory.create_from_model_with_session(model, self._session)
-
-            self.logger.info(
-                "Found workstation assignment for employee and workstation",
-                extra={
-                    "event_type": "workstation_assignment_lookup_success",
-                    "lookup_type": "employee_and_workstation",
-                    "employee_id": employee_id,
-                    "workstation_id": workstation_id,
-                    "workstation_name": result.workstation_name
-                }
-            )
 
             return result
         except SQLAlchemyError as e:
@@ -197,22 +198,23 @@ class SqlAlchemyEmployeeWorkstationRepository(BaseSqlAlchemyRepository[Workstati
         )
 
         try:
-            models = self._session.query(EmployeeWorkstationModel).filter(
-                EmployeeWorkstationModel.employee_id == employee_id
-            ).all()
-
             result = []
-            for model in models:
-                self.rate_limited_logger.debug(
-                    f"Converting EmployeeWorkstationModel [id={model.id}] to domain WorkstationAssignment",
-                    extra={
-                        "event_type": "model_to_domain_conversion",
-                        "entity_id": model.id,
-                        "employee_id": employee_id,
-                        "workstation_id": model.station_id
-                    }
-                )
-                result.append(WorkstationAssignmentFactory.create_from_model_with_session(model, self._session))
+            with self.session_scope() as session:
+                models = session.query(EmployeeWorkstationModel).filter(
+                    EmployeeWorkstationModel.employee_id == employee_id
+                ).all()
+
+                for model in models:
+                    self.rate_limited_logger.debug(
+                        f"Converting EmployeeWorkstationModel [id={model.id}] to domain WorkstationAssignment",
+                        extra={
+                            "event_type": "model_to_domain_conversion",
+                            "entity_id": model.id,
+                            "employee_id": employee_id,
+                            "workstation_id": model.station_id
+                        }
+                    )
+                    result.append(WorkstationAssignmentFactory.create_from_model_with_session(model, session))
 
             assignment_count = len(result)
             self.logger.info(
@@ -262,27 +264,28 @@ class SqlAlchemyEmployeeWorkstationRepository(BaseSqlAlchemyRepository[Workstati
         )
 
         try:
-            models = self._session.query(EmployeeWorkstationModel).filter(
-                EmployeeWorkstationModel.station_id == workstation_id
-            ).all()
-
-            # Fetch the workstation name once for logging
-            workstation = self._session.query(WorkstationModel).get(workstation_id)
-            workstation_name = workstation.name if workstation else "Unknown"
-
             result = []
-            for model in models:
-                self.rate_limited_logger.debug(
-                    f"Converting EmployeeWorkstationModel [id={model.id}] to domain WorkstationAssignment",
-                    extra={
-                        "event_type": "model_to_domain_conversion",
-                        "entity_id": model.id,
-                        "employee_id": model.employee_id,
-                        "workstation_id": workstation_id
-                    }
-                )
-                # We can use the workstation name we already fetched
-                result.append(WorkstationAssignmentFactory.create_from_model(model, workstation_name))
+            with self.session_scope() as session:
+                models = session.query(EmployeeWorkstationModel).filter(
+                    EmployeeWorkstationModel.station_id == workstation_id
+                ).all()
+
+                # Fetch the workstation name once for logging
+                workstation = session.query(WorkstationModel).get(workstation_id)
+                workstation_name = workstation.name if workstation else "Unknown"
+
+                for model in models:
+                    self.rate_limited_logger.debug(
+                        f"Converting EmployeeWorkstationModel [id={model.id}] to domain WorkstationAssignment",
+                        extra={
+                            "event_type": "model_to_domain_conversion",
+                            "entity_id": model.id,
+                            "employee_id": model.employee_id,
+                            "workstation_id": workstation_id
+                        }
+                    )
+                    # We can use the workstation name we already fetched
+                    result.append(WorkstationAssignmentFactory.create_from_model(model, workstation_name))
 
             assignment_count = len(result)
             self.logger.info(
@@ -562,20 +565,21 @@ class SqlAlchemyEmployeeWorkstationRepository(BaseSqlAlchemyRepository[Workstati
         )
 
         try:
-            models = self._session.query(EmployeeWorkstationModel).all()
-
             result = []
-            for model in models:
-                self.rate_limited_logger.debug(
-                    f"Converting EmployeeWorkstationModel [id={model.id}] to domain WorkstationAssignment",
-                    extra={
-                        "event_type": "model_to_domain_conversion",
-                        "entity_id": model.id,
-                        "employee_id": model.employee_id,
-                        "workstation_id": model.station_id
-                    }
-                )
-                result.append(WorkstationAssignmentFactory.create_from_model_with_session(model, self._session))
+            with self.session_scope() as session:
+                models = session.query(EmployeeWorkstationModel).all()
+
+                for model in models:
+                    self.rate_limited_logger.debug(
+                        f"Converting EmployeeWorkstationModel [id={model.id}] to domain WorkstationAssignment",
+                        extra={
+                            "event_type": "model_to_domain_conversion",
+                            "entity_id": model.id,
+                            "employee_id": model.employee_id,
+                            "workstation_id": model.station_id
+                        }
+                    )
+                    result.append(WorkstationAssignmentFactory.create_from_model_with_session(model, session))
 
             assignment_count = len(result)
             self.logger.info(
@@ -620,7 +624,8 @@ class SqlAlchemyEmployeeWorkstationRepository(BaseSqlAlchemyRepository[Workstati
             )
 
             # Use the factory to create the domain entity
-            result = WorkstationAssignmentFactory.create_from_model_with_session(model, self._session)
+            with self.session_scope() as session:
+                result = WorkstationAssignmentFactory.create_from_model_with_session(model, session)
 
             self.logger.debug(
                 "Successfully converted workstation assignment model to domain entity",

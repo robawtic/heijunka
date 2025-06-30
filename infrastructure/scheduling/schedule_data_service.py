@@ -31,7 +31,8 @@ class ScheduleDataService:
             workstation_repository: WorkstationRepositoryInterface,
             team_repository: TeamRepositoryInterface,
             aro_repository: AROAssignmentRepositoryInterface,
-            session: Session
+            session_factory=None,
+            work_history_repository=None
     ):
         """
         Initialize the ScheduleDataService with required repositories.
@@ -41,13 +42,15 @@ class ScheduleDataService:
             workstation_repository: Repository for workstation data
             team_repository: Repository for team data
             aro_repository: Repository for ARO assignment data
-            session: Database session
+            session_factory: Factory function to create database sessions
+            work_history_repository: Repository for work history data (optional)
         """
         self.employee_repository = employee_repository
         self.workstation_repository = workstation_repository
         self.team_repository = team_repository
         self.aro_repository = aro_repository
-        self.session = session
+        self.session_factory = session_factory
+        self.work_history_repository = work_history_repository
 
     def prefetch_for_teams(
             self,
@@ -226,6 +229,49 @@ class ScheduleDataService:
             identifier="complete"
         )
 
+        # Fetch work history data if repository is available
+        work_history_data = {}
+        if self.work_history_repository:
+            try:
+                logger.info(
+                    "Prefetching work history data",
+                    event_type="bulk_data_fetch",
+                    identifier="work_history"
+                )
+                # Get all employee IDs
+                employee_ids = [employee.id for employee in all_employees]
+
+                # Fetch work history for these employees
+                # We need to fetch work history for each employee individually since get_filtered doesn't support multiple employee IDs
+                entries = []
+                for employee_id in employee_ids:
+                    # Get work history entries for this employee on or before the start date
+                    employee_entries, _ = self.work_history_repository.get_filtered(
+                        employee_id=employee_id,
+                        end_date=start_date  # Include entries up to and including start_date
+                    )
+                    entries.extend(employee_entries)
+
+                # Organize by employee ID
+                for entry in entries:
+                    if entry.employee_id not in work_history_data:
+                        work_history_data[entry.employee_id] = []
+                    work_history_data[entry.employee_id].append(entry)
+
+                logger.info(
+                    f"Prefetched work history data for {len(work_history_data)} employees",
+                    event_type="bulk_data_fetch",
+                    identifier="work_history"
+                )
+            except Exception as e:
+                logger.error(
+                    f"Error prefetching work history data: {str(e)}",
+                    event_type="bulk_data_fetch",
+                    identifier="work_history_error"
+                )
+                # Use empty dictionary as fallback
+                work_history_data = {}
+
         # Create a shared prefetched data dictionary
         prefetched_data = {
             'teams_by_name': teams_by_name,
@@ -239,7 +285,8 @@ class ScheduleDataService:
             'employees_by_id': employees_by_id,
             'employees_by_team': employees_by_team,
             'workstations_by_team': workstations_by_team,
-            'periods_per_day': periods
+            'periods_per_day': periods,
+            'work_history_data': work_history_data
         }
 
         return prefetched_data

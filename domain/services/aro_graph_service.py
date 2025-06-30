@@ -12,7 +12,7 @@ class AROGraphService:
 
     This service extends the basic AROService with advanced optimization
     capabilities based on graph theory algorithms.
-    
+
     DEPRECATED: This class is deprecated. Use domain.contexts.assignment.services.aro_graph_service.AROGraphService instead.
     """
 
@@ -28,7 +28,7 @@ class AROGraphService:
             DeprecationWarning,
             stacklevel=2
         )
-        
+
         # Create an instance of the context-specific AROGraphService
         self._context_service = ContextAROGraphService(
             aro_service=aro_service,
@@ -38,7 +38,7 @@ class AROGraphService:
             workstation_repository=workstation_repository,
             event_publisher=event_publisher or DomainEventPublisher()
         )
-        
+
         # Forward attributes for backward compatibility
         self.aro_service = aro_service
         self.aro_repository = aro_repository
@@ -47,7 +47,7 @@ class AROGraphService:
         self.workstation_repository = workstation_repository
         self._edge_cost_cache = self._context_service._edge_cost_cache
         self._graph_cache = self._context_service._graph_cache
-        self._session = getattr(aro_repository, '_session', None)
+        self._session_factory = getattr(aro_repository, '_session_factory', None)
 
     def __getattr__(self, name):
         """Forward all method calls to the context-specific implementation."""

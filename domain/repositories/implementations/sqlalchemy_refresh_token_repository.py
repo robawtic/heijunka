@@ -19,14 +19,14 @@ class SqlAlchemyRefreshTokenRepository(BaseSqlAlchemyRepository[RefreshToken, Re
     SQLAlchemy implementation of the RefreshTokenRepository interface.
     """
 
-    def __init__(self, session: Session):
+    def __init__(self, session_factory):
         """
-        Initialize the repository with a SQLAlchemy session.
+        Initialize the repository with a SQLAlchemy session factory.
 
         Args:
-            session: The SQLAlchemy session to use for database operations.
+            session_factory: The SQLAlchemy session factory to use for database operations.
         """
-        super().__init__(session, RefreshTokenModel, RefreshToken)
+        super().__init__(session_factory, RefreshTokenModel, RefreshToken)
         self.logger = get_logger("heijunka.repositories.refresh_token")
         self.rate_limited_logger = get_logger("heijunka.repositories.refresh_token", rate_limit=True)
 

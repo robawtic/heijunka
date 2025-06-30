@@ -41,10 +41,10 @@ class AROGraphService:
         self._edge_cost_cache = {}  # Cache for edge costs
         self._graph_cache = {}      # Cache for transfer graphs
 
-        # Get the session from the repository
-        self._session = getattr(aro_repository, '_session', None)
-        if not self._session:
-            raise ValueError("Could not get database session from repository")
+        # Get the session factory from the repository
+        self._session_factory = getattr(aro_repository, '_session_factory', None)
+        if not self._session_factory:
+            raise ValueError("Could not get database session factory from repository")
 
     def clear_caches(self):
         """Clear all caches when data changes."""
@@ -533,12 +533,13 @@ class AROGraphService:
         """
         retries = 0
         while True:
+            session = self._session_factory()
             try:
-                yield
-                self._session.commit()
+                yield session
+                session.commit()
                 break  # Success, exit the loop
             except SQLAlchemyError as e:
-                self._session.rollback()
+                session.rollback()
 
                 # Check if it's a deadlock error (depends on the database)
                 is_deadlock = "deadlock" in str(e).lower() or "lock timeout" in str(e).lower()
@@ -552,11 +553,18 @@ class AROGraphService:
                 else:
                     # Not a deadlock or max retries exceeded
                     raise ValueError(f"Database error: {str(e)}")
+            finally:
+                session.close()
 
-    def _lock_aro_assignments(self, assignment_date: date, period: Optional[int] = None):
+    def _lock_aro_assignments(self, session, assignment_date: date, period: Optional[int] = None):
         """
         Acquire a lock on the ARO assignments for a specific date and period.
         This prevents concurrent modifications to the same assignments.
+
+        Args:
+            session: The database session to use
+            assignment_date: The date to lock
+            period: Optional period of the day
         """
         # Implementation depends on the database being used
         # For PostgreSQL, you might use:
@@ -566,7 +574,7 @@ class AROGraphService:
         WHERE assignment_date = :date AND (period = :period OR period IS NULL)
         FOR UPDATE
         """)
-        self._session.execute(query, {"date": assignment_date, "period": period})
+        session.execute(query, {"date": assignment_date, "period": period})
 
     def assign_optimal_aros(self, 
                            understaffed_team_id: int, 
@@ -597,9 +605,9 @@ class AROGraphService:
         remaining_needed = needed_aros
 
         # Use a transaction for the entire operation
-        with self._transaction():
+        with self._transaction() as session:
             # Acquire a lock on the aro_assignments table for this date/period
-            self._lock_aro_assignments(assignment_date, period)
+            self._lock_aro_assignments(session, assignment_date, period)
 
             # Refresh the graph to ensure we have the latest data
             self.clear_caches()

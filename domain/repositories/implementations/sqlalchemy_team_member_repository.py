@@ -21,14 +21,14 @@ class SqlAlchemyTeamMemberRepository(BaseSqlAlchemyRepository[TeamMember, TeamMe
     TeamMember entities in the database using SQLAlchemy.
     """
 
-    def __init__(self, session: Session):
+    def __init__(self, session_factory):
         """
-        Initialize the repository with a SQLAlchemy session.
+        Initialize the repository with a SQLAlchemy session factory.
 
         Args:
-            session: The SQLAlchemy session to use for database operations.
+            session_factory: The SQLAlchemy session factory to use for database operations.
         """
-        super().__init__(session, TeamMemberModel, TeamMember)
+        super().__init__(session_factory, TeamMemberModel, TeamMember)
         self.logger = get_logger("heijunka.repositories.team_member")
         self.rate_limited_logger = get_logger("heijunka.repositories.team_member", rate_limit=True)
 

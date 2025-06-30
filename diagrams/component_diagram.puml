@@ -1,0 +1,69 @@
+@startuml
+title Heijunka Component Diagram
+
+package "Application Layer" {
+  [ScheduleService]
+  [EmployeeService]
+  [TeamService]
+  [AROAssignmentService]
+  [SeedService]
+}
+
+package "Domain Layer" {
+  [Schedule]
+  [Employee]
+  [Team]
+  [Group]
+  [Department]
+  [Workstation]
+  [AROAssignment]
+  [WorkAssignment]
+}
+
+package "Infrastructure Layer" {
+  [ScheduleRepository]
+  [EmployeeRepository]
+  [TeamRepository]
+  [GroupRepository]
+  [DepartmentRepository]
+  [WorkstationRepository]
+  [AROAssignmentRepository]
+}
+
+' Application services interactions
+[ScheduleService] --> [ScheduleRepository]
+[ScheduleService] --> [Schedule]
+[ScheduleService] --> [EmployeeRepository]
+[ScheduleService] --> [TeamRepository]
+[ScheduleService] --> [WorkAssignment]
+
+[EmployeeService] --> [EmployeeRepository]
+[EmployeeService] --> [Employee]
+[EmployeeService] --> [TeamRepository]
+
+[TeamService] --> [TeamRepository]
+[TeamService] --> [Team]
+[TeamService] --> [EmployeeRepository]
+[TeamService] --> [WorkstationRepository]
+
+[AROAssignmentService] --> [AROAssignmentRepository]
+[AROAssignmentService] --> [AROAssignment]
+[AROAssignmentService] --> [EmployeeRepository]
+[AROAssignmentService] --> [TeamRepository]
+
+[SeedService] --> [GroupRepository]
+[SeedService] --> [DepartmentRepository]
+[SeedService] --> [TeamRepository]
+[SeedService] --> [EmployeeRepository]
+[SeedService] --> [WorkstationRepository]
+
+' Repositories interact with domain entities
+[ScheduleRepository] --> [Schedule]
+[EmployeeRepository] --> [Employee]
+[TeamRepository] --> [Team]
+[GroupRepository] --> [Group]
+[DepartmentRepository] --> [Department]
+[WorkstationRepository] --> [Workstation]
+[AROAssignmentRepository] --> [AROAssignment]
+
+@enduml

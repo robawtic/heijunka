@@ -2,7 +2,7 @@
 Manual assignment command handling for the CLI application.
 """
 import sys
-from typing import Optional, Any
+from typing import Optional, Any, cast
 from datetime import datetime
 from sqlalchemy.orm import Session
 
@@ -11,18 +11,18 @@ from application.commands.create_manual_assignment_handler import CreateManualAs
 from domain.repositories.implementations.sqlalchemy_employee_repository import SqlAlchemyEmployeeRepository
 from domain.repositories.implementations.sqlalchemy_workstation_repository import SqlAlchemyWorkstationRepository
 from domain.repositories.implementations.sqlalchemy_assignment_repository import SqlAlchemyAssignmentRepository
-from utilities.logging_factory import get_logger
+from utilities.logging_factory import get_logger, RateLimitedLogger
 
 # Create a logger for this module
-logger = get_logger("presentation.cli.commands.manual_assignment_command", rate_limit=True)
+logger = cast(RateLimitedLogger, get_logger("presentation.cli.commands.manual_assignment_command", rate_limit=True))
 
-def handle_manual_assignment(args: Any, session: Session) -> bool:
+def handle_manual_assignment(args: Any, session_factory: Any) -> bool:
     """
     Handle the manual assignment command.
 
     Args:
         args: Command line arguments
-        session: Database session
+        session_factory: Database session factory
 
     Returns:
         bool: True if the operation was successful, False otherwise
@@ -41,9 +41,9 @@ def handle_manual_assignment(args: Any, session: Session) -> bool:
             identifier="setup"
         )
         
-        employee_repository = SqlAlchemyEmployeeRepository(session)
-        workstation_repository = SqlAlchemyWorkstationRepository(session)
-        assignment_repository = SqlAlchemyAssignmentRepository(session)
+        employee_repository = SqlAlchemyEmployeeRepository(session_factory)
+        workstation_repository = SqlAlchemyWorkstationRepository(session_factory)
+        assignment_repository = SqlAlchemyAssignmentRepository(session_factory)
 
         # Get employee by name
         logger.debug(

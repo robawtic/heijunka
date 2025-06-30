@@ -1,0 +1,123 @@
+@startuml
+title Heijunka Domain Model (Code-Driven)
+
+' Department/Group/Team structure
+class Department {
+  +id: int
+  +name: str
+  +description: str
+  _groups: List<Group>
+}
+
+class Group {
+  +id: int
+  +name: str
+  +department_id: int
+}
+
+class Team {
+  +id: int
+  +name: str
+  +description: str
+  _workstations: List<Workstation>
+  _team_members: List<TeamMember>
+}
+
+class TeamMember {
+  +employee: Employee
+  +roles: List<str>
+}
+
+class Employee {
+  +id: int
+  +name: str
+  +team_id: int
+  +is_active: bool
+  _roles: List<str>
+  _qualifications: List<str>
+  _available_periods: List<EmployeeAvailability>
+  _work_history: List<WorkHistoryEntry>
+  _assigned_workstations: List<WorkstationAssignment>
+  _team_memberships: List<TeamMember>
+}
+
+class EmployeeAvailability {
+  +employee_id: int
+  +date: date
+  +period: int
+  +is_partial: bool
+  +is_call_in: bool
+  +is_aro: bool
+}
+
+class Workstation {
+  +id: int
+  +name: str
+  +team_id: int
+  +line_type: LineType
+}
+
+class WorkstationAssignment {
+  +workstation: Workstation
+}
+
+class WorkHistoryEntry {
+  +date: date
+  +workstation_id: int
+  +period: int
+}
+
+class LineType {
+  +name: str
+}
+
+' Scheduling
+class Schedule {
+  +id: int
+  +team_id: int
+  +start_date: date
+  +end_date: date
+  +periods_per_day: int
+  +status: str
+  _assignments: List<WorkAssignment>
+}
+
+class WorkAssignment {
+  +employee: Employee
+  +workstation: Workstation
+  +period: SchedulePeriod
+}
+
+class SchedulePeriod {
+  +date: date
+  +period: int
+}
+
+' ARO Assignment
+class AROAssignment {
+  +id: int
+  +employee_id: int
+  +from_team_id: int
+  +to_team_id: int
+  +assignment_date: date
+  +period: int
+}
+
+' Relationships
+Department "1" o-- "*" Group
+Group "1" o-- "*" Team
+Team "1" o-- "*" TeamMember
+Team "1" o-- "*" Workstation
+TeamMember "*" --> "1" Employee
+Employee "1" o-- "*" EmployeeAvailability
+Employee "1" o-- "*" WorkstationAssignment
+Employee "1" o-- "*" WorkHistoryEntry
+Employee "1" o-- "*" TeamMember
+WorkstationAssignment "*" --> "1" Workstation
+Schedule "1" o-- "*" WorkAssignment
+WorkAssignment "*" --> "1" Employee
+WorkAssignment "*" --> "1" Workstation
+AROAssignment "*" --> "1" Employee
+AROAssignment "*" --> "1" Team
+
+@enduml

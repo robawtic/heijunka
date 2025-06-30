@@ -1,5 +1,0 @@
-Scenario,Team ID,Start Date,Periods,Call-ins,Offline,Force Complete,Total Assignments,Min Employee Assignments,Max Employee Assignments,Avg Employee Assignments,Std Dev Employee Assignments,Min Workstation Utilization,Max Workstation Utilization,Avg Workstation Utilization
-Baseline,1,2025-05-26,4,0,0,False,37,0,4,3.0833333333333335,1.0374916331657276,1,4,3.7
-High_Absenteeism,1,2025-05-26,4,2,0,True,37,0,4,3.0833333333333335,1.0374916331657276,1,4,3.7
-Partial_Offline,1,2025-05-26,4,0,2,False,37,0,4,3.0833333333333335,1.0374916331657276,1,4,3.7
-Combined_Challenges,1,2025-05-26,4,1,2,True,37,0,4,3.0833333333333335,1.0374916331657276,1,4,3.7

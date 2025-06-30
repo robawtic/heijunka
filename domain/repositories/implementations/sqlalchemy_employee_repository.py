@@ -31,14 +31,14 @@ class SqlAlchemyEmployeeRepository(BaseSqlAlchemyRepository[Employee, EmployeeMo
     It does not contain any business logic, which is encapsulated in the domain entities.
     """
 
-    def __init__(self, session: Session):
+    def __init__(self, session_factory):
         """
         Initialize the repository with a SQLAlchemy session.
 
         Args:
-            session: The SQLAlchemy session to use for database operations.
+            session_factory: The SQLAlchemy session factory to use for database operations.
         """
-        super().__init__(session, EmployeeModel, Employee)
+        super().__init__(session_factory, EmployeeModel, Employee)
         self.logger = get_logger("heijunka.repositories.employee")
         self.rate_limited_logger = get_logger("heijunka.repositories.employee", rate_limit=True)
 
@@ -69,39 +69,43 @@ class SqlAlchemyEmployeeRepository(BaseSqlAlchemyRepository[Employee, EmployeeMo
                 }
             )
 
-            employee_model = self._session.query(EmployeeModel).get(employee_id)
+            result = None
+            with self.session_scope() as session:
+                employee_model = session.query(EmployeeModel).get(employee_id)
 
-            if employee_model is None:
+                if employee_model is None:
+                    self.logger.info(
+                        f"No employee found with ID: {employee_id}",
+                        extra={
+                            "event_type": "employee_lookup_failed",
+                            "lookup_type": "id",
+                            "employee_id": employee_id,
+                            "reason": "not_found"
+                        }
+                    )
+                    return None
+
                 self.logger.info(
-                    f"No employee found with ID: {employee_id}",
+                    f"Found employee with ID: {employee_id}",
                     extra={
-                        "event_type": "employee_lookup_failed",
+                        "event_type": "employee_lookup_success",
                         "lookup_type": "id",
-                        "employee_id": employee_id,
-                        "reason": "not_found"
+                        "employee_id": employee_id
                     }
                 )
-                return None
 
-            self.logger.info(
-                f"Found employee with ID: {employee_id}",
-                extra={
-                    "event_type": "employee_lookup_success",
-                    "lookup_type": "id",
-                    "employee_id": employee_id
-                }
-            )
+                self.logger.debug(
+                    f"Converting EmployeeModel [id={employee_model.id}] to domain Employee",
+                    extra={
+                        "event_type": "model_to_domain_conversion",
+                        "entity_id": employee_model.id,
+                        "entity_type": "Employee"
+                    }
+                )
 
-            self.logger.debug(
-                f"Converting EmployeeModel [id={employee_model.id}] to domain Employee",
-                extra={
-                    "event_type": "model_to_domain_conversion",
-                    "entity_id": employee_model.id,
-                    "entity_type": "Employee"
-                }
-            )
+                result = self._to_domain(employee_model)
 
-            return self._to_domain(employee_model)
+            return result
         except SQLAlchemyError as e:
             error_msg = sanitize_exception(e)
             self.logger.error(
@@ -145,40 +149,41 @@ class SqlAlchemyEmployeeRepository(BaseSqlAlchemyRepository[Employee, EmployeeMo
                 }
             )
 
-            employee_models = self._session.query(EmployeeModel).all()
-
-            employee_count = len(employee_models)
-            self.logger.info(
-                f"Found {employee_count} employees",
-                extra={
-                    "event_type": "employees_lookup_success",
-                    "employee_count": employee_count
-                }
-            )
-
             employees = []
-            for employee_model in employee_models:
-                self.logger.debug(
-                    f"Converting EmployeeModel [id={employee_model.id}] to domain Employee",
+            with self.session_scope() as session:
+                employee_models = session.query(EmployeeModel).all()
+
+                employee_count = len(employee_models)
+                self.logger.info(
+                    f"Found {employee_count} employees",
                     extra={
-                        "event_type": "model_to_domain_conversion",
-                        "entity_id": employee_model.id,
-                        "entity_type": "Employee"
+                        "event_type": "employees_lookup_success",
+                        "employee_count": employee_count
                     }
                 )
 
-                employee = self._to_domain(employee_model)
-                employees.append(employee)
+                for employee_model in employee_models:
+                    self.logger.debug(
+                        f"Converting EmployeeModel [id={employee_model.id}] to domain Employee",
+                        extra={
+                            "event_type": "model_to_domain_conversion",
+                            "entity_id": employee_model.id,
+                            "entity_type": "Employee"
+                        }
+                    )
 
-                self.rate_limited_logger.debug(
-                    f"Processed employee: {employee.name}",
-                    event_type="employee_processed",
-                    identifier=str(employee.id),
-                    extra={
-                        "employee_id": employee.id,
-                        "employee_name": employee.name
-                    }
-                )
+                    employee = self._to_domain(employee_model)
+                    employees.append(employee)
+
+                    self.rate_limited_logger.debug(
+                        f"Processed employee: {employee.name}",
+                        event_type="employee_processed",
+                        identifier=str(employee.id),
+                        extra={
+                            "employee_id": employee.id,
+                            "employee_name": employee.name
+                        }
+                    )
 
             return employees
         except SQLAlchemyError as e:
@@ -225,42 +230,46 @@ class SqlAlchemyEmployeeRepository(BaseSqlAlchemyRepository[Employee, EmployeeMo
                 }
             )
 
-            employee_model = self._session.query(EmployeeModel).filter(
-                func.lower(EmployeeModel.name) == func.lower(name)
-            ).first()
+            result = None
+            with self.session_scope() as session:
+                employee_model = session.query(EmployeeModel).filter(
+                    func.lower(EmployeeModel.name) == func.lower(name)
+                ).first()
 
-            if employee_model is None:
+                if employee_model is None:
+                    self.logger.info(
+                        f"No employee found with name: {name}",
+                        extra={
+                            "event_type": "employee_lookup_failed",
+                            "lookup_type": "name",
+                            "employee_name": name,
+                            "reason": "not_found"
+                        }
+                    )
+                    return None
+
                 self.logger.info(
-                    f"No employee found with name: {name}",
+                    f"Found employee with ID: {employee_model.id}",
                     extra={
-                        "event_type": "employee_lookup_failed",
+                        "event_type": "employee_lookup_success",
                         "lookup_type": "name",
                         "employee_name": name,
-                        "reason": "not_found"
+                        "employee_id": employee_model.id
                     }
                 )
-                return None
 
-            self.logger.info(
-                f"Found employee with ID: {employee_model.id}",
-                extra={
-                    "event_type": "employee_lookup_success",
-                    "lookup_type": "name",
-                    "employee_name": name,
-                    "employee_id": employee_model.id
-                }
-            )
+                self.logger.debug(
+                    f"Converting EmployeeModel [id={employee_model.id}] to domain Employee",
+                    extra={
+                        "event_type": "model_to_domain_conversion",
+                        "entity_id": employee_model.id,
+                        "entity_type": "Employee"
+                    }
+                )
 
-            self.logger.debug(
-                f"Converting EmployeeModel [id={employee_model.id}] to domain Employee",
-                extra={
-                    "event_type": "model_to_domain_conversion",
-                    "entity_id": employee_model.id,
-                    "entity_type": "Employee"
-                }
-            )
+                result = self._to_domain(employee_model)
 
-            return self._to_domain(employee_model)
+            return result
         except SQLAlchemyError as e:
             error_msg = sanitize_exception(e)
             self.logger.error(
@@ -312,31 +321,32 @@ class SqlAlchemyEmployeeRepository(BaseSqlAlchemyRepository[Employee, EmployeeMo
                 }
             )
 
-            employee_models = self._session.query(EmployeeModel).filter(
-                EmployeeModel.team_id == team_id
-            ).all()
-
-            employee_count = len(employee_models)
-            self.logger.info(
-                f"Found {employee_count} employees for team ID: {team_id}",
-                extra={
-                    "event_type": "team_employees_lookup_success",
-                    "team_id": team_id,
-                    "employee_count": employee_count
-                }
-            )
-
             employees = []
-            for employee_model in employee_models:
-                self.logger.debug(
-                    f"Converting EmployeeModel [id={employee_model.id}] to domain Employee",
+            with self.session_scope() as session:
+                employee_models = session.query(EmployeeModel).filter(
+                    EmployeeModel.team_id == team_id
+                ).all()
+
+                employee_count = len(employee_models)
+                self.logger.info(
+                    f"Found {employee_count} employees for team ID: {team_id}",
                     extra={
-                        "event_type": "model_to_domain_conversion",
-                        "entity_id": employee_model.id,
-                        "entity_type": "Employee"
+                        "event_type": "team_employees_lookup_success",
+                        "team_id": team_id,
+                        "employee_count": employee_count
                     }
                 )
-                employees.append(self._to_domain(employee_model))
+
+                for employee_model in employee_models:
+                    self.logger.debug(
+                        f"Converting EmployeeModel [id={employee_model.id}] to domain Employee",
+                        extra={
+                            "event_type": "model_to_domain_conversion",
+                            "entity_id": employee_model.id,
+                            "entity_type": "Employee"
+                        }
+                    )
+                    employees.append(self._to_domain(employee_model))
 
             return employees
         except SQLAlchemyError as e:
@@ -387,37 +397,38 @@ class SqlAlchemyEmployeeRepository(BaseSqlAlchemyRepository[Employee, EmployeeMo
                 }
             )
 
-            # Use SQLAlchemy's selectinload for eager loading related data
-            employee_models = self._session.query(EmployeeModel).filter(
-                EmployeeModel.team_id.in_(team_ids)
-            ).options(
-                selectinload(EmployeeModel.teams),
-                selectinload(EmployeeModel.workstations),
-                selectinload(EmployeeModel.availability),
-                selectinload(EmployeeModel.station_skills)
-            ).all()
-
-            employee_count = len(employee_models)
-            self.logger.info(
-                f"Found {employee_count} employees for {len(team_ids)} teams with eager loading",
-                extra={
-                    "event_type": "bulk_employees_lookup_success",
-                    "team_count": len(team_ids),
-                    "employee_count": employee_count
-                }
-            )
-
             employees = []
-            for employee_model in employee_models:
-                self.logger.debug(
-                    f"Converting EmployeeModel [id={employee_model.id}] to domain Employee",
+            # Use SQLAlchemy's selectinload for eager loading related data
+            with self.session_scope() as session:
+                employee_models = session.query(EmployeeModel).filter(
+                    EmployeeModel.team_id.in_(team_ids)
+                ).options(
+                    selectinload(EmployeeModel.teams),
+                    selectinload(EmployeeModel.workstations),
+                    selectinload(EmployeeModel.availability),
+                    selectinload(EmployeeModel.station_skills)
+                ).all()
+
+                employee_count = len(employee_models)
+                self.logger.info(
+                    f"Found {employee_count} employees for {len(team_ids)} teams with eager loading",
                     extra={
-                        "event_type": "model_to_domain_conversion",
-                        "entity_id": employee_model.id,
-                        "entity_type": "Employee"
+                        "event_type": "bulk_employees_lookup_success",
+                        "team_count": len(team_ids),
+                        "employee_count": employee_count
                     }
                 )
-                employees.append(self._to_domain(employee_model))
+
+                for employee_model in employee_models:
+                    self.logger.debug(
+                        f"Converting EmployeeModel [id={employee_model.id}] to domain Employee",
+                        extra={
+                            "event_type": "model_to_domain_conversion",
+                            "entity_id": employee_model.id,
+                            "entity_type": "Employee"
+                        }
+                    )
+                    employees.append(self._to_domain(employee_model))
 
             return employees
         except SQLAlchemyError as e:
@@ -469,119 +480,120 @@ class SqlAlchemyEmployeeRepository(BaseSqlAlchemyRepository[Employee, EmployeeMo
                 }
             )
 
-            employee = self._session.query(EmployeeModel).get(employee_id)
-            team = self._session.query(TeamModel).get(team_id)
+            with self.session_scope() as session:
+                employee = session.query(EmployeeModel).get(employee_id)
+                team = session.query(TeamModel).get(team_id)
 
-            if not employee or not team:
-                self.logger.warning(
-                    f"Role assignment failed - employee or team not found",
+                if not employee or not team:
+                    self.logger.warning(
+                        f"Role assignment failed - employee or team not found",
+                        extra={
+                            "event_type": "role_assignment_failed",
+                            "employee_id": employee_id,
+                            "team_id": team_id,
+                            "role": role_name,
+                            "reason": "entity_not_found"
+                        }
+                    )
+                    return {"status": "error", "message": "Employee or team not found"}
+
+                # Log with redaction
+                result = redact_log_message(
+                    f"Assigning role '{role_name}' to employee {employee.name} (ID: {employee_id}) in team {team.name} (ID: {team_id})",
+                    employee_names=[employee.name],
+                    employee_ids=[str(employee_id)],
+                    team_names=[team.name],
+                    team_ids=[str(team_id)]
+                )
+                self.logger.info(
+                    result.message,
                     extra={
-                        "event_type": "role_assignment_failed",
+                        "event_type": "role_assignment_attempt",
                         "employee_id": employee_id,
+                        "role_name": role_name,
                         "team_id": team_id,
-                        "role": role_name,
-                        "reason": "entity_not_found"
+                        "redacted": True,
+                        "redacted_fields": result.redacted_fields
                     }
                 )
-                return {"status": "error", "message": "Employee or team not found"}
 
-            # Log with redaction
-            result = redact_log_message(
-                f"Assigning role '{role_name}' to employee {employee.name} (ID: {employee_id}) in team {team.name} (ID: {team_id})",
-                employee_names=[employee.name],
-                employee_ids=[str(employee_id)],
-                team_names=[team.name],
-                team_ids=[str(team_id)]
-            )
-            self.logger.info(
-                result.message,
-                extra={
-                    "event_type": "role_assignment_attempt",
-                    "employee_id": employee_id,
-                    "role_name": role_name,
-                    "team_id": team_id,
-                    "redacted": True,
-                    "redacted_fields": result.redacted_fields
-                }
-            )
+                for team_member in employee.teams:
+                    if team_member.team == team:
+                        role = session.query(RoleModel).filter_by(role_name=role_name).first()
+                        if not role:
+                            self.logger.warning(
+                                f"Role '{role_name}' not found",
+                                extra={
+                                    "event_type": "role_assignment_failed",
+                                    "employee_id": employee_id,
+                                    "team_id": team_id,
+                                    "role_name": role_name,
+                                    "reason": "role_not_found"
+                                }
+                            )
+                            return {"status": "error", "message": f"Role '{role_name}' not found"}
 
-            for team_member in employee.teams:
-                if team_member.team == team:
-                    role = self._session.query(RoleModel).filter_by(role_name=role_name).first()
-                    if not role:
-                        self.logger.warning(
-                            f"Role '{role_name}' not found",
-                            extra={
-                                "event_type": "role_assignment_failed",
-                                "employee_id": employee_id,
-                                "team_id": team_id,
-                                "role_name": role_name,
-                                "reason": "role_not_found"
-                            }
+                        if role in team_member.roles:
+                            self.logger.info(
+                                redact_log_message(
+                                    f"Employee {employee.name} already has role '{role_name}' in team {team.name}",
+                                    employee_names=[employee.name],
+                                    team_names=[team.name]
+                                ).message,
+                                extra={
+                                    "event_type": "role_assignment_skipped",
+                                    "employee_id": employee_id,
+                                    "role_name": role_name,
+                                    "team_id": team_id,
+                                    "reason": "already_assigned"
+                                }
+                            )
+                            return {"status": "exists", "message": f"Already has role '{role_name}'"}
+
+                        team_member.roles.append(role)
+                        session.commit()
+
+                        # Log audit event for this security-relevant operation
+                        log_audit_event(
+                            event_type="role_assignment",
+                            message=f"Role '{role_name}' assigned to employee in team",
+                            employee_names=[employee.name],
+                            employee_ids=[str(employee_id)],
+                            team_names=[team.name],
+                            team_ids=[str(team_id)],
+                            custom_data={"role": role_name}
                         )
-                        return {"status": "error", "message": f"Role '{role_name}' not found"}
 
-                    if role in team_member.roles:
                         self.logger.info(
                             redact_log_message(
-                                f"Employee {employee.name} already has role '{role_name}' in team {team.name}",
+                                f"Successfully assigned role '{role_name}' to employee {employee.name} in team {team.name}",
                                 employee_names=[employee.name],
                                 team_names=[team.name]
                             ).message,
                             extra={
-                                "event_type": "role_assignment_skipped",
+                                "event_type": "role_assignment_success",
                                 "employee_id": employee_id,
                                 "role_name": role_name,
-                                "team_id": team_id,
-                                "reason": "already_assigned"
+                                "team_id": team_id
                             }
                         )
-                        return {"status": "exists", "message": f"Already has role '{role_name}'"}
+                        return {"status": "success", "message": f"Role '{role_name}' assigned"}
 
-                    team_member.roles.append(role)
-                    self._session.commit()
-
-                    # Log audit event for this security-relevant operation
-                    log_audit_event(
-                        event_type="role_assignment",
-                        message=f"Role '{role_name}' assigned to employee in team",
+                self.logger.warning(
+                    redact_log_message(
+                        f"Employee {employee.name} not in team {team.name}",
                         employee_names=[employee.name],
-                        employee_ids=[str(employee_id)],
-                        team_names=[team.name],
-                        team_ids=[str(team_id)],
-                        custom_data={"role": role_name}
-                    )
-
-                    self.logger.info(
-                        redact_log_message(
-                            f"Successfully assigned role '{role_name}' to employee {employee.name} in team {team.name}",
-                            employee_names=[employee.name],
-                            team_names=[team.name]
-                        ).message,
-                        extra={
-                            "event_type": "role_assignment_success",
-                            "employee_id": employee_id,
-                            "role_name": role_name,
-                            "team_id": team_id
-                        }
-                    )
-                    return {"status": "success", "message": f"Role '{role_name}' assigned"}
-
-            self.logger.warning(
-                redact_log_message(
-                    f"Employee {employee.name} not in team {team.name}",
-                    employee_names=[employee.name],
-                    team_names=[team.name]
-                ).message,
-                extra={
-                    "event_type": "role_assignment_failed",
-                    "employee_id": employee_id,
-                    "role_name": role_name,
-                    "team_id": team_id,
-                    "reason": "not_in_team"
-                }
-            )
-            return {"status": "error", "message": "Employee not in team"}
+                        team_names=[team.name]
+                    ).message,
+                    extra={
+                        "event_type": "role_assignment_failed",
+                        "employee_id": employee_id,
+                        "role_name": role_name,
+                        "team_id": team_id,
+                        "reason": "not_in_team"
+                    }
+                )
+                return {"status": "error", "message": "Employee not in team"}
         except SQLAlchemyError as e:
             error_msg = sanitize_exception(e)
             self.logger.error(
@@ -635,90 +647,91 @@ class SqlAlchemyEmployeeRepository(BaseSqlAlchemyRepository[Employee, EmployeeMo
                 }
             )
 
-            employee = self._session.query(EmployeeModel).get(employee_id)
-            team = self._session.query(TeamModel).get(team_id)
+            with self.session_scope() as session:
+                employee = session.query(EmployeeModel).get(employee_id)
+                team = session.query(TeamModel).get(team_id)
 
-            if not employee or not team:
+                if not employee or not team:
+                    self.logger.warning(
+                        f"Role removal failed - employee or team not found",
+                        extra={
+                            "event_type": "role_removal_failed",
+                            "employee_id": employee_id,
+                            "team_id": team_id,
+                            "role": role_name,
+                            "reason": "entity_not_found"
+                        }
+                    )
+                    return {"status": "error", "message": "Employee or team not found"}
+
+                # Log with redaction
+                result = redact_log_message(
+                    f"Removing role '{role_name}' from employee {employee.name} (ID: {employee_id}) in team {team.name} (ID: {team_id})",
+                    employee_names=[employee.name],
+                    employee_ids=[str(employee_id)],
+                    team_names=[team.name],
+                    team_ids=[str(team_id)]
+                )
+                self.logger.info(
+                    result.message,
+                    extra={
+                        "event_type": "role_removal_attempt",
+                        "employee_id": employee_id,
+                        "role_name": role_name,
+                        "team_id": team_id,
+                        "redacted": True,
+                        "redacted_fields": result.redacted_fields
+                    }
+                )
+
+                for team_member in employee.teams:
+                    if team_member.team == team:
+                        for role in team_member.roles:
+                            if role.name == role_name:
+                                team_member.roles.remove(role)
+                                session.commit()
+
+                                # Log audit event for this security-relevant operation
+                                log_audit_event(
+                                    event_type="role_removal",
+                                    message=f"Role '{role_name}' removed from employee in team",
+                                    employee_names=[employee.name],
+                                    employee_ids=[str(employee_id)],
+                                    team_names=[team.name],
+                                    team_ids=[str(team_id)],
+                                    custom_data={"role": role_name}
+                                )
+
+                                self.logger.info(
+                                    redact_log_message(
+                                        f"Successfully removed role '{role_name}' from employee {employee.name} in team {team.name}",
+                                        employee_names=[employee.name],
+                                        team_names=[team.name]
+                                    ).message,
+                                    extra={
+                                        "event_type": "role_removal_success",
+                                        "employee_id": employee_id,
+                                        "role_name": role_name,
+                                        "team_id": team_id
+                                    }
+                                )
+                                return {"status": "success", "message": f"Removed role '{role_name}'"}
+
                 self.logger.warning(
-                    f"Role removal failed - employee or team not found",
+                    redact_log_message(
+                        f"Role '{role_name}' not found for employee {employee.name} in team {team.name}",
+                        employee_names=[employee.name],
+                        team_names=[team.name]
+                    ).message,
                     extra={
                         "event_type": "role_removal_failed",
                         "employee_id": employee_id,
+                        "role_name": role_name,
                         "team_id": team_id,
-                        "role": role_name,
-                        "reason": "entity_not_found"
+                        "reason": "role_not_found"
                     }
                 )
-                return {"status": "error", "message": "Employee or team not found"}
-
-            # Log with redaction
-            result = redact_log_message(
-                f"Removing role '{role_name}' from employee {employee.name} (ID: {employee_id}) in team {team.name} (ID: {team_id})",
-                employee_names=[employee.name],
-                employee_ids=[str(employee_id)],
-                team_names=[team.name],
-                team_ids=[str(team_id)]
-            )
-            self.logger.info(
-                result.message,
-                extra={
-                    "event_type": "role_removal_attempt",
-                    "employee_id": employee_id,
-                    "role_name": role_name,
-                    "team_id": team_id,
-                    "redacted": True,
-                    "redacted_fields": result.redacted_fields
-                }
-            )
-
-            for team_member in employee.teams:
-                if team_member.team == team:
-                    for role in team_member.roles:
-                        if role.name == role_name:
-                            team_member.roles.remove(role)
-                            self._session.commit()
-
-                            # Log audit event for this security-relevant operation
-                            log_audit_event(
-                                event_type="role_removal",
-                                message=f"Role '{role_name}' removed from employee in team",
-                                employee_names=[employee.name],
-                                employee_ids=[str(employee_id)],
-                                team_names=[team.name],
-                                team_ids=[str(team_id)],
-                                custom_data={"role": role_name}
-                            )
-
-                            self.logger.info(
-                                redact_log_message(
-                                    f"Successfully removed role '{role_name}' from employee {employee.name} in team {team.name}",
-                                    employee_names=[employee.name],
-                                    team_names=[team.name]
-                                ).message,
-                                extra={
-                                    "event_type": "role_removal_success",
-                                    "employee_id": employee_id,
-                                    "role_name": role_name,
-                                    "team_id": team_id
-                                }
-                            )
-                            return {"status": "success", "message": f"Removed role '{role_name}'"}
-
-            self.logger.warning(
-                redact_log_message(
-                    f"Role '{role_name}' not found for employee {employee.name} in team {team.name}",
-                    employee_names=[employee.name],
-                    team_names=[team.name]
-                ).message,
-                extra={
-                    "event_type": "role_removal_failed",
-                    "employee_id": employee_id,
-                    "role_name": role_name,
-                    "team_id": team_id,
-                    "reason": "role_not_found"
-                }
-            )
-            return {"status": "error", "message": f"Role '{role_name}' not found"}
+                return {"status": "error", "message": f"Role '{role_name}' not found"}
         except SQLAlchemyError as e:
             error_msg = sanitize_exception(e)
             self.logger.error(
@@ -775,92 +788,92 @@ class SqlAlchemyEmployeeRepository(BaseSqlAlchemyRepository[Employee, EmployeeMo
             )
 
             # Verify employee and workstation exist
-            employee = self._session.query(EmployeeModel).get(employee_id)
-            workstation = self._session.query(WorkstationModel).get(workstation_id)
+            with self.session_scope() as session:
+                employee = session.query(EmployeeModel).get(employee_id)
+                workstation = session.query(WorkstationModel).get(workstation_id)
 
-            if not employee or not workstation:
-                self.logger.warning(
-                    f"Workstation assignment failed - employee or workstation not found",
+                if not employee or not workstation:
+                    self.logger.warning(
+                        f"Workstation assignment failed - employee or workstation not found",
+                        extra={
+                            "event_type": "workstation_assignment_failed",
+                            "employee_id": employee_id,
+                            "workstation_id": workstation_id,
+                            "reason": "entity_not_found"
+                        }
+                    )
+                    return {"status": "error", "message": "Employee or workstation not found"}
+
+                # Log with redaction
+                result = redact_log_message(
+                    f"Assigning workstation {workstation.name} (ID: {workstation_id}) to employee {employee.name} (ID: {employee_id})",
+                    employee_names=[employee.name],
+                    employee_ids=[str(employee_id)],
+                    workstation_names=[workstation.name]
+                )
+                self.logger.info(
+                    result.message,
                     extra={
-                        "event_type": "workstation_assignment_failed",
+                        "event_type": "workstation_assignment_attempt",
                         "employee_id": employee_id,
                         "workstation_id": workstation_id,
-                        "reason": "entity_not_found"
+                        "redacted": True,
+                        "redacted_fields": result.redacted_fields
                     }
                 )
-                return {"status": "error", "message": "Employee or workstation not found"}
 
-            # Log with redaction
-            result = redact_log_message(
-                f"Assigning workstation {workstation.name} (ID: {workstation_id}) to employee {employee.name} (ID: {employee_id})",
-                employee_names=[employee.name],
-                employee_ids=[str(employee_id)],
-                workstation_names=[workstation.name]
-            )
-            self.logger.info(
-                result.message,
-                extra={
-                    "event_type": "workstation_assignment_attempt",
-                    "employee_id": employee_id,
-                    "workstation_id": workstation_id,
-                    "redacted": True,
-                    "redacted_fields": result.redacted_fields
-                }
-            )
+                existing = session.query(EmployeeWorkstationModel).filter_by(
+                    employee_id=employee_id,
+                    station_id=workstation_id
+                ).first()
 
-            existing = self._session.query(EmployeeWorkstationModel).filter_by(
-                employee_id=employee_id,
-                station_id=workstation_id
-            ).first()
+                if existing:
+                    self.logger.info(
+                        redact_log_message(
+                            f"Employee {employee.name} already assigned to workstation {workstation.name}",
+                            employee_names=[employee.name],
+                            workstation_names=[workstation.name]
+                        ).message,
+                        extra={
+                            "event_type": "workstation_assignment_skipped",
+                            "employee_id": employee_id,
+                            "workstation_id": workstation_id,
+                            "reason": "already_assigned"
+                        }
+                    )
+                    return {"status": "exists", "message": f"Already assigned to {workstation.name}"}
 
-            if existing:
+                new_assignment = EmployeeWorkstationModel(
+                    employee_id=employee_id,
+                    station_id=workstation_id
+                )
+                session.add(new_assignment)
+                session.commit()
+
+                # Log audit event for this security-relevant operation
+                log_audit_event(
+                    event_type="workstation_assignment",
+                    message=f"Workstation assigned to employee",
+                    employee_names=[employee.name],
+                    employee_ids=[str(employee_id)],
+                    workstation_names=[workstation.name],
+                    custom_data={"workstation_id": workstation_id}
+                )
+
                 self.logger.info(
                     redact_log_message(
-                        f"Employee {employee.name} already assigned to workstation {workstation.name}",
+                        f"Successfully assigned workstation {workstation.name} to employee {employee.name}",
                         employee_names=[employee.name],
                         workstation_names=[workstation.name]
                     ).message,
                     extra={
-                        "event_type": "workstation_assignment_skipped",
+                        "event_type": "workstation_assignment_success",
                         "employee_id": employee_id,
-                        "workstation_id": workstation_id,
-                        "reason": "already_assigned"
+                        "workstation_id": workstation_id
                     }
                 )
-                return {"status": "exists", "message": f"Already assigned to {workstation.name}"}
-
-            new_assignment = EmployeeWorkstationModel(
-                employee_id=employee_id,
-                station_id=workstation_id
-            )
-            self._session.add(new_assignment)
-            self._session.commit()
-
-            # Log audit event for this security-relevant operation
-            log_audit_event(
-                event_type="workstation_assignment",
-                message=f"Workstation assigned to employee",
-                employee_names=[employee.name],
-                employee_ids=[str(employee_id)],
-                workstation_names=[workstation.name],
-                custom_data={"workstation_id": workstation_id}
-            )
-
-            self.logger.info(
-                redact_log_message(
-                    f"Successfully assigned workstation {workstation.name} to employee {employee.name}",
-                    employee_names=[employee.name],
-                    workstation_names=[workstation.name]
-                ).message,
-                extra={
-                    "event_type": "workstation_assignment_success",
-                    "employee_id": employee_id,
-                    "workstation_id": workstation_id
-                }
-            )
-            return {"status": "success", "message": f"Assigned to {workstation.name}"}
+                return {"status": "success", "message": f"Assigned to {workstation.name}"}
         except SQLAlchemyError as e:
-            self._session.rollback()
             error_msg = sanitize_exception(e)
             self.logger.error(
                 f"Error in EmployeeRepository.assign_workstation: {error_msg}",
@@ -873,7 +886,6 @@ class SqlAlchemyEmployeeRepository(BaseSqlAlchemyRepository[Employee, EmployeeMo
             )
             raise RepositoryError(f"Database error while assigning workstation: {error_msg}")
         except Exception as e:
-            self._session.rollback()
             error_msg = sanitize_exception(e)
             self.logger.error(
                 f"Unexpected error in EmployeeRepository.assign_workstation: {error_msg}",
@@ -911,31 +923,33 @@ class SqlAlchemyEmployeeRepository(BaseSqlAlchemyRepository[Employee, EmployeeMo
             )
 
             # Get employee and workstation names for better logging
-            employee = self._session.query(EmployeeModel).get(employee_id)
-            workstation = self._session.query(WorkstationModel).get(workstation_id)
+            with self.session_scope() as session:
+                employee = session.query(EmployeeModel).get(employee_id)
+                workstation = session.query(WorkstationModel).get(workstation_id)
 
-            if employee and workstation:
-                # Log with redaction
-                result = redact_log_message(
-                    f"Retrieving work history for employee {employee.name} at workstation {workstation.name}",
-                    employee_names=[employee.name],
-                    workstation_names=[workstation.name]
-                )
-                self.logger.info(
-                    result.message,
-                    extra={
-                        "event_type": "work_history_lookup_detail",
-                        "employee_id": employee_id,
-                        "workstation_id": workstation_id,
-                        "redacted": True,
-                        "redacted_fields": result.redacted_fields
-                    }
-                )
+                if employee and workstation:
+                    # Log with redaction
+                    result = redact_log_message(
+                        f"Retrieving work history for employee {employee.name} at workstation {workstation.name}",
+                        employee_names=[employee.name],
+                        workstation_names=[workstation.name]
+                    )
+                    self.logger.info(
+                        result.message,
+                        extra={
+                            "event_type": "work_history_lookup_detail",
+                            "employee_id": employee_id,
+                            "workstation_id": workstation_id,
+                            "redacted": True,
+                            "redacted_fields": result.redacted_fields
+                        }
+                    )
 
-            history = self._session.query(EmployeeWorkHistoryModel).filter(
-                EmployeeWorkHistoryModel.employee_id == employee_id,
-                EmployeeWorkHistoryModel.station_id == workstation_id
-            ).all()
+            with self.session_scope() as session:
+                history = session.query(EmployeeWorkHistoryModel).filter(
+                    EmployeeWorkHistoryModel.employee_id == employee_id,
+                    EmployeeWorkHistoryModel.station_id == workstation_id
+                ).all()
 
             self.logger.info(
                 f"Found {len(history)} work history entries for employee ID: {employee_id} at workstation ID: {workstation_id}",
@@ -1004,76 +1018,76 @@ class SqlAlchemyEmployeeRepository(BaseSqlAlchemyRepository[Employee, EmployeeMo
             )
 
             # Get employee and workstation names for better logging
-            employee = self._session.query(EmployeeModel).get(employee_id)
-            workstation = self._session.query(WorkstationModel).get(workstation_id)
+            with self.session_scope() as session:
+                employee = session.query(EmployeeModel).get(employee_id)
+                workstation = session.query(WorkstationModel).get(workstation_id)
 
-            if employee and workstation:
-                # Log with redaction
-                result = redact_log_message(
-                    f"Adding work history entry for employee {employee.name} at workstation {workstation.name} on {worked_date} period {work_period}",
-                    employee_names=[employee.name],
-                    workstation_names=[workstation.name],
-                    dates=[str(worked_date)]
-                )
+                if employee and workstation:
+                    # Log with redaction
+                    result = redact_log_message(
+                        f"Adding work history entry for employee {employee.name} at workstation {workstation.name} on {worked_date} period {work_period}",
+                        employee_names=[employee.name],
+                        workstation_names=[workstation.name],
+                        dates=[str(worked_date)]
+                    )
+                    self.logger.info(
+                        result.message,
+                        extra={
+                            "event_type": "work_history_add_detail",
+                            "employee_id": employee_id,
+                            "workstation_id": workstation_id,
+                            "worked_date": str(worked_date),
+                            "work_period": work_period,
+                            "end_flag": end_flag,
+                            "redacted": True,
+                            "redacted_fields": result.redacted_fields
+                        }
+                    )
+                else:
+                    self.logger.warning(
+                        f"Adding work history for unknown employee or workstation",
+                        extra={
+                            "event_type": "work_history_add_warning",
+                            "employee_id": employee_id,
+                            "workstation_id": workstation_id,
+                            "reason": "entity_not_found"
+                        }
+                    )
+
+                session.add(EmployeeWorkHistoryModel(
+                    employee_id=employee_id,
+                    station_id=workstation_id,
+                    worked_date=worked_date,
+                    work_period=work_period,
+                    end_flag=end_flag
+                ))
+                session.commit()
+
+                # Log audit event for this security-relevant operation
+                if employee and workstation:
+                    log_audit_event(
+                        event_type="work_history_added",
+                        message=f"Work history entry added for employee at workstation",
+                        employee_names=[employee.name],
+                        employee_ids=[str(employee_id)],
+                        workstation_names=[workstation.name],
+                        dates=[str(worked_date)],
+                        custom_data={"work_period": work_period, "end_flag": end_flag}
+                    )
+
                 self.logger.info(
-                    result.message,
+                    f"Successfully added work history entry for employee ID: {employee_id}",
                     extra={
-                        "event_type": "work_history_add_detail",
+                        "event_type": "work_history_add_success",
                         "employee_id": employee_id,
                         "workstation_id": workstation_id,
                         "worked_date": str(worked_date),
                         "work_period": work_period,
-                        "end_flag": end_flag,
-                        "redacted": True,
-                        "redacted_fields": result.redacted_fields
+                        "end_flag": end_flag
                     }
                 )
-            else:
-                self.logger.warning(
-                    f"Adding work history for unknown employee or workstation",
-                    extra={
-                        "event_type": "work_history_add_warning",
-                        "employee_id": employee_id,
-                        "workstation_id": workstation_id,
-                        "reason": "entity_not_found"
-                    }
-                )
-
-            self._session.add(EmployeeWorkHistoryModel(
-                employee_id=employee_id,
-                station_id=workstation_id,
-                worked_date=worked_date,
-                work_period=work_period,
-                end_flag=end_flag
-            ))
-            self._session.commit()
-
-            # Log audit event for this security-relevant operation
-            if employee and workstation:
-                log_audit_event(
-                    event_type="work_history_added",
-                    message=f"Work history entry added for employee at workstation",
-                    employee_names=[employee.name],
-                    employee_ids=[str(employee_id)],
-                    workstation_names=[workstation.name],
-                    dates=[str(worked_date)],
-                    custom_data={"work_period": work_period, "end_flag": end_flag}
-                )
-
-            self.logger.info(
-                f"Successfully added work history entry for employee ID: {employee_id}",
-                extra={
-                    "event_type": "work_history_add_success",
-                    "employee_id": employee_id,
-                    "workstation_id": workstation_id,
-                    "worked_date": str(worked_date),
-                    "work_period": work_period,
-                    "end_flag": end_flag
-                }
-            )
-            return True
+                return True
         except SQLAlchemyError as e:
-            self._session.rollback()
             error_msg = sanitize_exception(e)
             self.logger.error(
                 f"Error in EmployeeRepository.add_work_history: {error_msg}",
@@ -1089,7 +1103,6 @@ class SqlAlchemyEmployeeRepository(BaseSqlAlchemyRepository[Employee, EmployeeMo
             )
             raise RepositoryError(f"Error adding work history entry: {error_msg}")
         except Exception as e:
-            self._session.rollback()
             error_msg = sanitize_exception(e)
             self.logger.error(
                 f"Unexpected error in EmployeeRepository.add_work_history: {error_msg}",
@@ -1130,38 +1143,40 @@ class SqlAlchemyEmployeeRepository(BaseSqlAlchemyRepository[Employee, EmployeeMo
             )
 
             # Get employee and workstation names for better logging
-            employee = self._session.query(EmployeeModel).get(employee_id)
-            workstation = self._session.query(WorkstationModel).get(workstation_id)
+            with self.session_scope() as session:
+                employee = session.query(EmployeeModel).get(employee_id)
+                workstation = session.query(WorkstationModel).get(workstation_id)
 
-            if employee and workstation:
-                # Log with redaction
-                result = redact_log_message(
-                    f"Retrieving last worked date for employee {employee.name} at workstation {workstation.name}",
-                    employee_names=[employee.name],
-                    workstation_names=[workstation.name]
-                )
+                if employee and workstation:
+                    # Log with redaction
+                    result = redact_log_message(
+                        f"Retrieving last worked date for employee {employee.name} at workstation {workstation.name}",
+                        employee_names=[employee.name],
+                        workstation_names=[workstation.name]
+                    )
 
-                self.rate_limited_logger.info(
-                    result.message,
-                    event_type="last_worked_date_check_detail",
-                    identifier=f"{employee_id}:{workstation_id}",
-                    extra={
-                        "employee_id": employee_id,
-                        "workstation_id": workstation_id,
-                        "redacted": True,
-                        "redacted_fields": result.redacted_fields
-                    }
-                )
+                    self.rate_limited_logger.info(
+                        result.message,
+                        event_type="last_worked_date_check_detail",
+                        identifier=f"{employee_id}:{workstation_id}",
+                        extra={
+                            "employee_id": employee_id,
+                            "workstation_id": workstation_id,
+                            "redacted": True,
+                            "redacted_fields": result.redacted_fields
+                        }
+                    )
 
-            entry = self._session.query(EmployeeWorkHistoryModel).filter(
-                and_(
-                    EmployeeWorkHistoryModel.employee_id == employee_id,
-                    EmployeeWorkHistoryModel.station_id == workstation_id
-                )
-            ).order_by(
-                EmployeeWorkHistoryModel.worked_date.desc(),
-                EmployeeWorkHistoryModel.work_period.desc()
-            ).first()
+            with self.session_scope() as session:
+                entry = session.query(EmployeeWorkHistoryModel).filter(
+                    and_(
+                        EmployeeWorkHistoryModel.employee_id == employee_id,
+                        EmployeeWorkHistoryModel.station_id == workstation_id
+                    )
+                ).order_by(
+                    EmployeeWorkHistoryModel.worked_date.desc(),
+                    EmployeeWorkHistoryModel.work_period.desc()
+                ).first()
 
             if entry:
                 self.rate_limited_logger.info(
@@ -1240,75 +1255,76 @@ class SqlAlchemyEmployeeRepository(BaseSqlAlchemyRepository[Employee, EmployeeMo
                 }
             )
 
-            employee = self._session.query(EmployeeModel).get(employee_id)
-            if not employee:
-                self.logger.warning(
-                    "Availability check failed - employee not found",
+            with self.session_scope() as session:
+                employee = session.query(EmployeeModel).get(employee_id)
+                if not employee:
+                    self.logger.warning(
+                        "Availability check failed - employee not found",
+                        extra={
+                            "event_type": "availability_check_failed",
+                            "employee_id": employee_id,
+                            "reason": "employee_not_found"
+                        }
+                    )
+                    return False
+
+                # Log with redaction using rate-limited logger
+                result = redact_log_message(
+                    f"Checking availability for employee {employee.name} (ID: {employee_id}) on {date_obj}",
+                    employee_names=[employee.name],
+                    employee_ids=[str(employee_id)],
+                    dates=[str(date_obj)]
+                )
+
+                # Use rate-limited logger for this high-frequency operation
+                self.rate_limited_logger.info(
+                    result.message,
+                    event_type="availability_check_detail",
+                    identifier=f"{employee_id}:{date_obj}",
                     extra={
-                        "event_type": "availability_check_failed",
                         "employee_id": employee_id,
-                        "reason": "employee_not_found"
+                        "date": str(date_obj),
+                        "period": period,
+                        "redacted": True,
+                        "redacted_fields": result.redacted_fields
                     }
                 )
-                return False
 
-            # Log with redaction using rate-limited logger
-            result = redact_log_message(
-                f"Checking availability for employee {employee.name} (ID: {employee_id}) on {date_obj}",
-                employee_names=[employee.name],
-                employee_ids=[str(employee_id)],
-                dates=[str(date_obj)]
-            )
+                # Check availability logic
+                is_available = True
+                for av in employee.availability:
+                    if av.date != date_obj:
+                        continue
+                    if av.is_call_in or av.is_aro:
+                        is_available = False
+                        break
+                    if av.is_partial and period is not None and av.period == period:
+                        is_available = False
+                        break
 
-            # Use rate-limited logger for this high-frequency operation
-            self.rate_limited_logger.info(
-                result.message,
-                event_type="availability_check_detail",
-                identifier=f"{employee_id}:{date_obj}",
-                extra={
-                    "employee_id": employee_id,
-                    "date": str(date_obj),
-                    "period": period,
-                    "redacted": True,
-                    "redacted_fields": result.redacted_fields
-                }
-            )
+                # Log result with redaction using rate-limited logger
+                result = redact_log_message(
+                    f"Employee {employee.name} (ID: {employee_id}) is {'available' if is_available else 'not available'} on {date_obj}",
+                    employee_names=[employee.name],
+                    employee_ids=[str(employee_id)],
+                    dates=[str(date_obj)]
+                )
 
-            # Check availability logic
-            is_available = True
-            for av in employee.availability:
-                if av.date != date_obj:
-                    continue
-                if av.is_call_in or av.is_aro:
-                    is_available = False
-                    break
-                if av.is_partial and period is not None and av.period == period:
-                    is_available = False
-                    break
+                self.rate_limited_logger.info(
+                    result.message,
+                    event_type="availability_result",
+                    identifier=f"{employee_id}:{date_obj}",
+                    extra={
+                        "employee_id": employee_id,
+                        "date": str(date_obj),
+                        "period": period,
+                        "is_available": is_available,
+                        "redacted": True,
+                        "redacted_fields": result.redacted_fields
+                    }
+                )
 
-            # Log result with redaction using rate-limited logger
-            result = redact_log_message(
-                f"Employee {employee.name} (ID: {employee_id}) is {'available' if is_available else 'not available'} on {date_obj}",
-                employee_names=[employee.name],
-                employee_ids=[str(employee_id)],
-                dates=[str(date_obj)]
-            )
-
-            self.rate_limited_logger.info(
-                result.message,
-                event_type="availability_result",
-                identifier=f"{employee_id}:{date_obj}",
-                extra={
-                    "employee_id": employee_id,
-                    "date": str(date_obj),
-                    "period": period,
-                    "is_available": is_available,
-                    "redacted": True,
-                    "redacted_fields": result.redacted_fields
-                }
-            )
-
-            return is_available
+                return is_available
         except SQLAlchemyError as e:
             error_msg = sanitize_exception(e)
             self.logger.error(

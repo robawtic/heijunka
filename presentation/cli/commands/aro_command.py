@@ -2,21 +2,21 @@
 ARO (Assigned Relief Operator) command handling for the CLI application.
 """
 import sys
-from typing import Optional, Any, Dict, List, Tuple, Union
-from datetime import datetime
+from typing import Optional, Any, Dict, List, Tuple, Union, cast
+from datetime import datetime, date
 from sqlalchemy.orm import Session
 
 from domain.repositories.implementations.sqlalchemy_employee_repository import SqlAlchemyEmployeeRepository
 from domain.repositories.implementations.sqlalchemy_team_repository import SqlAlchemyTeamRepository
 from domain.repositories.implementations.sqlalchemy_workstation_repository import SqlAlchemyWorkstationRepository
-from utilities.logging_factory import get_logger
+from utilities.logging_factory import get_logger, RateLimitedLogger
 
 # Create a logger for this module
-logger = get_logger("presentation.cli.commands.aro_command", rate_limit=True)
+logger = cast(RateLimitedLogger, get_logger("presentation.cli.commands.aro_command", rate_limit=True))
 
 def handle_aro_assignment(
     args: Any, 
-    session: Session, 
+    session_factory: Any, 
     aro_service: Optional[Any] = None, 
     aro_graph_service: Optional[Any] = None
 ) -> bool:
@@ -25,7 +25,7 @@ def handle_aro_assignment(
 
     Args:
         args: Command line arguments
-        session: Database session
+        session_factory: Database session factory
         aro_service: Optional ARO service instance (if None, a new one will be created)
         aro_graph_service: Optional ARO graph service instance
 
@@ -46,9 +46,9 @@ def handle_aro_assignment(
             identifier="setup"
         )
 
-        employee_repository = SqlAlchemyEmployeeRepository(session)
-        team_repository = SqlAlchemyTeamRepository(session)
-        workstation_repository = SqlAlchemyWorkstationRepository(session)
+        employee_repository = SqlAlchemyEmployeeRepository(session_factory)
+        team_repository = SqlAlchemyTeamRepository(session_factory)
+        workstation_repository = SqlAlchemyWorkstationRepository(session_factory)
 
         # Use the provided ARO service or create a new one
         if aro_service is None:
@@ -60,8 +60,8 @@ def handle_aro_assignment(
 
             from domain.repositories.implementations.sqlalchemy_aro_assignment_repository import SqlAlchemyAROAssignmentRepository
             from domain.repositories.implementations.sqlalchemy_team_aro_repository import SqlAlchemyTeamAroRepository
-            aro_repository = SqlAlchemyAROAssignmentRepository(session)
-            team_aro_repository = SqlAlchemyTeamAroRepository(session)
+            aro_repository = SqlAlchemyAROAssignmentRepository(session_factory)
+            team_aro_repository = SqlAlchemyTeamAroRepository(session_factory)
             from domain.services.aro_service import AROService
             aro_service = AROService(aro_repository, employee_repository, team_repository, team_aro_repository)
 
@@ -69,7 +69,7 @@ def handle_aro_assignment(
         if args.aro_command == 'optimize':
             return handle_aro_optimize(
                 args, 
-                session, 
+                session_factory, 
                 employee_repository, 
                 team_repository, 
                 workstation_repository, 
@@ -166,7 +166,7 @@ def handle_aro_assignment(
 
 def handle_aro_optimize(
     args: Any, 
-    session: Session,
+    session_factory: Any,
     employee_repository: SqlAlchemyEmployeeRepository,
     team_repository: SqlAlchemyTeamRepository,
     workstation_repository: SqlAlchemyWorkstationRepository,
@@ -178,7 +178,7 @@ def handle_aro_optimize(
 
     Args:
         args: Command line arguments
-        session: Database session
+        session_factory: Database session factory
         employee_repository: Repository for employee data
         team_repository: Repository for team data
         workstation_repository: Repository for workstation data
@@ -203,7 +203,7 @@ def handle_aro_optimize(
         )
 
         from domain.repositories.implementations.sqlalchemy_aro_assignment_repository import SqlAlchemyAROAssignmentRepository
-        aro_repository = SqlAlchemyAROAssignmentRepository(session)
+        aro_repository = SqlAlchemyAROAssignmentRepository(session_factory)
         from domain.contexts.assignment.services.aro_graph_service import AROGraphService
         from domain.events.publisher import DomainEventPublisher
         event_publisher = DomainEventPublisher()
@@ -325,7 +325,7 @@ def handle_aro_assign(
     team_repository: SqlAlchemyTeamRepository,
     aro_service: Any,
     employee: Any,
-    assignment_date: datetime.date
+    assignment_date: date
 ) -> bool:
     """
     Handle the ARO assign command.
@@ -436,7 +436,7 @@ def handle_aro_remove(
     team_repository: SqlAlchemyTeamRepository,
     aro_service: Any,
     employee: Any,
-    assignment_date: datetime.date
+    assignment_date: date
 ) -> bool:
     """
     Handle the ARO remove command.

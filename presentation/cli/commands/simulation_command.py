@@ -18,13 +18,13 @@ from utilities.logging_factory import get_logger
 # Create a logger for this module
 logger = get_logger("presentation.cli.commands.simulation_command", rate_limit=True)
 
-def handle_simulation(args: Any, session: Session) -> bool:
+def handle_simulation(args: Any, session_factory: Any) -> bool:
     """
     Handle the simulation command.
 
     Args:
         args: Command line arguments
-        session: Database session
+        session_factory: Database session factory
 
     Returns:
         bool: True if the operation was successful, False otherwise
@@ -48,10 +48,10 @@ def handle_simulation(args: Any, session: Session) -> bool:
             identifier="setup"
         )
         
-        employee_repository = SqlAlchemyEmployeeRepository(session)
-        workstation_repository = SqlAlchemyWorkstationRepository(session)
-        team_repository = SqlAlchemyTeamRepository(session)
-        schedule_repository = SqlAlchemyScheduleRepository(session)
+        employee_repository = SqlAlchemyEmployeeRepository(session_factory)
+        workstation_repository = SqlAlchemyWorkstationRepository(session_factory)
+        team_repository = SqlAlchemyTeamRepository(session_factory)
+        schedule_repository = SqlAlchemyScheduleRepository(session_factory)
         schedule_service = ScheduleService()
 
         # Get team by name
@@ -141,7 +141,7 @@ def handle_simulation(args: Any, session: Session) -> bool:
             team_repository=team_repository,
             schedule_service=schedule_service,
             schedule_repository=schedule_repository,
-            session=session
+            session_factory=session_factory
         )
 
         results = simulator.run_scenarios(scenarios)
@@ -163,7 +163,7 @@ def handle_simulation(args: Any, session: Session) -> bool:
             )
             
             from domain.analytics.scenario_analytics import ScenarioAnalytics
-            analytics = ScenarioAnalytics(results, session=session)
+            analytics = ScenarioAnalytics(results, session_factory=session_factory)
             analytics.generate_advanced_analytics(args.output_dir)
             print(f"Generated advanced analytics in: {args.output_dir}")
 

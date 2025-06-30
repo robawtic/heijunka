@@ -3,8 +3,8 @@ Regression test command handling for the CLI application.
 """
 import sys
 import os
-from typing import Optional, Any, Dict, List, Tuple, Union
-from datetime import datetime
+from typing import Optional, Any, Dict, List, Tuple, Union, cast
+from datetime import datetime, date
 from sqlalchemy.orm import Session
 from tabulate import tabulate
 
@@ -13,18 +13,18 @@ from domain.repositories.implementations.sqlalchemy_workstation_repository impor
 from domain.repositories.implementations.sqlalchemy_team_repository import SqlAlchemyTeamRepository
 from domain.repositories.implementations.sqlalchemy_schedule_repository import SqlAlchemyScheduleRepository
 from domain.services.schedule_service import ScheduleService
-from utilities.logging_factory import get_logger
+from utilities.logging_factory import get_logger, RateLimitedLogger
 
 # Create a logger for this module
-logger = get_logger("presentation.cli.commands.regression_command", rate_limit=True)
+logger = cast(RateLimitedLogger, get_logger("presentation.cli.commands.regression_command", rate_limit=True))
 
-def handle_regression_test(args: Any, session: Session) -> bool:
+def handle_regression_test(args: Any, session_factory: Any) -> bool:
     """
     Handle the regression test command.
 
     Args:
         args: Command line arguments
-        session: Database session
+        session_factory: Database session factory
 
     Returns:
         bool: True if the operation was successful, False otherwise
@@ -45,11 +45,11 @@ def handle_regression_test(args: Any, session: Session) -> bool:
             event_type="regression_test", 
             identifier="setup"
         )
-        
-        employee_repository = SqlAlchemyEmployeeRepository(session)
-        workstation_repository = SqlAlchemyWorkstationRepository(session)
-        team_repository = SqlAlchemyTeamRepository(session)
-        schedule_repository = SqlAlchemyScheduleRepository(session)
+
+        employee_repository = SqlAlchemyEmployeeRepository(session_factory)
+        workstation_repository = SqlAlchemyWorkstationRepository(session_factory)
+        team_repository = SqlAlchemyTeamRepository(session_factory)
+        schedule_repository = SqlAlchemyScheduleRepository(session_factory)
         schedule_service = ScheduleService()
 
         # Get team by name
@@ -58,7 +58,7 @@ def handle_regression_test(args: Any, session: Session) -> bool:
             event_type="regression_test", 
             identifier="team_lookup"
         )
-        
+
         team = team_repository.get_by_name(args.team)
         if not team:
             error_msg = f"Error: Team '{args.team}' not found"
@@ -76,7 +76,7 @@ def handle_regression_test(args: Any, session: Session) -> bool:
             event_type="regression_test", 
             identifier="date_parsing"
         )
-        
+
         try:
             start_date = datetime.strptime(args.start_date, "%Y-%m-%d").date()
         except ValueError:
@@ -96,7 +96,7 @@ def handle_regression_test(args: Any, session: Session) -> bool:
             team_repository=team_repository,
             schedule_service=schedule_service,
             schedule_repository=schedule_repository,
-            session=session
+            session_factory=session_factory
         )
 
         # Check if we're generating golden outputs
@@ -121,7 +121,7 @@ def handle_generate_golden(
     args: Any, 
     regression_service: Any, 
     team: Any, 
-    start_date: datetime.date
+    start_date: date
 ) -> bool:
     """
     Handle generating golden outputs for regression tests.
@@ -151,7 +151,7 @@ def handle_generate_golden(
         event_type="regression_test", 
         identifier="load_tests"
     )
-    
+
     try:
         scenarios = regression_service.load_regression_tests_from_file(args.tests, args.team, start_date)
     except Exception as e:
@@ -172,7 +172,7 @@ def handle_generate_golden(
             event_type="regression_test", 
             identifier="apply_threshold"
         )
-        
+
         for scenario in scenarios:
             for metric in scenario.tolerance_thresholds:
                 scenario.tolerance_thresholds[metric] = args.threshold
@@ -183,7 +183,7 @@ def handle_generate_golden(
         event_type="regression_test", 
         identifier="generate_golden"
     )
-    
+
     try:
         regression_service.save_golden_outputs(scenarios, args.golden_output)
         success_msg = f"Generated golden outputs for {len(scenarios)} scenarios and saved to {args.golden_output}"
@@ -209,7 +209,7 @@ def handle_run_regression_tests(
     args: Any, 
     regression_service: Any, 
     team: Any, 
-    start_date: datetime.date
+    start_date: date
 ) -> bool:
     """
     Handle running regression tests against golden outputs.
@@ -230,7 +230,7 @@ def handle_run_regression_tests(
             event_type="regression_test", 
             identifier="load_tests"
         )
-        
+
         scenarios = regression_service.load_regression_tests_from_file(args.tests, args.team, start_date)
 
         # Apply global threshold if specified
@@ -240,7 +240,7 @@ def handle_run_regression_tests(
                 event_type="regression_test", 
                 identifier="apply_threshold"
             )
-            
+
             for scenario in scenarios:
                 for metric in scenario.tolerance_thresholds:
                     scenario.tolerance_thresholds[metric] = args.threshold
@@ -328,7 +328,7 @@ def save_detailed_results(
         event_type="regression_test", 
         identifier="save_results"
     )
-    
+
     os.makedirs(output_dir, exist_ok=True)
 
     # Save summary to file

@@ -3,7 +3,7 @@ from domain.rules.context import RuleContext, rule_metadata
 from datetime import timedelta
 from domain.value_objects.employee_availability import AvailabilityStatus
 
-@rule_metadata(uses=["model", "assign", "employees", "workstations", "current_period", "start_date", "employee_history_repo"])
+@rule_metadata(uses=["model", "assign", "employees", "workstations", "current_period", "start_date", "employee_history_repo", "work_history_data"])
 def add_same_day_repeat_penalties(ctx: RuleContext):
     """
     Penalize any employee who works the same station in two different periods on the same day.
@@ -24,6 +24,7 @@ def add_same_day_repeat_penalties(ctx: RuleContext):
     current_period = ctx.current_period or 1  # Default to period 1 if not specified
     start_date = ctx.start_date
     repo = ctx.employee_history_repo
+    work_history_data = ctx.work_history_data
 
     # Convert to 0-indexed for internal use
     p = current_period - 1
@@ -35,12 +36,13 @@ def add_same_day_repeat_penalties(ctx: RuleContext):
         logger.warning("Cannot apply same-day repeat penalties: start_date is missing")
         return []
 
-    if not repo:
-        logger.warning("Cannot apply same-day repeat penalties: employee_history_repo is missing")
-        return []
-
     if current_period <= 1:
         logger.info("Skipping same-day repeat penalties for period 1 (no previous periods)")
+        return []
+
+    # Check if we have work history data available
+    if not work_history_data and not repo:
+        logger.warning("Cannot apply same-day repeat penalties: neither work_history_data nor employee_history_repo is available")
         return []
 
     penalties = []
@@ -49,20 +51,30 @@ def add_same_day_repeat_penalties(ctx: RuleContext):
 
     try:
         for i, emp in enumerate(employees):
-            # Get all work history entries for this employee on the current day up to the current period
-            entries, _ = repo.get_filtered(
-                employee_id=emp.id,
-                start_date=start_date,
-                end_date=start_date,  # Same day
-                period=None  # All periods
-            )
-
-            # Extract workstation IDs from previous periods on the same day
             previous_stations = set()
-            for entry in entries:
-                # Only consider periods before the current one
-                if entry.work_period < current_period:
-                    previous_stations.add(entry.workstation_id)
+
+            # First try to use work_history_data if available (DDD-compliant approach)
+            if work_history_data and emp.id in work_history_data:
+                entries = work_history_data[emp.id]
+                for entry in entries:
+                    # Only consider entries from the same day and periods before the current one
+                    if entry.worked_date == start_date and entry.work_period < current_period:
+                        previous_stations.add(entry.workstation_id)
+            # Fall back to repository if work_history_data is not available
+            elif repo:
+                # Get all work history entries for this employee on the current day up to the current period
+                entries, _ = repo.get_filtered(
+                    employee_id=emp.id,
+                    start_date=start_date,
+                    end_date=start_date,  # Same day
+                    period=None  # All periods
+                )
+
+                # Extract workstation IDs from previous periods on the same day
+                for entry in entries:
+                    # Only consider periods before the current one
+                    if entry.work_period < current_period:
+                        previous_stations.add(entry.workstation_id)
 
             # Penalize assignments to stations the employee already worked at earlier today
             for station_id in previous_stations:
@@ -92,7 +104,7 @@ def add_same_day_repeat_penalties(ctx: RuleContext):
         raise
 
 
-@rule_metadata(uses=["model", "assign", "employees", "workstations", "current_period", "start_date", "lookback", "employee_history_repo"])
+@rule_metadata(uses=["model", "assign", "employees", "workstations", "current_period", "start_date", "lookback", "employee_history_repo", "work_history_data"])
 def add_lookback_any_period_penalties(ctx: RuleContext):
     """
     Penalize employees who are assigned to the same workstation they worked at all in the recent past
@@ -115,6 +127,7 @@ def add_lookback_any_period_penalties(ctx: RuleContext):
     start_date = ctx.start_date
     lookback = max(ctx.lookback or 0, 0)  # Normalize lookback window
     repo = ctx.employee_history_repo
+    work_history_data = ctx.work_history_data
 
     # Convert to 0-indexed for internal use
     p = current_period - 1
@@ -126,12 +139,13 @@ def add_lookback_any_period_penalties(ctx: RuleContext):
         logger.warning("Cannot apply lookback-any penalties: start_date is missing")
         return []
 
-    if not repo:
-        logger.warning("Cannot apply lookback-any penalties: employee_history_repo is missing")
-        return []
-
     if lookback == 0:
         logger.info("Skipping lookback-any penalties: lookback window is zero")
+        return []
+
+    # Check if we have work history data available
+    if not work_history_data and not repo:
+        logger.warning("Cannot apply lookback-any penalties: neither work_history_data nor employee_history_repo is available")
         return []
 
     penalties = []
@@ -146,8 +160,19 @@ def add_lookback_any_period_penalties(ctx: RuleContext):
 
     try:
         for i, emp in enumerate(employees):
-            # Get all distinct stations the employee worked at in the lookback window
-            worked_stations = repo.get_distinct_stations(emp.id, lookback_start, start_date)
+            worked_stations = set()
+
+            # First try to use work_history_data if available (DDD-compliant approach)
+            if work_history_data and emp.id in work_history_data:
+                entries = work_history_data[emp.id]
+                for entry in entries:
+                    # Only consider entries within the lookback window
+                    if lookback_start <= entry.worked_date < start_date:
+                        worked_stations.add(entry.workstation_id)
+            # Fall back to repository if work_history_data is not available
+            elif repo:
+                # Get all distinct stations the employee worked at in the lookback window
+                worked_stations = repo.get_distinct_stations(emp.id, lookback_start, start_date)
 
             for station_id in worked_stations:
                 j = ws_idx.get(station_id)
@@ -176,7 +201,7 @@ def add_lookback_any_period_penalties(ctx: RuleContext):
         raise
 
 
-@rule_metadata(uses=["model", "assign", "employees", "workstations", "current_period", "start_date", "lookback", "employee_history_repo"])
+@rule_metadata(uses=["model", "assign", "employees", "workstations", "current_period", "start_date", "lookback", "employee_history_repo", "work_history_data"])
 def add_lookback_same_period_penalties(ctx: RuleContext):
     """
     Penalize employees who are assigned to the same workstation and period they worked in the recent past
@@ -199,6 +224,7 @@ def add_lookback_same_period_penalties(ctx: RuleContext):
     start_date = ctx.start_date
     lookback = max(ctx.lookback or 0, 0)  # Normalize lookback window
     repo = ctx.employee_history_repo
+    work_history_data = ctx.work_history_data
 
     # Convert to 0-indexed for internal use
     p = current_period - 1
@@ -210,12 +236,13 @@ def add_lookback_same_period_penalties(ctx: RuleContext):
         logger.warning("Cannot apply lookback-same-period penalties: start_date is missing")
         return []
 
-    if not repo:
-        logger.warning("Cannot apply lookback-same-period penalties: employee_history_repo is missing")
-        return []
-
     if lookback == 0:
         logger.info("Skipping lookback-same-period penalties: lookback window is zero")
+        return []
+
+    # Check if we have work history data available
+    if not work_history_data and not repo:
+        logger.warning("Cannot apply lookback-same-period penalties: neither work_history_data nor employee_history_repo is available")
         return []
 
     penalties = []
@@ -230,8 +257,20 @@ def add_lookback_same_period_penalties(ctx: RuleContext):
 
     try:
         for i, emp in enumerate(employees):
-            # Get all distinct (station_id, work_period) pairs the employee worked in the lookback window
-            station_period_pairs = repo.get_distinct_station_periods(emp.id, lookback_start, start_date)
+            station_period_pairs = set()
+
+            # First try to use work_history_data if available (DDD-compliant approach)
+            if work_history_data and emp.id in work_history_data:
+                entries = work_history_data[emp.id]
+                for entry in entries:
+                    # Only consider entries within the lookback window
+                    if lookback_start <= entry.worked_date < start_date:
+                        # Store as (station_id, period) pair, with period 0-indexed
+                        station_period_pairs.add((entry.workstation_id, entry.work_period - 1))
+            # Fall back to repository if work_history_data is not available
+            elif repo:
+                # Get all distinct (station_id, work_period) pairs the employee worked in the lookback window
+                station_period_pairs = repo.get_distinct_station_periods(emp.id, lookback_start, start_date)
 
             # Penalize assignments to (station, period) pairs the employee worked in the lookback window
             for station_id, period_num in station_period_pairs:

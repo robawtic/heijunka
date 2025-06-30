@@ -1,10 +1,10 @@
 """
 Dependency setup utilities for the CLI application.
 """
-from typing import Tuple, Any, Optional
+from typing import Tuple, Any, Optional, cast
 from sqlalchemy.orm import Session
 
-from domain.models.db import Session as DbSession
+from domain.models.db import Session as ScopedSession
 from domain.repositories.implementations.sqlalchemy_employee_repository import SqlAlchemyEmployeeRepository
 from domain.repositories.implementations.sqlalchemy_workstation_repository import SqlAlchemyWorkstationRepository
 from domain.repositories.implementations.sqlalchemy_team_repository import SqlAlchemyTeamRepository
@@ -12,13 +12,13 @@ from domain.repositories.implementations.sqlalchemy_assignment_repository import
 from domain.repositories.implementations.sqlalchemy_employee_work_history_repository import SqlAlchemyEmployeeWorkHistoryRepository
 from domain.repositories.implementations.sqlalchemy_schedule_repository import SqlAlchemyScheduleRepository
 from domain.services.schedule_service import ScheduleService
-from utilities.logging_factory import get_logger
+from utilities.logging_factory import get_logger, RateLimitedLogger
 
 # Create a logger for this module
-logger = get_logger("presentation.cli.utils.dependencies", rate_limit=True)
+logger = cast(RateLimitedLogger, get_logger("presentation.cli.utils.dependencies", rate_limit=True))
 
 def setup_dependencies() -> Tuple[
-    Session,  # session
+    Any,  # session_factory
     SqlAlchemyEmployeeRepository,  # employee_repository
     SqlAlchemyWorkstationRepository,  # workstation_repository
     SqlAlchemyTeamRepository,  # team_repository
@@ -35,7 +35,7 @@ def setup_dependencies() -> Tuple[
 
     Returns:
         tuple: A tuple containing:
-            - session: Database session
+            - session_factory: Database session factory
             - employee_repository: Repository for employee data
             - workstation_repository: Repository for workstation data
             - team_repository: Repository for team data
@@ -49,20 +49,20 @@ def setup_dependencies() -> Tuple[
     """
     logger.debug("Setting up dependencies", event_type="dependencies", identifier="setup_start")
 
-    session = DbSession()
-    employee_repository = SqlAlchemyEmployeeRepository(session)
-    workstation_repository = SqlAlchemyWorkstationRepository(session)
-    team_repository = SqlAlchemyTeamRepository(session)
+    session_factory = ScopedSession
+    employee_repository = SqlAlchemyEmployeeRepository(session_factory)
+    workstation_repository = SqlAlchemyWorkstationRepository(session_factory)
+    team_repository = SqlAlchemyTeamRepository(session_factory)
     schedule_service = ScheduleService()
-    assignment_repository = SqlAlchemyAssignmentRepository(session)
-    work_history_repository = SqlAlchemyEmployeeWorkHistoryRepository(session)
-    schedule_repository = SqlAlchemyScheduleRepository(session)
+    assignment_repository = SqlAlchemyAssignmentRepository(session_factory)
+    work_history_repository = SqlAlchemyEmployeeWorkHistoryRepository(session_factory)
+    schedule_repository = SqlAlchemyScheduleRepository(session_factory)
 
     # Import here to avoid circular imports
     from domain.repositories.implementations.sqlalchemy_aro_assignment_repository import SqlAlchemyAROAssignmentRepository
     from domain.repositories.implementations.sqlalchemy_team_aro_repository import SqlAlchemyTeamAroRepository
-    aro_repository = SqlAlchemyAROAssignmentRepository(session)
-    team_aro_repository = SqlAlchemyTeamAroRepository(session)
+    aro_repository = SqlAlchemyAROAssignmentRepository(session_factory)
+    team_aro_repository = SqlAlchemyTeamAroRepository(session_factory)
 
     # Create and register the schedule recalculation handler
     from domain.services.aro_service import AROService
@@ -106,7 +106,7 @@ def setup_dependencies() -> Tuple[
     logger.debug("Dependencies setup complete", event_type="dependencies", identifier="setup_complete")
 
     return (
-        session, 
+        session_factory, 
         employee_repository, 
         workstation_repository, 
         team_repository, 

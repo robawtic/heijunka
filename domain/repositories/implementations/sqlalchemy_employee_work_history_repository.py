@@ -23,14 +23,14 @@ class SqlAlchemyEmployeeWorkHistoryRepository(BaseSqlAlchemyRepository[WorkHisto
     employee work history entries in the database using SQLAlchemy.
     """
 
-    def __init__(self, session: Session):
+    def __init__(self, session_factory):
         """
-        Initialize the repository with a SQLAlchemy session.
+        Initialize the repository with a SQLAlchemy session factory.
 
         Args:
-            session: The SQLAlchemy session to use for database operations.
+            session_factory: The SQLAlchemy session factory to use for database operations.
         """
-        super().__init__(session, EmployeeWorkHistoryModel, WorkHistoryEntry)
+        super().__init__(session_factory, EmployeeWorkHistoryModel, WorkHistoryEntry)
         self.logger = get_logger("heijunka.repositories.employee_work_history")
         self.rate_limited_logger = get_logger("heijunka.repositories.employee_work_history", rate_limit=True)
 
@@ -215,27 +215,28 @@ class SqlAlchemyEmployeeWorkHistoryRepository(BaseSqlAlchemyRepository[WorkHisto
         )
 
         try:
-            models = self._session.query(EmployeeWorkHistoryModel).filter(
-                and_(
-                    EmployeeWorkHistoryModel.employee_id == employee_id,
-                    EmployeeWorkHistoryModel.station_id == workstation_id
+            with self.session_scope() as session:
+                models = session.query(EmployeeWorkHistoryModel).filter(
+                    and_(
+                        EmployeeWorkHistoryModel.employee_id == employee_id,
+                        EmployeeWorkHistoryModel.station_id == workstation_id
+                    )
+                ).all()
+
+                entry_count = len(models)
+                self.logger.info(
+                    f"Found {entry_count} work history entries for employee and workstation",
+                    extra={
+                        "event_type": "work_history_entries_lookup_success",
+                        "lookup_type": "employee_and_workstation",
+                        "employee_id": employee_id,
+                        "workstation_id": workstation_id,
+                        "entry_count": entry_count
+                    }
                 )
-            ).all()
 
-            entry_count = len(models)
-            self.logger.info(
-                f"Found {entry_count} work history entries for employee and workstation",
-                extra={
-                    "event_type": "work_history_entries_lookup_success",
-                    "lookup_type": "employee_and_workstation",
-                    "employee_id": employee_id,
-                    "workstation_id": workstation_id,
-                    "entry_count": entry_count
-                }
-            )
-
-            # Use the factory to convert models to domain entities
-            return [WorkHistoryEntryFactory.create_from_model(model) for model in models]
+                # Use the factory to convert models to domain entities
+                return [WorkHistoryEntryFactory.create_from_model(model) for model in models]
         except SQLAlchemyError as e:
             error_msg = sanitize_exception(e)
             self.logger.error(
@@ -274,38 +275,39 @@ class SqlAlchemyEmployeeWorkHistoryRepository(BaseSqlAlchemyRepository[WorkHisto
         )
 
         try:
-            entry = self._session.query(EmployeeWorkHistoryModel).filter(
-                and_(
-                    EmployeeWorkHistoryModel.employee_id == employee_id,
-                    EmployeeWorkHistoryModel.station_id == workstation_id
-                )
-            ).order_by(
-                EmployeeWorkHistoryModel.worked_date.desc(),
-                EmployeeWorkHistoryModel.work_period.desc()
-            ).first()
+            with self.session_scope() as session:
+                entry = session.query(EmployeeWorkHistoryModel).filter(
+                    and_(
+                        EmployeeWorkHistoryModel.employee_id == employee_id,
+                        EmployeeWorkHistoryModel.station_id == workstation_id
+                    )
+                ).order_by(
+                    EmployeeWorkHistoryModel.worked_date.desc(),
+                    EmployeeWorkHistoryModel.work_period.desc()
+                ).first()
 
-            if entry:
+                if entry:
+                    self.logger.info(
+                        "Found last worked date for employee at workstation",
+                        extra={
+                            "event_type": "last_worked_date_lookup_success",
+                            "employee_id": employee_id,
+                            "workstation_id": workstation_id,
+                            "worked_date": entry.worked_date.isoformat() if hasattr(entry.worked_date, 'isoformat') else str(entry.worked_date),
+                            "work_period": entry.work_period
+                        }
+                    )
+                    return entry.worked_date, entry.work_period
+
                 self.logger.info(
-                    "Found last worked date for employee at workstation",
+                    "No work history found for employee at workstation",
                     extra={
-                        "event_type": "last_worked_date_lookup_success",
+                        "event_type": "last_worked_date_lookup_empty",
                         "employee_id": employee_id,
-                        "workstation_id": workstation_id,
-                        "worked_date": entry.worked_date.isoformat() if hasattr(entry.worked_date, 'isoformat') else str(entry.worked_date),
-                        "work_period": entry.work_period
+                        "workstation_id": workstation_id
                     }
                 )
-                return entry.worked_date, entry.work_period
-
-            self.logger.info(
-                "No work history found for employee at workstation",
-                extra={
-                    "event_type": "last_worked_date_lookup_empty",
-                    "employee_id": employee_id,
-                    "workstation_id": workstation_id
-                }
-            )
-            return None, None
+                return None, None
         except SQLAlchemyError as e:
             error_msg = sanitize_exception(e)
             self.logger.error(
@@ -357,27 +359,28 @@ class SqlAlchemyEmployeeWorkHistoryRepository(BaseSqlAlchemyRepository[WorkHisto
         )
 
         try:
-            models = self._session.query(EmployeeWorkHistoryModel).filter(
-                and_(
-                    EmployeeWorkHistoryModel.worked_date >= start_date,
-                    EmployeeWorkHistoryModel.worked_date <= end_date
+            with self.session_scope() as session:
+                models = session.query(EmployeeWorkHistoryModel).filter(
+                    and_(
+                        EmployeeWorkHistoryModel.worked_date >= start_date,
+                        EmployeeWorkHistoryModel.worked_date <= end_date
+                    )
+                ).all()
+
+                entry_count = len(models)
+                self.logger.info(
+                    f"Found {entry_count} work history entries in date range",
+                    extra={
+                        "event_type": "work_history_entries_lookup_success",
+                        "lookup_type": "date_range",
+                        "start_date": start_date.isoformat() if hasattr(start_date, 'isoformat') else str(start_date),
+                        "end_date": end_date.isoformat() if hasattr(end_date, 'isoformat') else str(end_date),
+                        "entry_count": entry_count
+                    }
                 )
-            ).all()
 
-            entry_count = len(models)
-            self.logger.info(
-                f"Found {entry_count} work history entries in date range",
-                extra={
-                    "event_type": "work_history_entries_lookup_success",
-                    "lookup_type": "date_range",
-                    "start_date": start_date.isoformat() if hasattr(start_date, 'isoformat') else str(start_date),
-                    "end_date": end_date.isoformat() if hasattr(end_date, 'isoformat') else str(end_date),
-                    "entry_count": entry_count
-                }
-            )
-
-            # Use the factory to convert models to domain entities
-            return [WorkHistoryEntryFactory.create_from_model(model) for model in models]
+                # Use the factory to convert models to domain entities
+                return [WorkHistoryEntryFactory.create_from_model(model) for model in models]
         except SQLAlchemyError as e:
             error_msg = sanitize_exception(e)
             self.logger.error(
@@ -432,29 +435,30 @@ class SqlAlchemyEmployeeWorkHistoryRepository(BaseSqlAlchemyRepository[WorkHisto
         )
 
         try:
-            models = self._session.query(EmployeeWorkHistoryModel).filter(
-                and_(
-                    EmployeeWorkHistoryModel.employee_id == employee_id,
-                    EmployeeWorkHistoryModel.worked_date >= start_date,
-                    EmployeeWorkHistoryModel.worked_date <= end_date
+            with self.session_scope() as session:
+                models = session.query(EmployeeWorkHistoryModel).filter(
+                    and_(
+                        EmployeeWorkHistoryModel.employee_id == employee_id,
+                        EmployeeWorkHistoryModel.worked_date >= start_date,
+                        EmployeeWorkHistoryModel.worked_date <= end_date
+                    )
+                ).all()
+
+                entry_count = len(models)
+                self.logger.info(
+                    f"Found {entry_count} work history entries for employee in date range",
+                    extra={
+                        "event_type": "work_history_entries_lookup_success",
+                        "lookup_type": "employee_date_range",
+                        "employee_id": employee_id,
+                        "start_date": start_date.isoformat() if hasattr(start_date, 'isoformat') else str(start_date),
+                        "end_date": end_date.isoformat() if hasattr(end_date, 'isoformat') else str(end_date),
+                        "entry_count": entry_count
+                    }
                 )
-            ).all()
 
-            entry_count = len(models)
-            self.logger.info(
-                f"Found {entry_count} work history entries for employee in date range",
-                extra={
-                    "event_type": "work_history_entries_lookup_success",
-                    "lookup_type": "employee_date_range",
-                    "employee_id": employee_id,
-                    "start_date": start_date.isoformat() if hasattr(start_date, 'isoformat') else str(start_date),
-                    "end_date": end_date.isoformat() if hasattr(end_date, 'isoformat') else str(end_date),
-                    "entry_count": entry_count
-                }
-            )
-
-            # Use the factory to convert models to domain entities
-            return [WorkHistoryEntryFactory.create_from_model(model) for model in models]
+                # Use the factory to convert models to domain entities
+                return [WorkHistoryEntryFactory.create_from_model(model) for model in models]
         except SQLAlchemyError as e:
             error_msg = sanitize_exception(e)
             self.logger.error(
@@ -683,30 +687,31 @@ class SqlAlchemyEmployeeWorkHistoryRepository(BaseSqlAlchemyRepository[WorkHisto
                 }
             )
 
-            model = self._session.query(EmployeeWorkHistoryModel).get(id)
-            if model is None:
+            with self.session_scope() as session:
+                model = session.query(EmployeeWorkHistoryModel).get(id)
+                if model is None:
+                    self.logger.info(
+                        f"No work history entry found with ID: {id}",
+                        extra={
+                            "event_type": "work_history_entry_lookup_failed",
+                            "lookup_type": "id",
+                            "entity_id": id,
+                            "reason": "not_found"
+                        }
+                    )
+                    return None
+
                 self.logger.info(
-                    f"No work history entry found with ID: {id}",
+                    f"Found work history entry with ID: {id}",
                     extra={
-                        "event_type": "work_history_entry_lookup_failed",
+                        "event_type": "work_history_entry_lookup_success",
                         "lookup_type": "id",
                         "entity_id": id,
-                        "reason": "not_found"
+                        "employee_id": model.employee_id,
+                        "workstation_id": model.station_id
                     }
                 )
-                return None
-
-            self.logger.info(
-                f"Found work history entry with ID: {id}",
-                extra={
-                    "event_type": "work_history_entry_lookup_success",
-                    "lookup_type": "id",
-                    "entity_id": id,
-                    "employee_id": model.employee_id,
-                    "workstation_id": model.station_id
-                }
-            )
-            return self._to_domain(model)
+                return self._to_domain(model)
         except SQLAlchemyError as e:
             error_msg = sanitize_exception(e)
             self.logger.error(
@@ -735,18 +740,19 @@ class SqlAlchemyEmployeeWorkHistoryRepository(BaseSqlAlchemyRepository[WorkHisto
                 }
             )
 
-            models = self._session.query(EmployeeWorkHistoryModel).all()
+            with self.session_scope() as session:
+                models = session.query(EmployeeWorkHistoryModel).all()
 
-            entry_count = len(models)
-            self.logger.info(
-                f"Retrieved {entry_count} work history entries",
-                extra={
-                    "event_type": "work_history_entries_list_all_success",
-                    "entry_count": entry_count
-                }
-            )
+                entry_count = len(models)
+                self.logger.info(
+                    f"Retrieved {entry_count} work history entries",
+                    extra={
+                        "event_type": "work_history_entries_list_all_success",
+                        "entry_count": entry_count
+                    }
+                )
 
-            return [self._to_domain(model) for model in models]
+                return [self._to_domain(model) for model in models]
         except SQLAlchemyError as e:
             error_msg = sanitize_exception(e)
             self.logger.error(
@@ -1192,77 +1198,78 @@ class SqlAlchemyEmployeeWorkHistoryRepository(BaseSqlAlchemyRepository[WorkHisto
                 }
             )
 
-            # Start with a base query that joins with Employee and Workstation
-            query = self._session.query(EmployeeWorkHistoryModel).\
-                join(EmployeeModel, EmployeeWorkHistoryModel.employee_id == EmployeeModel.id).\
-                join(WorkstationModel, EmployeeWorkHistoryModel.station_id == WorkstationModel.id)
+            with self.session_scope() as session:
+                # Start with a base query that joins with Employee and Workstation
+                query = session.query(EmployeeWorkHistoryModel).\
+                    join(EmployeeModel, EmployeeWorkHistoryModel.employee_id == EmployeeModel.id).\
+                    join(WorkstationModel, EmployeeWorkHistoryModel.station_id == WorkstationModel.id)
 
-            # Apply filters
-            if team_id is not None:
-                # We can filter by either employee's team or workstation's team
-                query = query.filter(
-                    or_(
-                        EmployeeModel.team_id == team_id,
-                        WorkstationModel.team_id == team_id
+                # Apply filters
+                if team_id is not None:
+                    # We can filter by either employee's team or workstation's team
+                    query = query.filter(
+                        or_(
+                            EmployeeModel.team_id == team_id,
+                            WorkstationModel.team_id == team_id
+                        )
                     )
+
+                if employee_id is not None:
+                    query = query.filter(EmployeeWorkHistoryModel.employee_id == employee_id)
+
+                if workstation_id is not None:
+                    query = query.filter(EmployeeWorkHistoryModel.station_id == workstation_id)
+
+                if start_date is not None:
+                    query = query.filter(EmployeeWorkHistoryModel.worked_date >= start_date)
+
+                if end_date is not None:
+                    query = query.filter(EmployeeWorkHistoryModel.worked_date <= end_date)
+
+                if period is not None:
+                    query = query.filter(EmployeeWorkHistoryModel.work_period == period)
+
+                if status is not None:
+                    query = query.filter(EmployeeWorkHistoryModel.status == status)
+                # For backward compatibility
+                elif is_generated is not None:
+                    # If is_generated is True, filter for GENERATED or GENERATED_TEMPORARY status
+                    if is_generated:
+                        query = query.filter(or_(
+                            EmployeeWorkHistoryModel.status == WorkHistoryStatus.GENERATED,
+                            EmployeeWorkHistoryModel.status == WorkHistoryStatus.GENERATED_TEMPORARY
+                        ))
+                    # If is_generated is False, filter for REGULAR or TEMPORARY status
+                    else:
+                        query = query.filter(or_(
+                            EmployeeWorkHistoryModel.status == WorkHistoryStatus.REGULAR,
+                            EmployeeWorkHistoryModel.status == WorkHistoryStatus.TEMPORARY
+                        ))
+
+                # Get total count for pagination
+                total = query.count()
+
+                # Apply pagination
+                query = query.order_by(EmployeeWorkHistoryModel.worked_date.desc()).\
+                    offset(skip).limit(limit)
+
+                # Execute query
+                models = query.all()
+                entry_count = len(models)
+
+                self.logger.info(
+                    f"Found {entry_count} work history entries (total: {total}) with applied filters",
+                    extra={
+                        "event_type": "work_history_entries_filtered_lookup_success",
+                        "filters": filters,
+                        "pagination": {"skip": skip, "limit": limit},
+                        "entry_count": entry_count,
+                        "total_count": total
+                    }
                 )
 
-            if employee_id is not None:
-                query = query.filter(EmployeeWorkHistoryModel.employee_id == employee_id)
-
-            if workstation_id is not None:
-                query = query.filter(EmployeeWorkHistoryModel.station_id == workstation_id)
-
-            if start_date is not None:
-                query = query.filter(EmployeeWorkHistoryModel.worked_date >= start_date)
-
-            if end_date is not None:
-                query = query.filter(EmployeeWorkHistoryModel.worked_date <= end_date)
-
-            if period is not None:
-                query = query.filter(EmployeeWorkHistoryModel.work_period == period)
-
-            if status is not None:
-                query = query.filter(EmployeeWorkHistoryModel.status == status)
-            # For backward compatibility
-            elif is_generated is not None:
-                # If is_generated is True, filter for GENERATED or GENERATED_TEMPORARY status
-                if is_generated:
-                    query = query.filter(or_(
-                        EmployeeWorkHistoryModel.status == WorkHistoryStatus.GENERATED,
-                        EmployeeWorkHistoryModel.status == WorkHistoryStatus.GENERATED_TEMPORARY
-                    ))
-                # If is_generated is False, filter for REGULAR or TEMPORARY status
-                else:
-                    query = query.filter(or_(
-                        EmployeeWorkHistoryModel.status == WorkHistoryStatus.REGULAR,
-                        EmployeeWorkHistoryModel.status == WorkHistoryStatus.TEMPORARY
-                    ))
-
-            # Get total count for pagination
-            total = query.count()
-
-            # Apply pagination
-            query = query.order_by(EmployeeWorkHistoryModel.worked_date.desc()).\
-                offset(skip).limit(limit)
-
-            # Execute query
-            models = query.all()
-            entry_count = len(models)
-
-            self.logger.info(
-                f"Found {entry_count} work history entries (total: {total}) with applied filters",
-                extra={
-                    "event_type": "work_history_entries_filtered_lookup_success",
-                    "filters": filters,
-                    "pagination": {"skip": skip, "limit": limit},
-                    "entry_count": entry_count,
-                    "total_count": total
-                }
-            )
-
-            # Convert to domain entities
-            return [self._to_domain(model) for model in models], total
+                # Convert to domain entities
+                return [self._to_domain(model) for model in models], total
 
         except SQLAlchemyError as e:
             error_msg = sanitize_exception(e)
@@ -1315,31 +1322,32 @@ class SqlAlchemyEmployeeWorkHistoryRepository(BaseSqlAlchemyRepository[WorkHisto
                 }
             )
 
-            # Use a single optimized query with distinct to get all unique station_ids
-            distinct_stations = (
-                self._session.query(EmployeeWorkHistoryModel.station_id)
-                .filter(
-                    EmployeeWorkHistoryModel.employee_id == employee_id,
-                    EmployeeWorkHistoryModel.worked_date >= since,
-                    EmployeeWorkHistoryModel.worked_date < until
+            with self.session_scope() as session:
+                # Use a single optimized query with distinct to get all unique station_ids
+                distinct_stations = (
+                    session.query(EmployeeWorkHistoryModel.station_id)
+                    .filter(
+                        EmployeeWorkHistoryModel.employee_id == employee_id,
+                        EmployeeWorkHistoryModel.worked_date >= since,
+                        EmployeeWorkHistoryModel.worked_date < until
+                    )
+                    .distinct()
+                    .all()
                 )
-                .distinct()
-                .all()
-            )
 
-            # Convert the result to a set of station IDs
-            result = {station_id for (station_id,) in distinct_stations}
+                # Convert the result to a set of station IDs
+                result = {station_id for (station_id,) in distinct_stations}
 
-            self.logger.info(
-                f"Found {len(result)} distinct stations for employee in date range",
-                extra={
-                    "event_type": "distinct_stations_lookup_success",
-                    "employee_id": employee_id,
-                    "station_count": len(result)
-                }
-            )
+                self.logger.info(
+                    f"Found {len(result)} distinct stations for employee in date range",
+                    extra={
+                        "event_type": "distinct_stations_lookup_success",
+                        "employee_id": employee_id,
+                        "station_count": len(result)
+                    }
+                )
 
-            return result
+                return result
 
         except SQLAlchemyError as e:
             error_msg = sanitize_exception(e)
@@ -1391,35 +1399,36 @@ class SqlAlchemyEmployeeWorkHistoryRepository(BaseSqlAlchemyRepository[WorkHisto
                 }
             )
 
-            # Use a single optimized query with distinct to get all unique (station_id, work_period) pairs
-            distinct_pairs = (
-                self._session.query(
-                    EmployeeWorkHistoryModel.station_id,
-                    EmployeeWorkHistoryModel.work_period
+            with self.session_scope() as session:
+                # Use a single optimized query with distinct to get all unique (station_id, work_period) pairs
+                distinct_pairs = (
+                    session.query(
+                        EmployeeWorkHistoryModel.station_id,
+                        EmployeeWorkHistoryModel.work_period
+                    )
+                    .filter(
+                        EmployeeWorkHistoryModel.employee_id == employee_id,
+                        EmployeeWorkHistoryModel.worked_date >= since,
+                        EmployeeWorkHistoryModel.worked_date < until
+                    )
+                    .distinct()
+                    .all()
                 )
-                .filter(
-                    EmployeeWorkHistoryModel.employee_id == employee_id,
-                    EmployeeWorkHistoryModel.worked_date >= since,
-                    EmployeeWorkHistoryModel.worked_date < until
+
+                # Convert the result to a set of (station_id, work_period) tuples
+                # Convert 1-based period to 0-based for the domain logic
+                result = {(station_id, work_period - 1) for station_id, work_period in distinct_pairs}
+
+                self.logger.info(
+                    f"Found {len(result)} distinct station-period pairs for employee in date range",
+                    extra={
+                        "event_type": "distinct_station_periods_lookup_success",
+                        "employee_id": employee_id,
+                        "pair_count": len(result)
+                    }
                 )
-                .distinct()
-                .all()
-            )
 
-            # Convert the result to a set of (station_id, work_period) tuples
-            # Convert 1-based period to 0-based for the domain logic
-            result = {(station_id, work_period - 1) for station_id, work_period in distinct_pairs}
-
-            self.logger.info(
-                f"Found {len(result)} distinct station-period pairs for employee in date range",
-                extra={
-                    "event_type": "distinct_station_periods_lookup_success",
-                    "employee_id": employee_id,
-                    "pair_count": len(result)
-                }
-            )
-
-            return result
+                return result
 
         except SQLAlchemyError as e:
             error_msg = sanitize_exception(e)

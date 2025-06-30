@@ -32,6 +32,7 @@ class RuleContext:
     call_ins: Optional[List[str]] = None  # List of employee names who called in (unavailable)
     employee_offline_periods: Optional[Dict[str, Set[int]]] = None  # Dict of employee name -> set of periods when offline
     employee_history_repo: Optional[EmployeeWorkHistoryRepositoryInterface] = None  # Repository for employee work history
+    work_history_data: Optional[Dict] = None  # Dictionary containing work history data for employees
     aro_data: Optional[Dict] = None  # Dictionary of ARO assignments by employee and period
     current_period: Optional[int] = None  # The current period being processed (1-indexed)
 

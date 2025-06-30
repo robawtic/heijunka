@@ -20,14 +20,14 @@ class SqlAlchemyGroupRepository(BaseSqlAlchemyRepository[Group, GroupModel], Gro
     the GroupRepositoryInterface.
     """
 
-    def __init__(self, session: Session):
+    def __init__(self, session_factory):
         """
-        Initialize the repository with a SQLAlchemy session.
+        Initialize the repository with a SQLAlchemy session factory.
 
         Args:
-            session: The SQLAlchemy session to use for database operations.
+            session_factory: The SQLAlchemy session factory to use for database operations.
         """
-        super().__init__(session, GroupModel, Group)
+        super().__init__(session_factory, GroupModel, Group)
         self.logger = get_logger("heijunka.repositories.group")
         self.rate_limited_logger = get_logger("heijunka.repositories.group", rate_limit=True)
 

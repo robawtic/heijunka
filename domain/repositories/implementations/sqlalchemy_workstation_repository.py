@@ -22,15 +22,16 @@ class SqlAlchemyWorkstationRepository(BaseSqlAlchemyRepository[Workstation, Work
     Workstation entities in the database using SQLAlchemy.
     """
 
-    def __init__(self, session: Session):
+    def __init__(self, session_factory):
         """
         Initialize the repository with a SQLAlchemy session.
 
         Args:
-            session: The SQLAlchemy session to use for database operations.
+            session_factory: The SQLAlchemy session factory to use for database operations.
         """
-        super().__init__(session, WorkstationModel, Workstation)
+        super().__init__(session_factory, WorkstationModel, Workstation)
         self.logger = get_logger("heijunka.repositories.workstation")
+        self.rate_limited_logger = get_logger("heijunka.repositories.workstation", rate_limit=True)
 
     # Core CRUD Operations
 
@@ -196,48 +197,49 @@ class SqlAlchemyWorkstationRepository(BaseSqlAlchemyRepository[Workstation, Work
                 }
             )
 
-            # Start building the query
-            query = self._session.query(WorkstationModel)
+            with self.session_scope() as session:
+                # Start building the query
+                query = session.query(WorkstationModel)
 
-            # Apply filters at the database level
-            if team_id is not None:
-                query = query.filter(WorkstationModel.team_id == team_id)
+                # Apply filters at the database level
+                if team_id is not None:
+                    query = query.filter(WorkstationModel.team_id == team_id)
 
-            if team_ids:
-                query = query.filter(WorkstationModel.team_id.in_(team_ids))
+                if team_ids:
+                    query = query.filter(WorkstationModel.team_id.in_(team_ids))
 
-            if is_active is not None:
-                query = query.filter(WorkstationModel.is_active == is_active)
+                if is_active is not None:
+                    query = query.filter(WorkstationModel.is_active == is_active)
 
-            # Get total count if requested
-            total_count = None
-            if count_total:
-                total_count = query.count()
-                self.logger.info(
-                    f"Total matching workstations before pagination: {total_count}",
-                    extra={
-                        "event_type": "workstations_filtered_count",
-                        "total_count": total_count
-                    }
-                )
+                # Get total count if requested
+                total_count = None
+                if count_total:
+                    total_count = query.count()
+                    self.logger.info(
+                        f"Total matching workstations before pagination: {total_count}",
+                        extra={
+                            "event_type": "workstations_filtered_count",
+                            "total_count": total_count
+                        }
+                    )
 
-            # Apply eager loading if requested
-            if eager:
-                query = query.options(
-                    selectinload(WorkstationModel.line_type),
-                    selectinload(WorkstationModel.employees),
-                    selectinload(WorkstationModel.team),
-                    selectinload(WorkstationModel.employee_skills)
-                )
+                # Apply eager loading if requested
+                if eager:
+                    query = query.options(
+                        selectinload(WorkstationModel.line_type),
+                        selectinload(WorkstationModel.employees),
+                        selectinload(WorkstationModel.team),
+                        selectinload(WorkstationModel.employee_skills)
+                    )
 
-            # Apply pagination at the database level
-            paginated_query = query.offset(skip).limit(limit)
+                # Apply pagination at the database level
+                paginated_query = query.offset(skip).limit(limit)
 
-            # Execute the query and convert models to domain entities
-            models = paginated_query.all()
-            result = []
-            for model in models:
-                result.append(self._to_domain(model))
+                # Execute the query and convert models to domain entities
+                models = paginated_query.all()
+                result = []
+                for model in models:
+                    result.append(self._to_domain(model))
 
             count = len(result)
             self.logger.info(
@@ -326,33 +328,34 @@ class SqlAlchemyWorkstationRepository(BaseSqlAlchemyRepository[Workstation, Work
                 }
             )
 
-            workstation_model = self._session.query(WorkstationModel).filter(
-                func.lower(WorkstationModel.name) == func.lower(name)
-            ).first()
+            with self.session_scope() as session:
+                workstation_model = session.query(WorkstationModel).filter(
+                    func.lower(WorkstationModel.name) == func.lower(name)
+                ).first()
 
-            if not workstation_model:
+                if not workstation_model:
+                    self.logger.info(
+                        f"No workstation found with name: {name}",
+                        extra={
+                            "event_type": "workstation_lookup_failed",
+                            "lookup_type": "name",
+                            "workstation_name": name,
+                            "reason": "not_found"
+                        }
+                    )
+                    return None
+
                 self.logger.info(
-                    f"No workstation found with name: {name}",
+                    f"Found workstation with name: {name}",
                     extra={
-                        "event_type": "workstation_lookup_failed",
+                        "event_type": "workstation_lookup_success",
                         "lookup_type": "name",
                         "workstation_name": name,
-                        "reason": "not_found"
+                        "workstation_id": workstation_model.id
                     }
                 )
-                return None
 
-            self.logger.info(
-                f"Found workstation with name: {name}",
-                extra={
-                    "event_type": "workstation_lookup_success",
-                    "lookup_type": "name",
-                    "workstation_name": name,
-                    "workstation_id": workstation_model.id
-                }
-            )
-
-            return self._to_domain(workstation_model)
+                return self._to_domain(workstation_model)
         except SQLAlchemyError as e:
             error_msg = sanitize_exception(e)
             self.logger.error(
@@ -451,23 +454,24 @@ class SqlAlchemyWorkstationRepository(BaseSqlAlchemyRepository[Workstation, Work
                 }
             )
 
-            line_type_model = self._session.query(LineTypeModel).filter(
-                LineTypeModel.name == name
-            ).first()
+            with self.session_scope() as session:
+                line_type_model = session.query(LineTypeModel).filter(
+                    LineTypeModel.name == name
+                ).first()
 
-            if not line_type_model:
-                error_msg = f"LineType with name '{name}' not found"
-                self.logger.error(
-                    error_msg,
-                    extra={
-                        "event_type": "line_type_lookup_error",
-                        "line_type_name": name,
-                        "reason": "not_found"
-                    }
-                )
-                raise RepositoryError(error_msg)
+                if not line_type_model:
+                    error_msg = f"LineType with name '{name}' not found"
+                    self.logger.error(
+                        error_msg,
+                        extra={
+                            "event_type": "line_type_lookup_error",
+                            "line_type_name": name,
+                            "reason": "not_found"
+                        }
+                    )
+                    raise RepositoryError(error_msg)
 
-            return line_type_model
+                return line_type_model
         except SQLAlchemyError as e:
             error_msg = sanitize_exception(e)
             self.logger.error(

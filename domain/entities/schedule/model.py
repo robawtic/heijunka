@@ -197,6 +197,101 @@ class Schedule:
         from domain.entities.schedule.validation import validate
         return validate(self)
 
+    def generate_assignments_ddd(
+        self, 
+        employees: List[Employee], 
+        workstations: List[Workstation],
+        prefetched_data: Optional[Dict] = None,
+        cp_model_builder=None,
+        work_history_data: Optional[Dict] = None
+    ) -> bool:
+        """
+        Generate assignments for this schedule using constraint programming (DDD-compliant version).
+
+        This method uses the CPModelBuilder service to generate assignments for each period.
+        It follows Domain-Driven Design principles by not accepting repository dependencies.
+
+        Args:
+            employees: List of employees available for scheduling
+            workstations: List of workstations to be staffed
+            prefetched_data: Optional dictionary containing prefetched data to avoid database queries
+            cp_model_builder: Optional CPModelBuilder service to use for generating assignments
+            work_history_data: Optional dictionary containing work history data for employees
+
+        Returns:
+            True if assignments were successfully generated, False otherwise
+        """
+        from domain.services.cp_model_builder import CPModelBuilder
+
+        # Clear existing assignments if any
+        self._assignments = []
+
+        # Create CP model builder if not provided
+        if cp_model_builder is None:
+            cp_model_builder = CPModelBuilder()
+
+        # Get ARO data from prefetched_data if available
+        aro_data = {}
+        if prefetched_data and 'aro_assignments_by_employee' in prefetched_data:
+            aro_data = prefetched_data['aro_assignments_by_employee']
+
+        # Get team name if available from prefetched_data
+        team_name = None
+        if prefetched_data and 'teams_by_id' in prefetched_data and self.team_id in prefetched_data['teams_by_id']:
+            team = prefetched_data['teams_by_id'][self.team_id]
+            if hasattr(team, 'name'):
+                team_name = team.name
+
+        # Generate assignments for each period
+        all_assignments = []
+        for period in range(1, self.periods_per_day + 1):
+            # Use the CP model builder to solve the model for this period
+            period_assignments = cp_model_builder.solve_one_period(
+                employees=employees,
+                workstations=workstations,
+                period=period,
+                team_id=self.team_id,
+                start_date=self.start_date,
+                aro_data=aro_data,
+                team_name=team_name,
+                work_history_data=work_history_data
+            )
+
+            if period_assignments:
+                all_assignments.extend(period_assignments)
+
+                # Add assignments to schedule
+                for assignment in period_assignments:
+                    try:
+                        # Create and add assignment to schedule
+                        new_assignment = create_and_add_assignment(self, assignment.employee, assignment.workstation, assignment.period)
+                    except ValueError as e:
+                        # Log error but continue with other assignments
+                        logger.warning(f"Team {self.team_id}: Error creating assignment: {str(e)}")
+                        self.register_domain_event(ScheduleValidationFailed(
+                            schedule_id=self.id,
+                            validation_errors=[str(e)]
+                        ))
+            else:
+                # If no solution found for any period, set error message and return False
+                error_msg = f"No solution found for period {period}."
+                self.set_error_message(error_msg)
+                self.set_status("failed")
+                logger.warning(f"Team {self.team_id}: {error_msg}")
+                return False
+
+        # Update schedule status
+        if all_assignments:
+            self.set_status("generated")
+            logger.info(f"Team {self.team_id}: Generated {len(self._assignments)} assignments")
+            return True
+        else:
+            self.set_status("failed")
+            error_msg = "No assignments generated."
+            self.set_error_message(error_msg)
+            logger.warning(f"Team {self.team_id}: {error_msg}")
+            return False
+
     def generate_assignments(
         self, 
         employees: List[Employee], 
@@ -213,6 +308,8 @@ class Schedule:
     ) -> bool:
         """
         Generate assignments for this schedule using constraint programming.
+
+        @deprecated: Use generate_assignments_ddd instead and handle persistence in the application layer.
 
         This method uses the CPModelBuilder service to generate assignments for each period.
 
@@ -233,6 +330,7 @@ class Schedule:
             True if assignments were successfully generated, False otherwise
         """
         from domain.services.cp_model_builder import CPModelBuilder
+        from domain.value_objects.work_history_entry import WorkHistoryEntry
 
         # Clear existing assignments if any
         self._assignments = []
@@ -282,7 +380,6 @@ class Schedule:
 
                         # Update work history repository if provided
                         if employee_history_repo:
-                            from domain.value_objects.work_history_entry import WorkHistoryEntry
                             # Create a work history entry for this assignment
                             entry = WorkHistoryEntry(
                                 employee_id=assignment.employee.id,

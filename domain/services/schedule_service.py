@@ -135,12 +135,47 @@ class ScheduleService:
         return offline_dict
 
 
+    def _create_schedule_entity(self, team_id: int, start_date: date, periods_per_day: int,
+                          call_ins: Optional[List[str]], offline: Optional[List[str]],
+                          offline_dict: OfflineDict, force_complete: bool):
+        """
+        Create a Schedule entity directly in memory.
+
+        Args:
+            team_id: ID of the team
+            start_date: Start date of the schedule
+            periods_per_day: Number of periods per day
+            call_ins: List of employee names who called in (unavailable)
+            offline: List of strings in format "employee:periods"
+            offline_dict: Parsed offline dictionary
+            force_complete: Whether to force completion of the schedule
+
+        Returns:
+            A Schedule entity
+        """
+        from domain.entities.schedule import Schedule
+
+        # Create an in-memory schedule
+        schedule = Schedule(
+            id=self.DEFAULT_SCHEDULE_ID,
+            team_id=team_id,
+            start_date=start_date,
+            periods_per_day=periods_per_day,
+            status="active",
+            call_ins=call_ins,
+            offline=offline_dict,
+            force_complete=force_complete
+        )
+        return schedule
+
     def _create_schedule(self, team_id: int, start_date: date, periods_per_day: int,
                           call_ins: Optional[List[str]], offline: Optional[List[str]],
                           offline_dict: OfflineDict, force_complete: bool,
                           schedule_repository=None):
         """
         Create a Schedule entity either through the repository or directly.
+
+        @deprecated: Use _create_schedule_entity instead and handle persistence in the application layer.
 
         Args:
             team_id: ID of the team
@@ -155,8 +190,6 @@ class ScheduleService:
         Returns:
             A Schedule entity
         """
-        from domain.entities.schedule import Schedule
-
         if schedule_repository:
             # Create a new schedule in the repository
             try:
@@ -176,28 +209,23 @@ class ScheduleService:
 
         # Create an in-memory schedule if repository is not provided or repository creation failed
         logger.warning("Creating in-memory schedule because repository is not provided or repository creation failed")
-        schedule = Schedule(
-            id=self.DEFAULT_SCHEDULE_ID,
+        return self._create_schedule_entity(
             team_id=team_id,
             start_date=start_date,
             periods_per_day=periods_per_day,
-            status="active",
             call_ins=call_ins,
-            offline=offline_dict,
+            offline=offline,
+            offline_dict=offline_dict,
             force_complete=force_complete
         )
-        return schedule
 
 
 
 
     def generate_schedule(self, employees: List[Employee], workstations: List[Workstation],
                           start_date: date, periods_per_day: int,
-                          team_name: str, call_ins: List[str] = None, offline: List[str] = None,
-                          force_complete: bool = False, session: Any = None, team_repository: Optional[Any] = None,
-                          aro_assignment_repository: Optional[Any] = None, schedule_repository: Optional[Any] = None,
-                          aro_service: Optional[Any] = None, aro_graph_service: Optional[Any] = None,
-                          prefetched_data: Optional[Dict] = None, employee_history_repo: Optional[Any] = None) -> WorkAssignments:
+                          team_name: str, team_id: int, call_ins: List[str] = None, offline: List[str] = None,
+                          force_complete: bool = False, prefetched_data: Optional[Dict] = None) -> Tuple[List[WorkAssignment], Dict[str, Any]]:
         """
         Generate a schedule for the given employees, workstations, and time period
 
@@ -205,7 +233,7 @@ class ScheduleService:
         1. Creating a Schedule entity
         2. Setting up the necessary parameters
         3. Delegating the actual generation to the Schedule entity
-        4. Returning the generated assignments
+        4. Returning the generated assignments and work history entries
 
         Args:
             employees: List of employees to schedule
@@ -213,80 +241,57 @@ class ScheduleService:
             start_date: The start date of the schedule
             periods_per_day: Number of periods per day
             team_name: Name of the team to generate the schedule for
+            team_id: ID of the team to generate the schedule for
             call_ins: List of employee names who called in (unavailable)
             offline: List of strings in format "employee:periods" specifying which employees are offline for which periods
             force_complete: Whether to force completion of the schedule
-            session: Database session for accessing work history data
-            team_repository: Optional repository for retrieving team information (optional for testing/offline use)
-            aro_assignment_repository: Optional repository for retrieving ARO assignments (optional for testing/offline use)
-            schedule_repository: Optional repository for creating/retrieving schedules (optional for testing/offline use)
-            aro_service: Optional ARO service for finding and assigning AROs
-            aro_graph_service: Optional ARO graph service for optimizing ARO assignments
             prefetched_data: Optional dictionary containing prefetched data to avoid database queries
-            employee_history_repo: Optional repository for employee work history (required for same-day repeat penalties)
 
         Returns:
-            List of work assignments
+            Tuple containing:
+            - List of work assignments
+            - Dictionary with schedule metadata (id, status, etc.)
         """
         # Parse offline parameter
         offline_dict = self._parse_offline(offline)
 
-        # Get team_id from team_name (use prefetched data if available)
-        # Set team_repository on team_lookup_service if it's provided
-        if team_repository:
-            self.team_lookup_service.team_repository = team_repository
-
-        team_id = self.team_lookup_service.get_team_id(team_name, prefetched_data)
-
         # Handle ARO assignments (employees leaving/joining)
-        # Set repositories on ARO roster service if they're provided
-        if team_repository:
-            self.aro_roster_service.team_repository = team_repository
-        if aro_assignment_repository:
-            self.aro_roster_service.aro_assignment_repository = aro_assignment_repository
-
         available_employees = self.aro_roster_service.handle_aro_assignments(
             employees, team_id, start_date, prefetched_data
         )
 
         # Create a Schedule entity
-        schedule = self._create_schedule(
+        schedule = self._create_schedule_entity(
             team_id, start_date, periods_per_day, call_ins, offline, 
-            offline_dict, force_complete, schedule_repository
+            offline_dict, force_complete
         )
 
-        # Generate assignments using the Schedule entity
-        success = schedule.generate_assignments(
+        # Generate assignments using the Schedule entity (DDD-compliant version)
+        success = schedule.generate_assignments_ddd(
             available_employees, 
             workstations, 
-            session=session,
-            team_repository=team_repository,
-            aro_service=aro_service,
-            aro_graph_service=aro_graph_service,
             prefetched_data=prefetched_data,
-            employee_history_repo=employee_history_repo
+            work_history_data=prefetched_data.get('work_history_data') if prefetched_data else None
         )
 
-        # Update schedule status based on generation result
-        if schedule_repository:
-            try:
-                if success:
-                    schedule_repository.update_status(schedule.id, "completed")
-                    logger.info(f"Updated schedule {schedule.id} status to 'completed'")
-                else:
-                    schedule_repository.update_status(schedule.id, "failed", schedule.error_message)
-                    logger.warning(f"Updated schedule {schedule.id} status to 'failed': {schedule.error_message}")
-            except Exception as e:
-                logger.error(f"Error updating schedule status: {str(e)}")
+        # Prepare schedule metadata
+        schedule_metadata = {
+            "id": schedule.id,
+            "status": "completed" if success else "failed",
+            "error_message": schedule.error_message if not success else None,
+            "team_id": team_id,
+            "start_date": start_date,
+            "periods_per_day": periods_per_day
+        }
 
         if success:
             logger.info(f"Generated {len(schedule.assignments)} assignments")
-            return schedule.assignments
+            return schedule.assignments, schedule_metadata
         else:
             logger.warning(f"No solution found. Error: {schedule.error_message}")
-            return []
+            return [], schedule_metadata
 
-    def generate_period_schedule(self, team_id: int, cp_input: Dict, employee_history_repo=None) -> WorkAssignments:
+    def generate_period_schedule(self, team_id: int, cp_input: Dict, work_history_data: Optional[Dict] = None) -> Tuple[List[WorkAssignment], Dict[str, Any]]:
         """
         Generate a schedule for a specific team and period.
 
@@ -302,10 +307,14 @@ class ScheduleService:
                 - start_date: The date of the schedule
                 - aro_data: Dictionary of ARO assignments by employee and period
                 - teams_by_id: Dictionary of teams by ID (optional)
-            employee_history_repo: Optional repository for employee work history (required for same-day repeat penalties)
+                - work_history_data: Optional work history data for employees (required for same-day repeat penalties)
+            work_history_data: Optional work history data for employees (required for same-day repeat penalties)
+                This should be a dictionary mapping employee IDs to their work history entries
 
         Returns:
-            List of work assignments for the specified team and period
+            Tuple containing:
+            - List of work assignments for the specified team and period
+            - Dictionary with metadata about the generation process
         """
         try:
             # Extract data from cp_input
@@ -315,9 +324,13 @@ class ScheduleService:
             start_date = cp_input.get("start_date")
             aro_data = cp_input.get("aro_data", {})
 
+            # Use work_history_data from cp_input if provided and not passed as separate argument
+            if work_history_data is None and "work_history_data" in cp_input:
+                work_history_data = cp_input.get("work_history_data", {})
+
             if not employees or not workstations or period is None or not start_date:
                 logger.error(f"Missing required data for generate_period_schedule: team_id={team_id}, period={period}")
-                return []
+                return [], {"success": False, "error": "Missing required data"}
 
             # Get team name for logging
             team_name = "Unknown"
@@ -328,6 +341,10 @@ class ScheduleService:
 
             logger.info(f"Generating schedule for team '{team_name}' period {period}")
 
+            # Add work history data to cp_input if provided
+            if work_history_data:
+                cp_input["work_history_data"] = work_history_data
+
             # Use the CP model builder to solve the model
             assignments = self.cp_model_builder.solve_one_period(
                 employees=employees,
@@ -337,19 +354,31 @@ class ScheduleService:
                 start_date=start_date,
                 aro_data=aro_data,
                 team_name=team_name,
-                employee_history_repo=employee_history_repo
+                work_history_data=work_history_data
             )
+
+            # Prepare metadata
+            metadata = {
+                "success": len(assignments) > 0,
+                "team_id": team_id,
+                "team_name": team_name,
+                "period": period,
+                "start_date": start_date,
+                "assignment_count": len(assignments)
+            }
 
             if assignments:
                 logger.info(f"Generated {len(assignments)} assignments for team '{team_name}' period {period}")
             else:
                 logger.warning(f"No solution found for team '{team_name}' period {period}")
+                metadata["error"] = "No solution found"
 
-            return assignments
+            return assignments, metadata
 
         except Exception as e:
-            logger.error(f"Error generating period schedule for team {team_id}, period {cp_input.get('period')}: {str(e)}")
-            return []
+            error_msg = f"Error generating period schedule for team {team_id}, period {cp_input.get('period')}: {str(e)}"
+            logger.error(error_msg)
+            return [], {"success": False, "error": error_msg}
 
     def generate_period_schedules(self, teams: List[Any], period: int, 
                              available_by_team_and_period: Dict,
@@ -451,6 +480,120 @@ class ScheduleService:
     def generate_schedule_flow(
         self,
         args: Any,
+        teams: List[Any],
+        prefetched_data: Optional[Dict] = None,
+        work_history_data: Optional[Dict] = None
+    ) -> Dict[str, Any]:
+        """
+        Orchestrate the schedule generation flow without repository dependencies.
+
+        This method handles:
+        - Argument validation
+        - Schedule generation for multiple teams
+        - Performance metrics collection
+
+        Args:
+            args: Command line arguments or API request parameters
+            teams: List of teams for which to generate schedules
+            prefetched_data: Optional dictionary containing prefetched data
+            work_history_data: Optional dictionary containing work history data
+
+        Returns:
+            Dictionary containing:
+            - success: Boolean indicating if the operation was successful
+            - assignments: List of generated assignments
+            - teams: List of teams for which schedules were generated
+            - metrics: Performance metrics
+            - error: Error message if any
+            - schedule_metadata: Metadata about each generated schedule
+        """
+        result = {
+            "success": False,
+            "assignments": [],
+            "teams": teams,
+            "metrics": {},
+            "error": None,
+            "schedule_metadata": []
+        }
+
+        start_time = time.time()
+
+        try:
+            # Parse start_date if it's a string
+            start_date = args.start_date
+            if isinstance(start_date, str):
+                try:
+                    start_date = datetime.strptime(start_date, "%Y-%m-%d").date()
+                except ValueError:
+                    result["error"] = "Invalid start date format. Use YYYY-MM-DD"
+                    return result
+
+            if not teams:
+                result["error"] = "No teams provided for schedule generation"
+                return result
+
+            # Generate schedules for each team
+            all_assignments = []
+            all_metadata = []
+
+            for team in teams:
+                # Get employees and workstations from prefetched data if available
+                employees = []
+                workstations = []
+
+                if prefetched_data:
+                    if 'employees_by_team' in prefetched_data and team.id in prefetched_data['employees_by_team']:
+                        employees = prefetched_data['employees_by_team'][team.id]
+                    if 'workstations_by_team' in prefetched_data and team.id in prefetched_data['workstations_by_team']:
+                        workstations = prefetched_data['workstations_by_team'][team.id]
+
+                # Skip teams with no employees or workstations
+                if not employees or not workstations:
+                    continue
+
+                # Generate schedule for this team
+                assignments, metadata = self.generate_schedule(
+                    employees=employees,
+                    workstations=workstations,
+                    start_date=start_date,
+                    periods_per_day=args.periods,
+                    team_name=team.name,
+                    team_id=team.id,
+                    call_ins=args.call_ins,
+                    offline=args.offline,
+                    force_complete=args.force_complete,
+                    prefetched_data=prefetched_data
+                )
+
+                # Add team info to metadata
+                metadata["team_name"] = team.name
+                metadata["team_id"] = team.id
+
+                all_assignments.extend(assignments)
+                all_metadata.append(metadata)
+
+            # Calculate performance metrics
+            end_time = time.time()
+            execution_time = end_time - start_time
+
+            result["assignments"] = all_assignments
+            result["schedule_metadata"] = all_metadata
+            result["metrics"] = {
+                "execution_time": execution_time,
+                "assignment_count": len(all_assignments),
+                "team_count": len(teams)
+            }
+            result["success"] = True
+
+            return result
+
+        except Exception as e:
+            result["error"] = f"Error generating schedule: {str(e)}"
+            return result
+
+    def generate_schedule_flow_legacy(
+        self,
+        args: Any,
         session: Any,
         employee_repository: Any,
         workstation_repository: Any,
@@ -463,7 +606,9 @@ class ScheduleService:
         schedule_repository: Any
     ) -> Dict[str, Any]:
         """
-        Orchestrate the complete schedule generation flow.
+        Orchestrate the complete schedule generation flow with repository dependencies.
+
+        @deprecated: Use generate_schedule_flow instead and handle persistence in the application layer.
 
         This method handles:
         - Argument validation
@@ -533,7 +678,8 @@ class ScheduleService:
                 workstation_repository=workstation_repository,
                 team_repository=team_repository,
                 aro_repository=aro_repository,
-                session=session
+                session=session,
+                work_history_repository=work_history_repository
             )
             # Import handler and coordinator here to avoid circular import
             from application.commands.generate_schedule_handler import GenerateScheduleHandler

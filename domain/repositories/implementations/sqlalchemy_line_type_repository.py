@@ -20,14 +20,14 @@ class SqlAlchemyLineTypeRepository(BaseSqlAlchemyRepository, LineTypeRepositoryI
     LineType entities in the database using SQLAlchemy.
     """
 
-    def __init__(self, session: Session):
+    def __init__(self, session_factory):
         """
-        Initialize the repository with a SQLAlchemy session.
+        Initialize the repository with a SQLAlchemy session factory.
 
         Args:
-            session: The SQLAlchemy session to use
+            session_factory: The SQLAlchemy session factory to use
         """
-        super().__init__(session, LineTypeModel, LineType)
+        super().__init__(session_factory, LineTypeModel, LineType)
         self.logger = get_logger("heijunka.repositories.line_type")
         self.rate_limited_logger = get_logger("heijunka.repositories.line_type", rate_limit=True)
 

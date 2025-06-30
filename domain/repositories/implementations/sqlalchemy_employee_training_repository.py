@@ -23,14 +23,14 @@ class SqlAlchemyEmployeeTrainingRepository(BaseSqlAlchemyRepository[EmployeeTrai
     employee training records in the database using SQLAlchemy.
     """
 
-    def __init__(self, session: Session):
+    def __init__(self, session_factory):
         """
-        Initialize the repository with a SQLAlchemy session.
+        Initialize the repository with a SQLAlchemy session factory.
 
         Args:
-            session: The SQLAlchemy session to use for database operations.
+            session_factory: The SQLAlchemy session factory to use for database operations.
         """
-        super().__init__(session, EmployeeTrainingModel, EmployeeTraining)
+        super().__init__(session_factory, EmployeeTrainingModel, EmployeeTraining)
         self.logger = get_logger("heijunka.repositories.employee_training")
         self.rate_limited_logger = get_logger("heijunka.repositories.employee_training", rate_limit=True)
 
@@ -114,12 +114,13 @@ class SqlAlchemyEmployeeTrainingRepository(BaseSqlAlchemyRepository[EmployeeTrai
         )
 
         try:
-            model = self._session.query(EmployeeTrainingModel).filter(
-                and_(
-                    EmployeeTrainingModel.employee_id == employee_id,
-                    EmployeeTrainingModel.station_id == workstation_id
-                )
-            ).first()
+            with self.session_scope() as session:
+                model = session.query(EmployeeTrainingModel).filter(
+                    and_(
+                        EmployeeTrainingModel.employee_id == employee_id,
+                        EmployeeTrainingModel.station_id == workstation_id
+                    )
+                ).first()
 
             if not model:
                 self.logger.info(
@@ -182,9 +183,10 @@ class SqlAlchemyEmployeeTrainingRepository(BaseSqlAlchemyRepository[EmployeeTrai
         )
 
         try:
-            models = self._session.query(EmployeeTrainingModel).filter(
-                EmployeeTrainingModel.employee_id == employee_id
-            ).all()
+            with self.session_scope() as session:
+                models = session.query(EmployeeTrainingModel).filter(
+                    EmployeeTrainingModel.employee_id == employee_id
+                ).all()
 
             record_count = len(models)
             self.logger.info(
@@ -247,9 +249,10 @@ class SqlAlchemyEmployeeTrainingRepository(BaseSqlAlchemyRepository[EmployeeTrai
         )
 
         try:
-            models = self._session.query(EmployeeTrainingModel).filter(
-                EmployeeTrainingModel.station_id == workstation_id
-            ).all()
+            with self.session_scope() as session:
+                models = session.query(EmployeeTrainingModel).filter(
+                    EmployeeTrainingModel.station_id == workstation_id
+                ).all()
 
             record_count = len(models)
             self.logger.info(
@@ -312,12 +315,13 @@ class SqlAlchemyEmployeeTrainingRepository(BaseSqlAlchemyRepository[EmployeeTrai
         )
 
         try:
-            models = self._session.query(EmployeeTrainingModel).filter(
-                and_(
-                    EmployeeTrainingModel.employee_id == employee_id,
-                    EmployeeTrainingModel.date_completed != None
-                )
-            ).all()
+            with self.session_scope() as session:
+                models = session.query(EmployeeTrainingModel).filter(
+                    and_(
+                        EmployeeTrainingModel.employee_id == employee_id,
+                        EmployeeTrainingModel.date_completed.isnot(None)
+                    )
+                ).all()
 
             record_count = len(models)
             self.logger.info(
@@ -380,12 +384,13 @@ class SqlAlchemyEmployeeTrainingRepository(BaseSqlAlchemyRepository[EmployeeTrai
         )
 
         try:
-            models = self._session.query(EmployeeTrainingModel).filter(
-                and_(
-                    EmployeeTrainingModel.employee_id == employee_id,
-                    EmployeeTrainingModel.required_training == True
-                )
-            ).all()
+            with self.session_scope() as session:
+                models = session.query(EmployeeTrainingModel).filter(
+                    and_(
+                        EmployeeTrainingModel.employee_id == employee_id,
+                        EmployeeTrainingModel.required_training == True
+                    )
+                ).all()
 
             record_count = len(models)
             self.logger.info(
@@ -639,9 +644,10 @@ class SqlAlchemyEmployeeTrainingRepository(BaseSqlAlchemyRepository[EmployeeTrai
 
         try:
             # Try to find by internal ID
-            model = self._session.query(EmployeeTrainingModel).filter(
-                EmployeeTrainingModel.id == id
-            ).first()
+            with self.session_scope() as session:
+                model = session.query(EmployeeTrainingModel).filter(
+                    EmployeeTrainingModel.id == id
+                ).first()
 
             if not model:
                 self.logger.info(
@@ -709,7 +715,8 @@ class SqlAlchemyEmployeeTrainingRepository(BaseSqlAlchemyRepository[EmployeeTrai
         )
 
         try:
-            models = self._session.query(EmployeeTrainingModel).all()
+            with self.session_scope() as session:
+                models = session.query(EmployeeTrainingModel).all()
 
             record_count = len(models)
             self.logger.info(

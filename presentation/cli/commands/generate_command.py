@@ -3,9 +3,10 @@ Generate schedule command handling for the CLI application.
 """
 import sys
 import time
-from typing import Optional, Any, Dict, List, Tuple, Union
-from datetime import datetime
+from typing import Optional, Any, Dict, List, Tuple, Union, cast
+from datetime import datetime, date
 from sqlalchemy.orm import Session
+from collections import defaultdict
 
 from domain.entities.employee import Employee
 
@@ -26,25 +27,25 @@ from infrastructure.scheduling.schedule_data_service import ScheduleDataService
 from infrastructure.scheduling.schedule_coordinator import ScheduleCoordinator
 from domain.events.publisher import DomainEventPublisher
 from presentation.cli.utils.formatting import format_schedule_table
-from utilities.logging_factory import get_logger
+from utilities.logging_factory import get_logger, RateLimitedLogger
 
 # Create a logger for this module
-logger = get_logger("presentation.cli.commands.generate_command", rate_limit=True)
+logger = cast(RateLimitedLogger, get_logger("presentation.cli.commands.generate_command", rate_limit=True))
 
 def handle_generate(
     args: Any, 
     dependencies: Tuple[
-        Session,  # session
-        SqlAlchemyEmployeeRepository,  # employee_repository
-        SqlAlchemyWorkstationRepository,  # workstation_repository
-        SqlAlchemyTeamRepository,  # team_repository
-        ScheduleService,  # schedule_service
-        SqlAlchemyAssignmentRepository,  # assignment_repository
-        SqlAlchemyEmployeeWorkHistoryRepository,  # work_history_repository
-        Any,  # aro_repository
-        AROService,  # aro_service
-        AROGraphService,  # aro_graph_service
-        SqlAlchemyScheduleRepository  # schedule_repository
+        Any,  # session_factory
+        SqlAlchemyEmployeeRepository,
+        SqlAlchemyWorkstationRepository,
+        SqlAlchemyTeamRepository,
+        ScheduleService,
+        SqlAlchemyAssignmentRepository,
+        SqlAlchemyEmployeeWorkHistoryRepository,
+        Any,
+        AROService,
+        AROGraphService,
+        SqlAlchemyScheduleRepository
     ],
     query_count: int = 0
 ) -> bool:
@@ -60,15 +61,15 @@ def handle_generate(
         bool: True if the operation was successful, False otherwise
     """
     logger.info(
-        f"Handling generate command", 
-        event_type="generate", 
-        identifier="start"
+        f"Handling generate command",
+        "generate",
+        "start"
     )
 
     try:
         # Unpack dependencies
         (
-            session, 
+            session_factory, 
             employee_repository, 
             workstation_repository, 
             team_repository, 
@@ -81,28 +82,66 @@ def handle_generate(
             schedule_repository
         ) = dependencies
 
-        # Call the schedule service to handle all orchestration
-        result = schedule_service.generate_schedule_flow(
-            args=args,
-            session=session,
+        # Get teams for generation
+        teams = schedule_service._get_teams_for_generation(args, team_repository)
+
+        # Parse start_date if it's a string
+        start_date = args.start_date
+        if isinstance(start_date, str):
+            try:
+                start_date = datetime.strptime(start_date, "%Y-%m-%d").date()
+            except ValueError:
+                raise ValueError("Invalid start date format. Use YYYY-MM-DD")
+
+        # Prefetch data for teams
+        schedule_data_service = ScheduleDataService(
             employee_repository=employee_repository,
             workstation_repository=workstation_repository,
             team_repository=team_repository,
-            assignment_repository=assignment_repository,
-            work_history_repository=work_history_repository,
             aro_repository=aro_repository,
-            aro_service=aro_service,
-            aro_graph_service=aro_graph_service,
-            schedule_repository=schedule_repository
+            session_factory=session_factory,
+            work_history_repository=work_history_repository
         )
+
+        prefetched_data = schedule_data_service.prefetch_for_teams(
+            team_ids=[team.id for team in teams],
+            start_date=start_date,
+            periods=args.periods
+        )
+
+        # Call the schedule service to handle all orchestration using the new DDD-compliant method
+        result = schedule_service.generate_schedule_flow(
+            args=args,
+            teams=teams,
+            prefetched_data=prefetched_data
+        )
+
+        # Diagnostic: Print assignment counts per team before saving
+        assignments_by_team = defaultdict(list)
+        for assignment in result["assignments"]:
+            assignments_by_team[getattr(assignment, 'team_id', getattr(assignment, 'employee', None) and getattr(assignment.employee, 'team_id', None))].append(assignment)
+        print(f"\n[DIAGNOSTIC] Total assignments to save: {len(result['assignments'])}")
+        for team_id, assignments in assignments_by_team.items():
+            print(f"[DIAGNOSTIC] Team {team_id}: {len(assignments)} assignments")
+        print(f"[DIAGNOSTIC] Team IDs in assignments: {list(assignments_by_team.keys())}")
+
+        if result["success"]:
+            try:
+                print("[DIAGNOSTIC] Calling save_all...")
+                assignment_repository.save_all(result["assignments"], batch_size=200)
+                print("[DIAGNOSTIC] save_all completed successfully.")
+            except Exception as e:
+                print(f"[DIAGNOSTIC] Exception during save_all: {e}")
+                import traceback
+                traceback.print_exc()
 
         if not result["success"]:
             print(f"Error: {result['error']}", file=sys.stderr)
             return False
 
         # Display performance metrics
-        print(f"\nPerformance: {result['metrics']['query_count']} queries executed in {result['metrics']['execution_time']:.2f} seconds")
-        print(f"Generated {result['metrics']['assignment_count']} assignments for {result['metrics']['team_count']} teams using event-based coordination")
+        print(f"\nPerformance: Generated in {result['metrics']['execution_time']:.2f} seconds")
+        print(f"Generated {result['metrics']['assignment_count']} assignments for {result['metrics']['team_count']} teams")
 
         # Display the generated schedules
         display_generation_results(
@@ -113,11 +152,11 @@ def handle_generate(
             workstation_repository,
             args,
             work_history_repository,
-            args.start_date,
-            result["prefetched_data"]['aro_assignments_by_team'],
-            result["prefetched_data"]['aro_assignments_by_team_period'],
-            result["prefetched_data"]['aro_assignments_by_employee'],
-            result["prefetched_data"]['employees_by_id']
+            start_date,
+            prefetched_data['aro_assignments_by_team'],
+            prefetched_data['aro_assignments_by_team_period'],
+            prefetched_data['aro_assignments_by_employee'],
+            prefetched_data['employees_by_id']
         )
 
         return True
@@ -126,8 +165,8 @@ def handle_generate(
         error_msg = f"Error in CLI handler: {e}"
         logger.error(
             error_msg,
-            event_type="generate",
-            identifier="exception"
+            "generate",
+            "exception"
         )
         print(error_msg, file=sys.stderr)
         return False
@@ -142,7 +181,7 @@ def display_generation_results(
     workstation_repository: SqlAlchemyWorkstationRepository,
     args: Any,
     work_history_repository: SqlAlchemyEmployeeWorkHistoryRepository,
-    start_date: datetime.date,
+    start_date: date,
     aro_assignments_by_team: Optional[Dict[int, Dict[str, List[int]]]] = None,
     aro_assignments_by_team_period: Optional[Dict[int, Dict[int, Dict[str, List[int]]]]] = None,
     aro_assignments_by_employee: Optional[Dict[int, List[Any]]] = None,
@@ -160,6 +199,18 @@ def display_generation_results(
         args: Command line arguments
         work_history_repository: Repository for work history data
         start_date: Start date of the schedule
+        :param start_date:
+        :param work_history_repository:
+        :param args:
+        :param workstation_repository:
+        :param employee_repository:
+        :param teams:
+        :param team_repository:
+        :param assignments:
+        :param employees_by_id:
+        :param aro_assignments_by_employee:
+        :param aro_assignments_by_team_period:
+        :param aro_assignments_by_team:
     """
     if not assignments:
         print("\nNo assignments generated.")
