@@ -5,7 +5,7 @@ from datetime import datetime
 import bcrypt
 
 from domain.events import DomainEvent
-from domain.entities.role import Role
+from domain.contexts.user_management.value_objects.role import Role
 
 @dataclass
 class User:

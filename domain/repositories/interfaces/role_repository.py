@@ -1,7 +1,7 @@
 from abc import abstractmethod
 from typing import Optional, List
 
-from domain.entities.role import Role
+from domain.contexts.user_management.value_objects.role import Role
 from domain.repositories.interfaces.base_repository import BaseRepository
 
 

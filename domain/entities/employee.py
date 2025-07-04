@@ -2,10 +2,10 @@
 from dataclasses import dataclass, field
 from typing import List, Optional, Set
 from datetime import date
-from domain.value_objects.employee_availability import EmployeeAvailability, AvailabilityStatus
-from domain.entities.team_member import TeamMember
-from domain.value_objects.work_history_entry import WorkHistoryEntry
-from domain.value_objects.workstation_assignment import WorkstationAssignment
+from domain.contexts.employee_management.value_objects.employee_availability import EmployeeAvailability, AvailabilityStatus
+from domain.contexts.employee_management.entities.team_member import TeamMember
+from domain.contexts.employee_management.value_objects.work_history_entry import WorkHistoryEntry
+from domain.contexts.employee_management.value_objects.workstation_assignment import WorkstationAssignment
 from domain.events import (
     DomainEvent, QualificationAdded, QualificationRemoved, 
     RoleAssigned, TeamRoleAssigned, WorkHistoryEntryAdded

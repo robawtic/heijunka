@@ -1,7 +1,7 @@
 from abc import abstractmethod
 from typing import List, Optional
 
-from domain.entities.team_member import TeamMember
+from domain.contexts.employee_management.entities.team_member import TeamMember
 from domain.repositories.interfaces.base_repository import BaseRepository
 
 

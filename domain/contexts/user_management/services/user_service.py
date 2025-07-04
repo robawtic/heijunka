@@ -1,8 +1,8 @@
 from typing import List, Optional, Dict, Any
 from datetime import datetime
 
-from domain.entities.user import User
-from domain.repositories.interfaces.user_repository import UserRepositoryInterface
+from domain.contexts.user_management.entities.user import User
+from domain.contexts.user_management.repositories.interfaces.user_repository import UserRepositoryInterface
 from domain.events.publisher import DomainEventPublisher
 
 

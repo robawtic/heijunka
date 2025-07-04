@@ -4,8 +4,8 @@ from typing import Optional, Dict, List
 from datetime import datetime
 import logging
 
-from domain.entities.api_key import ApiKey
-from domain.repositories.interfaces.api_key_repository import ApiKeyRepositoryInterface
+from domain.contexts.user_management.entities.api_key import ApiKey
+from domain.contexts.user_management.repositories.interfaces.api_key_repository import ApiKeyRepositoryInterface
 from infrastructure.api.dependencies import get_api_key_repository, get_user_service
 from domain.contexts.user_management.services.user_service import UserService
 

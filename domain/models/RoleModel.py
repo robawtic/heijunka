@@ -4,7 +4,7 @@ from sqlalchemy.sql import func
 
 from domain.models.Base import Base
 from domain.models.team_member_roles import team_member_roles
-from domain.entities.role import Role
+from domain.contexts.user_management.value_objects.role import Role
 
 class RoleModel(Base):
     __tablename__ = 'roles'

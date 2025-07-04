@@ -168,6 +168,22 @@ class WorkAssignmentFactory:
             model_schedule_id = metadata.get('schedule_id', schedule_id)
             model_end_flag = metadata.get('end_flag', end_flag)
 
+            # Validate that employee and workstation exist and have valid IDs
+            if not entity.employee:
+                raise ValueError("Employee is missing")
+            if not hasattr(entity.employee, 'id') or not entity.employee.id:
+                raise ValueError("Employee ID is missing or invalid")
+
+            if not entity.workstation:
+                raise ValueError("Workstation is missing")
+            if not hasattr(entity.workstation, 'id') or not entity.workstation.id:
+                raise ValueError("Workstation ID is missing or invalid")
+
+            if not entity.period:
+                raise ValueError("Schedule period is missing")
+            if not hasattr(entity.period, 'date') or not entity.period.date:
+                raise ValueError("Schedule date is missing or invalid")
+
             # Determine status based on parameters
             model_status = metadata.get('status', status)
             if model_status is None:

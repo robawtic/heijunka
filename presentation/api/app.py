@@ -65,13 +65,21 @@ async def setup_token_cleanup():
     async def cleanup_expired_tokens():
         """Delete expired refresh tokens from the database."""
         try:
-            # Get the refresh token repository
-            refresh_token_repository = get_refresh_token_repository()
+            # Create a database session
+            from domain.models.db import Session as DBSession
+            db = DBSession()
 
-            # Delete expired tokens
-            deleted_count = refresh_token_repository.delete_expired_tokens()
+            try:
+                # Get the refresh token repository with the session
+                refresh_token_repository = get_refresh_token_repository(db)
 
-            logger.info(f"Token cleanup: deleted {deleted_count} expired refresh tokens")
+                # Delete expired tokens
+                deleted_count = refresh_token_repository.delete_expired_tokens()
+
+                logger.info(f"Token cleanup: deleted {deleted_count} expired refresh tokens")
+            finally:
+                # Make sure to close the session
+                db.close()
         except Exception as e:
             logger.error(f"Error during token cleanup: {str(e)}")
 

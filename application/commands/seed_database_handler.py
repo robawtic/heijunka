@@ -9,7 +9,7 @@ from domain.repositories.interfaces.group_repository import GroupRepositoryInter
 from domain.repositories.interfaces.team_repository import TeamRepositoryInterface
 from domain.repositories.interfaces.workstation_repository import WorkstationRepositoryInterface
 from domain.repositories.interfaces.employee_repository import EmployeeRepositoryInterface
-from domain.repositories.interfaces.role_repository import RoleRepositoryInterface
+from domain.contexts.user_management.repositories.interfaces.role_repository import RoleRepositoryInterface
 from domain.repositories.interfaces.line_type_repository import LineTypeRepositoryInterface
 from domain.models.Base import Base
 from domain.models.db import engine
@@ -18,7 +18,7 @@ from utilities.logging_factory import get_logger
 
 class SeedDatabaseHandler:
     """Handler for the SeedDatabaseCommand."""
-    
+
     def __init__(
         self,
         seed_data_repository: SeedDataRepositoryInterface,
@@ -33,7 +33,7 @@ class SeedDatabaseHandler:
     ):
         """
         Initialize the handler.
-        
+
         Args:
             seed_data_repository: Repository for loading seed data
             department_repository: Repository for departments
@@ -55,14 +55,14 @@ class SeedDatabaseHandler:
         self.line_type_repository = line_type_repository
         self.session = session
         self.logger = get_logger("application.commands.seed_database_handler")
-    
+
     def handle(self, command: SeedDatabaseCommand) -> Dict[str, Any]:
         """
         Handle the SeedDatabaseCommand.
-        
+
         Args:
             command: The command to handle
-            
+
         Returns:
             A dictionary with the results of the seeding operation
         """
@@ -78,11 +78,11 @@ class SeedDatabaseHandler:
                 "reset_database": command.reset_database
             }
         )
-        
+
         # Reset database if requested
         if command.reset_database:
             self._reset_database()
-        
+
         # Create seed service
         seed_service = SeedService(
             seed_data_repository=self.seed_data_repository,
@@ -94,10 +94,10 @@ class SeedDatabaseHandler:
             role_repository=self.role_repository,
             line_type_repository=self.line_type_repository
         )
-        
+
         # Seed based on command parameters
         result = {}
-        
+
         try:
             if command.team:
                 # Seed a specific team
@@ -106,7 +106,7 @@ class SeedDatabaseHandler:
                     event_type="seed_team",
                     identifier=command.team
                 )
-                
+
                 # Get the group for this team
                 group_id = self._get_group_id_for_team(command.team)
                 if not group_id:
@@ -117,17 +117,17 @@ class SeedDatabaseHandler:
                         identifier=command.team
                     )
                     return {"status": "error", "message": error_msg}
-                
+
                 # Seed the team
                 workstations_created, employees_created = seed_service.seed_team(command.team, group_id)
-                
+
                 result = {
                     "status": "success",
                     "teams_created": 1,
                     "workstations_created": workstations_created,
                     "employees_created": employees_created
                 }
-                
+
                 self.logger.info(
                     f"Seeded team {command.team}: {workstations_created} workstations, {employees_created} employees",
                     event_type="seed_team_complete",
@@ -141,7 +141,7 @@ class SeedDatabaseHandler:
                     event_type="seed_group",
                     identifier=command.group
                 )
-                
+
                 # Get the department for this group
                 department_id = self._get_department_id_for_group(command.group)
                 if not department_id:
@@ -152,10 +152,10 @@ class SeedDatabaseHandler:
                         identifier=command.group
                     )
                     return {"status": "error", "message": error_msg}
-                
+
                 # Seed the group
                 teams_created, workstations_created, employees_created = seed_service.seed_group(command.group, department_id)
-                
+
                 result = {
                     "status": "success",
                     "groups_created": 1,
@@ -163,7 +163,7 @@ class SeedDatabaseHandler:
                     "workstations_created": workstations_created,
                     "employees_created": employees_created
                 }
-                
+
                 self.logger.info(
                     f"Seeded group {command.group}: {teams_created} teams, "
                     f"{workstations_created} workstations, {employees_created} employees",
@@ -178,10 +178,10 @@ class SeedDatabaseHandler:
                     event_type="seed_department",
                     identifier=command.department
                 )
-                
+
                 # Seed the department
                 groups_created, teams_created, workstations_created, employees_created = seed_service.seed_department(command.department)
-                
+
                 result = {
                     "status": "success",
                     "departments_created": 1,
@@ -190,7 +190,7 @@ class SeedDatabaseHandler:
                     "workstations_created": workstations_created,
                     "employees_created": employees_created
                 }
-                
+
                 self.logger.info(
                     f"Seeded department {command.department}: {groups_created} groups, {teams_created} teams, "
                     f"{workstations_created} workstations, {employees_created} employees",
@@ -205,11 +205,11 @@ class SeedDatabaseHandler:
                     event_type="seed_all",
                     identifier="all"
                 )
-                
+
                 # Seed all departments
                 result = seed_service.seed_all()
                 result["status"] = "success"
-                
+
                 self.logger.info(
                     f"Seeded all departments: {result['departments']} departments, {result['groups']} groups, "
                     f"{result['teams']} teams, {result['workstations']} workstations, {result['employees']} employees",
@@ -217,15 +217,15 @@ class SeedDatabaseHandler:
                     identifier="all",
                     extra=result
                 )
-            
+
             # Commit the session
             self.session.commit()
-            
+
             return result
         except Exception as e:
             # Rollback the session on error
             self.session.rollback()
-            
+
             error_msg = f"Error seeding database: {str(e)}"
             self.logger.error(
                 error_msg,
@@ -233,9 +233,9 @@ class SeedDatabaseHandler:
                 identifier="error",
                 extra={"exception": str(e)}
             )
-            
+
             return {"status": "error", "message": error_msg}
-    
+
     def _reset_database(self) -> None:
         """Reset the database by dropping and recreating all tables."""
         self.logger.info(
@@ -243,14 +243,14 @@ class SeedDatabaseHandler:
             event_type="reset_database",
             identifier="start"
         )
-        
+
         try:
             # Drop all tables
             Base.metadata.drop_all(engine)
-            
+
             # Create all tables
             Base.metadata.create_all(engine)
-            
+
             self.logger.info(
                 "Database reset complete",
                 event_type="reset_database",
@@ -265,26 +265,26 @@ class SeedDatabaseHandler:
                 extra={"exception": str(e)}
             )
             raise
-    
+
     def _get_group_id_for_team(self, team_name: str) -> Optional[int]:
         """
         Get the group ID for a team.
-        
+
         Args:
             team_name: The name of the team
-            
+
         Returns:
             The group ID, or None if not found
         """
         team = self.team_repository.get_by_name(team_name)
         if team:
             return team.group_id
-        
+
         # If team doesn't exist, try to find the group from the seed data
         teams = self.seed_data_repository.get_available_teams()
         if team_name not in teams:
             return None
-        
+
         # Find the group that contains this team
         departments = self.seed_data_repository.get_available_departments()
         for dept in departments:
@@ -296,35 +296,35 @@ class SeedDatabaseHandler:
                     department = self.department_repository.get_by_name(dept)
                     if not department:
                         department = self.department_repository.create(name=dept)
-                    
+
                     # Create the group if it doesn't exist
                     group_obj = self.group_repository.get_by_name(group)
                     if not group_obj:
                         group_obj = self.group_repository.create(name=group, department_id=department.id)
-                    
+
                     return group_obj.id
-        
+
         return None
-    
+
     def _get_department_id_for_group(self, group_name: str) -> Optional[int]:
         """
         Get the department ID for a group.
-        
+
         Args:
             group_name: The name of the group
-            
+
         Returns:
             The department ID, or None if not found
         """
         group = self.group_repository.get_by_name(group_name)
         if group:
             return group.department_id
-        
+
         # If group doesn't exist, try to find the department from the seed data
         groups = self.seed_data_repository.get_available_groups()
         if group_name not in groups:
             return None
-        
+
         # Find the department that contains this group
         departments = self.seed_data_repository.get_available_departments()
         for dept in departments:
@@ -334,7 +334,7 @@ class SeedDatabaseHandler:
                 department = self.department_repository.get_by_name(dept)
                 if not department:
                     department = self.department_repository.create(name=dept)
-                
+
                 return department.id
-        
+
         return None

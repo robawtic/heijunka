@@ -7,7 +7,7 @@ from datetime import datetime
 
 from domain.models.Base import Base
 from domain.models.RoleModel import RoleModel
-from domain.entities.user import User
+from domain.contexts.user_management.entities.user import User
 
 # Association table for many-to-many relationship between users and roles
 user_roles = Table(

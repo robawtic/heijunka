@@ -6,11 +6,11 @@ from sqlalchemy.orm import Session
 
 from domain.models.db import Session as ScopedSession
 from domain.repositories.implementations.sqlalchemy_employee_repository import SqlAlchemyEmployeeRepository
-from domain.repositories.implementations.sqlalchemy_workstation_repository import SqlAlchemyWorkstationRepository
+from infrastructure.repositories.workstation_management.sqlalchemy_workstation_repository import SqlAlchemyWorkstationRepository
 from domain.repositories.implementations.sqlalchemy_team_repository import SqlAlchemyTeamRepository
-from domain.repositories.implementations.sqlalchemy_assignment_repository import SqlAlchemyAssignmentRepository
+from infrastructure.repositories.assignment.sqlalchemy_assignment_repository import SqlAlchemyAssignmentRepository
 from domain.repositories.implementations.sqlalchemy_employee_work_history_repository import SqlAlchemyEmployeeWorkHistoryRepository
-from domain.repositories.implementations.sqlalchemy_schedule_repository import SqlAlchemyScheduleRepository
+from infrastructure.repositories.scheduling.sqlalchemy_schedule_repository import SqlAlchemyScheduleRepository
 from domain.services.schedule_service import ScheduleService
 from utilities.logging_factory import get_logger, RateLimitedLogger
 
@@ -59,7 +59,7 @@ def setup_dependencies() -> Tuple[
     schedule_repository = SqlAlchemyScheduleRepository(session_factory)
 
     # Import here to avoid circular imports
-    from domain.repositories.implementations.sqlalchemy_aro_assignment_repository import SqlAlchemyAROAssignmentRepository
+    from infrastructure.repositories.assignment.sqlalchemy_aro_assignment_repository import SqlAlchemyAROAssignmentRepository
     from domain.repositories.implementations.sqlalchemy_team_aro_repository import SqlAlchemyTeamAroRepository
     aro_repository = SqlAlchemyAROAssignmentRepository(session_factory)
     team_aro_repository = SqlAlchemyTeamAroRepository(session_factory)

@@ -5,9 +5,9 @@ from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 
-from domain.entities.refresh_token import RefreshToken
+from domain.contexts.user_management.entities.refresh_token import RefreshToken
 from domain.models.RefreshTokenModel import RefreshTokenModel
-from domain.repositories.interfaces.refresh_token_repository import RefreshTokenRepositoryInterface
+from domain.contexts.user_management.repositories.interfaces.refresh_token_repository import RefreshTokenRepositoryInterface
 from infrastructure.repositories.sqlalchemy.base_sqlalchemy_repository import BaseSqlAlchemyRepository
 from infrastructure.exceptions import RepositoryError
 from utilities.secure_logging import redact_log_message, sanitize_exception, log_audit_event
@@ -27,6 +27,7 @@ class SqlAlchemyRefreshTokenRepository(BaseSqlAlchemyRepository[RefreshToken, Re
             session: The SQLAlchemy session to use for database operations.
         """
         super().__init__(session, RefreshTokenModel, RefreshToken)
+        self.session = session
         self.logger = get_logger("heijunka.repositories.refresh_token")
         self.rate_limited_logger = get_logger("heijunka.repositories.refresh_token", rate_limit=True)
 
@@ -39,10 +40,10 @@ class SqlAlchemyRefreshTokenRepository(BaseSqlAlchemyRepository[RefreshToken, Re
             The SQLAlchemy session.
         """
         try:
-            yield self._session
-            self._session.commit()
+            yield self.session
+            self.session.commit()
         except SQLAlchemyError as e:
-            self._session.rollback()
+            self.session.rollback()
             error_msg = sanitize_exception(e)
             self.logger.error(
                 f"Database operation failed: {error_msg}",
@@ -54,7 +55,7 @@ class SqlAlchemyRefreshTokenRepository(BaseSqlAlchemyRepository[RefreshToken, Re
             )
             raise RepositoryError(f"Database error: {error_msg}")
         except Exception as e:
-            self._session.rollback()
+            self.session.rollback()
             error_msg = sanitize_exception(e)
             self.logger.error(
                 f"Unexpected error in refresh token repository: {error_msg}",
@@ -92,7 +93,7 @@ class SqlAlchemyRefreshTokenRepository(BaseSqlAlchemyRepository[RefreshToken, Re
                 }
             )
 
-            model = self._session.query(RefreshTokenModel).filter(RefreshTokenModel.token_id == token_id).first()
+            model = self.session.query(RefreshTokenModel).filter(RefreshTokenModel.token_id == token_id).first()
             if model is None:
                 self.logger.info(
                     "No refresh token found with the provided token ID",
@@ -145,7 +146,7 @@ class SqlAlchemyRefreshTokenRepository(BaseSqlAlchemyRepository[RefreshToken, Re
             )
 
             now = datetime.utcnow()
-            models = self._session.query(RefreshTokenModel).filter(
+            models = self.session.query(RefreshTokenModel).filter(
                 and_(
                     RefreshTokenModel.user_id == user_id,
                     RefreshTokenModel.is_revoked == False,
@@ -452,7 +453,7 @@ class SqlAlchemyRefreshTokenRepository(BaseSqlAlchemyRepository[RefreshToken, Re
                 }
             )
 
-            exists = self._session.query(RefreshTokenModel).filter(RefreshTokenModel.token_id == token_id).first() is not None
+            exists = self.session.query(RefreshTokenModel).filter(RefreshTokenModel.token_id == token_id).first() is not None
 
             self.rate_limited_logger.info(
                 f"Refresh token exists: {exists}",

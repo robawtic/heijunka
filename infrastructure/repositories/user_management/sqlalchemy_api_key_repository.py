@@ -6,9 +6,9 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 import json
 
-from domain.entities.api_key import ApiKey
+from domain.contexts.user_management.entities.api_key import ApiKey
 from domain.models.ApiKeyModel import ApiKeyModel
-from domain.repositories.interfaces.api_key_repository import ApiKeyRepositoryInterface
+from domain.contexts.user_management.repositories.interfaces.api_key_repository import ApiKeyRepositoryInterface
 from infrastructure.repositories.sqlalchemy.base_sqlalchemy_repository import BaseSqlAlchemyRepository
 from infrastructure.exceptions import RepositoryError
 from utilities.secure_logging import redact_log_message, sanitize_exception, log_audit_event

@@ -1,7 +1,7 @@
 # infrastructure/security/csrf.py
 from fastapi import Request, Response, Depends, HTTPException
 from fastapi_csrf_protect import CsrfProtect
-from fastapi_csrf_protect.exceptions import InvalidCsrfToken
+from fastapi_csrf_protect.exceptions import TokenValidationError
 from typing import Callable, TypeVar, cast, Optional
 from contextlib import contextmanager
 import logging
@@ -76,7 +76,7 @@ class CSRFSecurity:
         try:
             self.csrf.validate_csrf_in_cookies()
             logger.debug("CSRF token validated successfully")
-        except InvalidCsrfToken:
+        except TokenValidationError:
             logger.warning("Invalid CSRF token detected")
             raise HTTPException(status_code=403, detail="Invalid CSRF token")
 

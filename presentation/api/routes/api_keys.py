@@ -8,9 +8,9 @@ import ipaddress
 from infrastructure.api.auth import get_current_user, get_admin_user
 from presentation.api.models import ErrorResponse
 from infrastructure.api.dependencies import get_api_key_repository, get_user_service
-from domain.repositories.interfaces.api_key_repository import ApiKeyRepositoryInterface
+from domain.contexts.user_management.repositories.interfaces.api_key_repository import ApiKeyRepositoryInterface
 from domain.contexts.user_management.services.user_service import UserService
-from domain.entities.api_key import ApiKey
+from domain.contexts.user_management.entities.api_key import ApiKey
 from infrastructure.security.csrf import verify_csrf_token
 
 router = APIRouter()

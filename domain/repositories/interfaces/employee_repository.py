@@ -2,7 +2,7 @@ from abc import abstractmethod
 from typing import Optional, List, Dict, Tuple
 from datetime import date
 
-from domain.entities.employee import Employee
+from domain.contexts.employee_management.entities.employee import Employee
 from domain.repositories.interfaces.base_repository import BaseRepository
 
 

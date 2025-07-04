@@ -16,8 +16,8 @@ from presentation.api.models import ErrorResponse, TokenRequest, TokenResponse, 
 from infrastructure.security.csrf import set_csrf_cookie, verify_csrf_token
 from infrastructure.api.dependencies import get_user_service, get_refresh_token_repository
 from domain.contexts.user_management.services.user_service import UserService
-from domain.repositories.interfaces.refresh_token_repository import RefreshTokenRepositoryInterface
-from domain.entities.user import User
+from domain.contexts.user_management.repositories.interfaces.refresh_token_repository import RefreshTokenRepositoryInterface
+from domain.contexts.user_management.entities.user import User
 
 router = APIRouter()
 logger = logging.getLogger("heijunka_api.auth")

@@ -2,7 +2,7 @@ from abc import abstractmethod
 from typing import Optional, List
 from datetime import datetime
 
-from domain.entities.user import User
+from domain.contexts.user_management.entities.user import User
 from domain.repositories.interfaces.base_repository import BaseRepository
 
 

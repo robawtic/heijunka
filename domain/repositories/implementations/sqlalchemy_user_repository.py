@@ -4,10 +4,10 @@ from datetime import datetime
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
-from domain.entities.user import User
+from domain.contexts.user_management.entities.user import User
 from domain.models.UserModel import UserModel
 from domain.models.RoleModel import RoleModel
-from domain.repositories.interfaces.user_repository import UserRepositoryInterface
+from domain.contexts.user_management.repositories.interfaces.user_repository import UserRepositoryInterface
 from infrastructure.repositories.sqlalchemy.base_sqlalchemy_repository import BaseSqlAlchemyRepository
 from infrastructure.exceptions import RepositoryError
 from utilities.secure_logging import redact_log_message, sanitize_exception, log_audit_event

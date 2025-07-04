@@ -4,11 +4,11 @@ from datetime import datetime
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
-from domain.entities.role import Role
+from domain.contexts.user_management.value_objects.role import Role
 from domain.models.RoleModel import RoleModel
 from domain.models.team_member_roles import team_member_roles
 from domain.models.TeamMemberModel import TeamMemberModel
-from domain.repositories.interfaces.role_repository import RoleRepositoryInterface
+from domain.contexts.user_management.repositories.interfaces.role_repository import RoleRepositoryInterface
 from infrastructure.repositories.sqlalchemy.base_sqlalchemy_repository import BaseSqlAlchemyRepository
 from infrastructure.exceptions import RepositoryError
 from utilities.secure_logging import sanitize_exception

@@ -5,9 +5,9 @@ from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 
-from domain.entities.refresh_token import RefreshToken
+from domain.contexts.user_management.entities.refresh_token import RefreshToken
 from domain.models.RefreshTokenModel import RefreshTokenModel
-from domain.repositories.interfaces.refresh_token_repository import RefreshTokenRepositoryInterface
+from domain.contexts.user_management.repositories.interfaces.refresh_token_repository import RefreshTokenRepositoryInterface
 from infrastructure.repositories.sqlalchemy.base_sqlalchemy_repository import BaseSqlAlchemyRepository
 from infrastructure.exceptions import RepositoryError
 from utilities.secure_logging import redact_log_message, sanitize_exception, log_audit_event

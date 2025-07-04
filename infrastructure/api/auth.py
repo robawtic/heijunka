@@ -8,8 +8,8 @@ import logging
 import uuid
 
 from infrastructure.config.settings import settings
-from domain.entities.refresh_token import RefreshToken
-from domain.repositories.interfaces.refresh_token_repository import RefreshTokenRepositoryInterface
+from domain.contexts.user_management.entities.refresh_token import RefreshToken
+from domain.contexts.user_management.repositories.interfaces.refresh_token_repository import RefreshTokenRepositoryInterface
 
 # Use settings instead of hardcoded values
 SECRET_KEY = settings.jwt_secret_key

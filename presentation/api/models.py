@@ -97,6 +97,12 @@ class UserUpdate(BaseModel):
             raise ValueError(f'Invalid role: {v}. Must be one of {valid_roles}')
         return v
 
+# Base models
+class BaseResponse(BaseModel):
+    id: int
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
 class UserResponse(BaseResponse, UserBase):
     id: int
     is_active: bool
@@ -225,11 +231,6 @@ class ErrorResponse(BaseModel):
             }
         }
 
-# Base models
-class BaseResponse(BaseModel):
-    id: int
-    created_at: Optional[datetime] = None
-    updated_at: Optional[datetime] = None
 
 # Employee models
 class EmployeeBase(BaseModel):

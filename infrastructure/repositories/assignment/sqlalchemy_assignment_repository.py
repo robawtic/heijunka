@@ -980,7 +980,7 @@ class SqlAlchemyAssignmentRepository(BaseSqlAlchemyRepository[WorkAssignment, Em
                 batch_success_count = 0
                 batch_failed_count = 0
 
-                for assignment in batch:
+                for idx, assignment in enumerate(batch):
                     try:
                         # Convert to model
                         self.rate_limited_logger.debug(
@@ -992,6 +992,11 @@ class SqlAlchemyAssignmentRepository(BaseSqlAlchemyRepository[WorkAssignment, Em
                                 "workstation_id": assignment.workstation.id
                             }
                         )
+
+                        # Ensure the assignment has the correct status (GENERATED)
+                        assignment = assignment.with_status(WorkHistoryStatus.GENERATED)
+
+
                         model = self._to_model(assignment)
                         session.add(model)
                         batch_success_count += 1
@@ -1013,10 +1018,23 @@ class SqlAlchemyAssignmentRepository(BaseSqlAlchemyRepository[WorkAssignment, Em
 
                 # Flush after each batch to ensure all assignments in this batch are saved
                 # but don't commit yet to maintain the session
-                session.flush()
+                try:
+                    session.flush()
+                except Exception as e:
+                    error_msg = sanitize_exception(e)
+                    self.logger.error(
+                        f"Error flushing batch {i//batch_size + 1}: {error_msg}",
+                        extra={
+                            "event_type": "batch_flush_error",
+                            "batch_number": i//batch_size + 1,
+                            "error_type": type(e).__name__
+                        }
+                    )
+                    # Continue processing other batches even if this one failed
+                    # The session will be rolled back at the end if any batch fails
 
                 self.logger.info(
-                    f"Batch {i//batch_size + 1}: Saved {batch_success_count} assignments, {batch_failed_count} failed",
+                    f"Batch {i//batch_size + 1}: Processed {batch_success_count} assignments, {batch_failed_count} failed",
                     extra={
                         "event_type": "assignments_batch_result",
                         "batch_number": i//batch_size + 1,
@@ -1028,10 +1046,27 @@ class SqlAlchemyAssignmentRepository(BaseSqlAlchemyRepository[WorkAssignment, Em
                 success_count += batch_success_count
 
             # Commit the session after all batches are processed
-            session.commit()
+            if len(failed_assignments) == 0:
+                session.commit()
+                self.logger.info(
+                    "Successfully committed all assignments to the database",
+                    extra={
+                        "event_type": "assignments_commit_success",
+                        "total_count": success_count
+                    }
+                )
+            else:
+                session.rollback()
+                self.logger.warning(
+                    f"Rolling back due to {len(failed_assignments)} failed assignments",
+                    extra={
+                        "event_type": "assignments_rollback",
+                        "failed_count": len(failed_assignments)
+                    }
+                )
 
             self.logger.info(
-                f"Total: Successfully saved {success_count} assignments, {len(failed_assignments)} failed",
+                f"Total: Successfully processed {success_count} assignments, {len(failed_assignments)} failed",
                 extra={
                     "event_type": "assignments_save_result",
                     "success_count": success_count,
