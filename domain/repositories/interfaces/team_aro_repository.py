@@ -1,7 +1,7 @@
 from abc import abstractmethod
 from typing import Optional, List
 
-from domain.entities.team_aro import TeamAro
+from domain.contexts.assignment.entities.team_aro import TeamAro
 from domain.repositories.interfaces.base_repository import BaseRepository
 
 class TeamAroRepositoryInterface(BaseRepository[TeamAro]):

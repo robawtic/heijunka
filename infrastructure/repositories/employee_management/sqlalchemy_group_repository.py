@@ -2,7 +2,7 @@ from typing import Optional, List
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
-from domain.entities.group import Group
+from domain.contexts.employee_management.entities.group import Group
 from domain.models.GroupModel import GroupModel
 from domain.factories.group_factory import GroupFactory
 from domain.repositories.interfaces.group_repository import GroupRepositoryInterface

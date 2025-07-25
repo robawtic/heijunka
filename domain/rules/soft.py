@@ -1,7 +1,7 @@
 # domain/rules/soft.py
 from domain.rules.context import RuleContext, rule_metadata
 from datetime import timedelta
-from domain.value_objects.employee_availability import AvailabilityStatus
+from domain.contexts.employee_management.value_objects.employee_availability import AvailabilityStatus
 
 @rule_metadata(uses=["model", "assign", "employees", "workstations", "current_period", "start_date", "employee_history_repo", "work_history_data"])
 def add_same_day_repeat_penalties(ctx: RuleContext):
@@ -42,7 +42,7 @@ def add_same_day_repeat_penalties(ctx: RuleContext):
 
     # Check if we have work history data available
     if not work_history_data and not repo:
-        logger.warning("Cannot apply same-day repeat penalties: neither work_history_data nor employee_history_repo is available")
+        logger.info("Cannot apply same-day repeat penalties: neither work_history_data nor employee_history_repo is available")
         return []
 
     penalties = []
@@ -145,7 +145,7 @@ def add_lookback_any_period_penalties(ctx: RuleContext):
 
     # Check if we have work history data available
     if not work_history_data and not repo:
-        logger.warning("Cannot apply lookback-any penalties: neither work_history_data nor employee_history_repo is available")
+        logger.info("Cannot apply lookback-any penalties: neither work_history_data nor employee_history_repo is available")
         return []
 
     penalties = []
@@ -242,7 +242,7 @@ def add_lookback_same_period_penalties(ctx: RuleContext):
 
     # Check if we have work history data available
     if not work_history_data and not repo:
-        logger.warning("Cannot apply lookback-same-period penalties: neither work_history_data nor employee_history_repo is available")
+        logger.info("Cannot apply lookback-same-period penalties: neither work_history_data nor employee_history_repo is available")
         return []
 
     penalties = []

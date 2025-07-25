@@ -1,9 +1,9 @@
-# heijunka/domain/repositories/implementations/sqlalchemy_line_type_repository.py
+# heijunka/domain/repositories/buses/sqlalchemy_line_type_repository.py
 from typing import List, Optional
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 
-from domain.value_objects.line_type import LineType
+from domain.contexts.workstation_management.value_objects.line_type import LineType
 from domain.models.LineTypeModel import LineTypeModel
 from domain.repositories.interfaces.line_type_repository import LineTypeRepositoryInterface
 from infrastructure.repositories.sqlalchemy.base_sqlalchemy_repository import BaseSqlAlchemyRepository

@@ -1,11 +1,11 @@
 # domain/factories/employee_factory.py
 from typing import List, Optional
 from datetime import date
-from domain.entities.employee import Employee
-from domain.value_objects.employee_availability import EmployeeAvailability
-from domain.entities.team_member import TeamMember
-from domain.value_objects.workstation_assignment import WorkstationAssignment
-from domain.value_objects.work_history_entry import WorkHistoryEntry
+from domain.contexts.employee_management.entities.employee import Employee
+from domain.contexts.employee_management.value_objects.employee_availability import EmployeeAvailability
+from domain.contexts.employee_management.entities.team_member import TeamMember
+from domain.contexts.assignment.value_objects.workstation_assignment import WorkstationAssignment
+from domain.contexts.employee_management.value_objects.work_history_entry import WorkHistoryEntry
 
 class EmployeeFactory:
     @staticmethod

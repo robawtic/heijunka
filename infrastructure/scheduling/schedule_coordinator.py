@@ -7,7 +7,7 @@ from domain.events.publisher import DomainEventPublisher
 from domain.events import AROTransferRequested, ScheduleGenerationCompleted, ScheduleRegenerationNeeded
 from application.commands.generate_schedule_command import GenerateScheduleCommand
 from application.commands.generate_schedule_handler import GenerateScheduleHandler
-from domain.value_objects.work_assignment import WorkAssignment
+from domain.contexts.assignment.value_objects.work_assignment import WorkAssignment
 from utilities.logging_factory import get_logger
 
 # Create a logger for this module
@@ -201,7 +201,6 @@ class ScheduleCoordinator:
                 )
                 continue
 
-            # Extract team data for this period
             team_data = self.schedule_data_service.extract_team_data(
                 prefetched_data=prefetched_data,
                 team_id=team_id,
@@ -209,7 +208,6 @@ class ScheduleCoordinator:
                 available_by_team_and_period=available_by_team_and_period
             )
 
-            # Skip if no employees or workstations
             if not team_data['employees'] or not team_data['workstations']:
                 logger.info(
                     f"No employees or workstations for team {team_id} in period {period}, skipping",
@@ -218,13 +216,10 @@ class ScheduleCoordinator:
                 )
                 continue
 
-            # Create a command for this team
-            # We need to get the command from active_schedules if it exists, or create a new one
             command = None
             if team_id in self.active_schedules and "command" in self.active_schedules[team_id]:
                 command = self.active_schedules[team_id]["command"]
             else:
-                # Create a new command with default values
                 from application.commands.generate_schedule_command import GenerateScheduleCommand
                 command = GenerateScheduleCommand(
                     team_id=team_id,
@@ -236,11 +231,9 @@ class ScheduleCoordinator:
                 )
 
             try:
-                # Set work_history_repository on handler if not already set
                 if hasattr(self, 'work_history_repository') and self.work_history_repository is not None:
                     self.schedule_handler.work_history_repository = self.work_history_repository
 
-                # Generate assignments for this team and period
                 period_assignments = self.schedule_handler.generate_with_prefetched_data(
                     command=command,
                     employees=team_data['employees'],

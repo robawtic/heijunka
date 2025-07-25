@@ -1,6 +1,6 @@
 # domain/factories/employee_training_factory.py
 from typing import Optional
-from domain.value_objects.employee_training import EmployeeTraining
+from domain.contexts.employee_management.value_objects.employee_training import EmployeeTraining
 from domain.models.EmployeeTrainingModel import EmployeeTrainingModel
 from utilities.logging_factory import get_logger
 

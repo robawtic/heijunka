@@ -1,35 +1,23 @@
-"""
-Generate schedule command handling for the CLI application.
-"""
 import sys
-import time
-from typing import Optional, Any, Dict, List, Tuple, Union, cast
+from typing import Optional, Any, Dict, List, Tuple, cast
 from datetime import datetime, date
-from sqlalchemy.orm import Session
 from collections import defaultdict
 
-from domain.entities.employee import Employee
-
-from application.commands.generate_schedule_command import GenerateScheduleCommand
-from application.commands.generate_schedule_handler import GenerateScheduleHandler
-from domain.repositories.implementations.sqlalchemy_employee_repository import SqlAlchemyEmployeeRepository
-from domain.repositories.implementations.sqlalchemy_workstation_repository import SqlAlchemyWorkstationRepository
-from domain.repositories.implementations.sqlalchemy_team_repository import SqlAlchemyTeamRepository
-from domain.repositories.implementations.sqlalchemy_assignment_repository import SqlAlchemyAssignmentRepository
-from domain.repositories.implementations.sqlalchemy_employee_work_history_repository import SqlAlchemyEmployeeWorkHistoryRepository
+from domain.contexts.employee_management.entities.employee import Employee
+from infrastructure.repositories.employee_management.sqlalchemy_employee_repository import SqlAlchemyEmployeeRepository
+from infrastructure.repositories.workstation_management.sqlalchemy_workstation_repository import SqlAlchemyWorkstationRepository
+from infrastructure.repositories.employee_management.sqlalchemy_team_repository import SqlAlchemyTeamRepository
+from infrastructure.repositories.assignment.sqlalchemy_assignment_repository import SqlAlchemyAssignmentRepository
+from infrastructure.repositories.employee_management.sqlalchemy_employee_work_history_repository import SqlAlchemyEmployeeWorkHistoryRepository
 from domain.models.EmployeeWorkHistoryModel import WorkHistoryStatus
-from domain.repositories.implementations.sqlalchemy_schedule_repository import SqlAlchemyScheduleRepository
-from domain.repositories.implementations.sqlalchemy_aro_assignment_repository import SqlAlchemyAROAssignmentRepository
+from infrastructure.repositories.scheduling.sqlalchemy_schedule_repository import SqlAlchemyScheduleRepository
 from domain.services.schedule_service import ScheduleService
 from domain.services.aro_service import AROService
 from domain.contexts.assignment.services.aro_graph_service import AROGraphService
 from infrastructure.scheduling.schedule_data_service import ScheduleDataService
-from infrastructure.scheduling.schedule_coordinator import ScheduleCoordinator
-from domain.events.publisher import DomainEventPublisher
 from presentation.cli.utils.formatting import format_schedule_table
 from utilities.logging_factory import get_logger, RateLimitedLogger
 
-# Create a logger for this module
 logger = cast(RateLimitedLogger, get_logger("presentation.cli.commands.generate_command", rate_limit=True))
 
 def handle_generate(
@@ -67,7 +55,6 @@ def handle_generate(
     )
 
     try:
-        # Unpack dependencies
         (
             session_factory, 
             employee_repository, 
@@ -82,10 +69,8 @@ def handle_generate(
             schedule_repository
         ) = dependencies
 
-        # Get teams for generation
         teams = schedule_service._get_teams_for_generation(args, team_repository)
 
-        # Parse start_date if it's a string
         start_date = args.start_date
         if isinstance(start_date, str):
             try:
@@ -109,8 +94,8 @@ def handle_generate(
             periods=args.periods
         )
 
-        # Call the schedule service to handle all orchestration using the new DDD-compliant method
-        result = schedule_service.generate_schedule_flow(
+        # Call the schedule service to handle all orchestration
+        result = schedule_service.orchestrate_team_schedule_generation(
             args=args,
             teams=teams,
             prefetched_data=prefetched_data
@@ -127,10 +112,46 @@ def handle_generate(
 
         if result["success"]:
             try:
+                logger.info(
+                    f"Starting save_all operation for {len(result['assignments'])} assignments (batch_size: 200)",
+                    "save_all_start",
+                    f"assignments_{len(result['assignments'])}"
+                )
                 print("[DIAGNOSTIC] Calling save_all...")
-                assignment_repository.save_all(result["assignments"], batch_size=200)
-                print("[DIAGNOSTIC] save_all completed successfully.")
+                
+                # Validate assignment data consistency before save_all
+                logger.info("Validating assignment data consistency before save_all", "assignment_validation", "pre_save_validation")
+                for i, assignment in enumerate(result["assignments"][:5]):  # Log first 5 for debugging
+                    logger.debug(
+                        f"Assignment {i+1}: Employee {getattr(assignment.employee, 'id', 'MISSING')} ({getattr(assignment.employee, 'name', 'MISSING')}) -> Workstation {getattr(assignment.workstation, 'id', 'MISSING')} ({getattr(assignment.workstation, 'name', 'MISSING')}) on {getattr(assignment.period, 'date', 'MISSING')} period {getattr(assignment.period, 'period', 'MISSING')}",
+                        "assignment_data_validation",
+                        f"assignment_{i+1}"
+                    )
+                
+                # Check return value
+                save_success = assignment_repository.save_all(result["assignments"], batch_size=200)
+                
+                if save_success:
+                    logger.info(
+                        f"save_all completed successfully - all {len(result['assignments'])} assignments saved",
+                        "save_all_success",
+                        f"assignments_{len(result['assignments'])}"
+                    )
+                    print("[DIAGNOSTIC] save_all completed successfully - all assignments saved.")
+                else:
+                    logger.warning(
+                        f"save_all completed but not all assignments were saved (total: {len(result['assignments'])})",
+                        "save_all_partial_failure",
+                        f"assignments_{len(result['assignments'])}"
+                    )
+                    print("[DIAGNOSTIC] save_all completed but some assignments failed validation or saving.")
+                    
             except Exception as e:
+                logger.error(
+                    f"Exception during save_all: {e} (type: {type(e).__name__}, assignments: {len(result['assignments'])})",
+                    "save_all_exception",
+                    f"assignments_{len(result['assignments'])}"
+                )
                 print(f"[DIAGNOSTIC] Exception during save_all: {e}")
                 import traceback
                 traceback.print_exc()
@@ -156,7 +177,9 @@ def handle_generate(
             prefetched_data['aro_assignments_by_team'],
             prefetched_data['aro_assignments_by_team_period'],
             prefetched_data['aro_assignments_by_employee'],
-            prefetched_data['employees_by_id']
+            prefetched_data['employees_by_id'],
+            result["schedule_metadata"],
+            aro_service
         )
 
         return True
@@ -185,7 +208,9 @@ def display_generation_results(
     aro_assignments_by_team: Optional[Dict[int, Dict[str, List[int]]]] = None,
     aro_assignments_by_team_period: Optional[Dict[int, Dict[int, Dict[str, List[int]]]]] = None,
     aro_assignments_by_employee: Optional[Dict[int, List[Any]]] = None,
-    employees_by_id: Optional[Dict[int, Employee]] = None
+    employees_by_id: Optional[Dict[int, Employee]] = None,
+    schedule_metadata: Optional[List[Dict]] = None,
+    aro_service: Optional[Any] = None
 ) -> None:
     """
     Display the results of schedule generation.
@@ -216,10 +241,6 @@ def display_generation_results(
         print("\nNo assignments generated.")
         return
 
-    #print(f"\nGenerated a total of {len(assignments)} assignments across all teams")
-    #print("Assignments have been saved to the employee_work_history table.")
-
-    # Verify assignments were saved to the database
     try:
         logger.debug(
             "Verifying assignments in database", 
@@ -234,7 +255,8 @@ def display_generation_results(
         work_history_entries, total_count = work_history_repository.get_filtered(
             start_date=start_date,
             end_date=end_date,
-            status=WorkHistoryStatus.GENERATED
+            status=WorkHistoryStatus.GENERATED,
+            limit=10000  # Set high limit to capture all assignments
         )
         saved_count = len(work_history_entries)
         logger.debug(
@@ -310,19 +332,21 @@ def display_generation_results(
         )
         print(warning_msg)
 
-    # Group assignments by team and date
+    # Group assignments by workstation's team and date (not employee's team)
+    # This ensures ARO assignments are displayed with the team they're working for
     assignments_by_team_and_date = {}
     for assignment in assignments:
-        team_id = assignment.employee.team_id
+        # Use workstation's team_id instead of employee's team_id
+        workstation_team_id = assignment.workstation.team_id
         date_key = assignment.period.date
 
-        if team_id not in assignments_by_team_and_date:
-            assignments_by_team_and_date[team_id] = {}
+        if workstation_team_id not in assignments_by_team_and_date:
+            assignments_by_team_and_date[workstation_team_id] = {}
 
-        if date_key not in assignments_by_team_and_date[team_id]:
-            assignments_by_team_and_date[team_id][date_key] = []
+        if date_key not in assignments_by_team_and_date[workstation_team_id]:
+            assignments_by_team_and_date[workstation_team_id][date_key] = []
 
-        assignments_by_team_and_date[team_id][date_key].append(assignment)
+        assignments_by_team_and_date[workstation_team_id][date_key].append(assignment)
 
     # Print schedule for each team and date
     for team_id, dates in assignments_by_team_and_date.items():
@@ -351,3 +375,65 @@ def display_generation_results(
                     team_id
                 ))
                 print()  # Add some space between dates
+
+    # Display available AROs for teams that failed to find solutions
+    if schedule_metadata and aro_service:
+        failed_teams = [metadata for metadata in schedule_metadata if metadata.get("status") == "failed"]
+        
+        if failed_teams:
+            print("\n" + "="*80)
+            print("AVAILABLE AROs FOR TEAMS AFFECTED BY CALL-INS")
+            print("="*80)
+            
+            for failed_metadata in failed_teams:
+                team_id = failed_metadata.get("team_id")
+                team_name = failed_metadata.get("team_name", f"Team {team_id}")
+                error_message = failed_metadata.get("error_message", "No solution found")
+                
+                print(f"\n--- Team: {team_name} (ID: {team_id}) ---")
+                print(f"Issue: {error_message}")
+                
+                # Get workstations for this team
+                workstations = workstation_repository.get_by_team_id(team_id)
+                
+                if workstations:
+                    # Get available AROs for this team's workstations
+                    try:
+                        aro_mapping = aro_service.get_workstation_aro_mapping(
+                            team_id=team_id,
+                            period=1,  # Check for period 1 as an example
+                            assignment_date=start_date,
+                            empty_workstations=workstations
+                        )
+                        
+                        if aro_mapping:
+                            print("Available ARO employees by workstation:")
+                            for workstation_id, aro_employee_ids in aro_mapping.items():
+                                # Find the workstation name
+                                workstation = next((ws for ws in workstations if ws.id == workstation_id), None)
+                                workstation_name = workstation.name if workstation else f"Workstation {workstation_id}"
+                                
+                                if aro_employee_ids:
+                                    print(f"  {workstation_name}:")
+                                    for emp_id in aro_employee_ids:
+                                        if employees_by_id and emp_id in employees_by_id:
+                                            employee = employees_by_id[emp_id]
+                                            home_team = team_repository.get(employee.team_id)
+                                            home_team_name = home_team.name if home_team else f"Team {employee.team_id}"
+                                            print(f"    - {employee.name} (from {home_team_name})")
+                                        else:
+                                            # Fallback: get employee from repository
+                                            employee = employee_repository.get(emp_id)
+                                            if employee:
+                                                home_team = team_repository.get(employee.team_id)
+                                                home_team_name = home_team.name if home_team else f"Team {employee.team_id}"
+                                                print(f"    - {employee.name} (from {home_team_name})")
+                        else:
+                            print("No available ARO employees found for this team's workstations.")
+                            
+                    except Exception as e:
+                        print(f"Error getting ARO suggestions: {e}")
+                else:
+                    print("No workstations found for this team.")
+            
+            print("\n" + "="*80)

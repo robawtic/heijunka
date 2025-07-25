@@ -1,4 +1,4 @@
-from domain.repositories.interfaces.assignment_repository import AssignmentRepositoryInterface
+from domain.contexts.assignment.repositories.interfaces.assignment_repository import AssignmentRepositoryInterface
 from application.commands.create_manual_assignment_command import CreateManualAssignmentCommand
 
 class CreateManualAssignmentHandler:

@@ -6,9 +6,9 @@ import time
 from sqlalchemy.exc import SQLAlchemyError
 from contextlib import contextmanager
 
-from domain.entities.employee import Employee
-from domain.entities.team import Team
-from domain.entities.workstation import Workstation
+from domain.contexts.employee_management.entities.employee import Employee
+from domain.contexts.employee_management.entities.team import Team
+from domain.contexts.workstation_management.entities.workstation import Workstation
 from domain.contexts.assignment.aro_assignment import AROAssignment
 from domain.repositories.interfaces.aro_assignment_repository import AROAssignmentRepositoryInterface
 from domain.repositories.interfaces.employee_repository import EmployeeRepositoryInterface

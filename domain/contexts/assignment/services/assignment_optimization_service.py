@@ -8,7 +8,7 @@ from domain.contexts.assignment.value_objects.assignment_criteria import Assignm
 from domain.contexts.assignment.value_objects.work_assignment_validator import WorkAssignmentValidator
 from domain.contexts.assignment.repositories.interfaces.assignment_repository import AssignmentRepositoryInterface
 from domain.contexts.employee_management.entities.employee import Employee
-from domain.entities.workstation import Workstation
+from domain.contexts.workstation_management.entities.workstation import Workstation
 from domain.contexts.scheduling.value_objects.schedule_period import SchedulePeriod
 
 logger = logging.getLogger(__name__)

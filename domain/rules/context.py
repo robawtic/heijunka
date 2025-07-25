@@ -5,11 +5,11 @@ from datetime import date
 from ortools.sat.python.cp_model import CpModel
 from sqlalchemy.orm import Session
 
-from domain.entities.employee import Employee
-from domain.entities.workstation import Workstation
+from domain.contexts.employee_management.entities.employee import Employee
+from domain.contexts.workstation_management.entities.workstation import Workstation
 from domain.repositories.interfaces.employee_work_history_repository import EmployeeWorkHistoryRepositoryInterface
 
-@dataclass
+@dataclass(init=True)
 class RuleContext:
     """
     Context object that holds all the data needed for scheduling rules.
@@ -32,7 +32,7 @@ class RuleContext:
     call_ins: Optional[List[str]] = None  # List of employee names who called in (unavailable)
     employee_offline_periods: Optional[Dict[str, Set[int]]] = None  # Dict of employee name -> set of periods when offline
     employee_history_repo: Optional[EmployeeWorkHistoryRepositoryInterface] = None  # Repository for employee work history
-    work_history_data: Optional[Dict] = None  # Dictionary containing work history data for employees
+    work_history_data: Optional[Dict] = field(default=None)  # Dictionary containing work history data for employees
     aro_data: Optional[Dict] = None  # Dictionary of ARO assignments by employee and period
     current_period: Optional[int] = None  # The current period being processed (1-indexed)
 
@@ -49,7 +49,7 @@ class RuleContext:
 
 
 # Team-specific context classes
-@dataclass
+@dataclass(init=True)
 class HeadsubRuleContext(RuleContext):
     """
     Context specific to the Headsub team rules.

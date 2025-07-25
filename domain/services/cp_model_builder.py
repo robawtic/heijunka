@@ -4,10 +4,10 @@ from ortools.sat.python import cp_model
 from datetime import date
 import logging
 
-from domain.entities.employee import Employee
-from domain.entities.workstation import Workstation
-from domain.value_objects.schedule_period import SchedulePeriod
-from domain.value_objects.work_assignment import WorkAssignment
+from domain.contexts.employee_management.entities.employee import Employee
+from domain.contexts.workstation_management.entities.workstation import Workstation
+from domain.contexts.scheduling.value_objects.schedule_period import SchedulePeriod
+from domain.contexts.assignment.value_objects.work_assignment import WorkAssignment
 
 # Logger for this module
 logger = logging.getLogger(__name__)
@@ -16,7 +16,8 @@ class CPModelBuilder:
     def build_model(self, employees: List[Employee], workstations: List[Workstation], 
                    period: int, team_id: int, aro_data: Dict, 
                    start_date: date = None, team_name: str = None,
-                   work_history_data: Dict = None, employee_history_repo = None) -> Tuple[cp_model.CpModel, Dict]:
+                   work_history_data: Dict = None, employee_history_repo = None,
+                   call_ins: List[str] = None, offline_dict: Dict = None) -> Tuple[cp_model.CpModel, Dict]:
         """
         Build a CP model for the given employees, workstations, and period.
 
@@ -30,6 +31,8 @@ class CPModelBuilder:
             team_name: The name of the team (required for rule context)
             work_history_data: Dictionary containing work history data for employees (preferred over repository)
             employee_history_repo: Repository for employee work history (deprecated, use work_history_data instead)
+            call_ins: List of employee names who called in (unavailable)
+            offline_dict: Dictionary of employee names to periods when they are offline
 
         Returns:
             A tuple containing:
@@ -45,6 +48,26 @@ class CPModelBuilder:
             for w, workstation in enumerate(workstations):
                 assign[(e, w, period-1)] = model.NewBoolVar(
                     f'assign_e{e}_w{w}_p{period-1}')
+        
+        # Handle ARO pre-assignments if provided in work_history_data
+        aro_pre_assignments = {}
+        if work_history_data and isinstance(work_history_data, dict) and 'aro_pre_assignments' in work_history_data:
+            aro_pre_assignments = work_history_data['aro_pre_assignments']
+            logger.info(f"Found {len(aro_pre_assignments)} ARO pre-assignments in work_history_data")
+        
+        # Apply ARO pre-assignment constraints
+        if aro_pre_assignments:
+            logger.info(f"Applying {len(aro_pre_assignments)} ARO pre-assignment constraints")
+            for workstation_idx, employee_idx in aro_pre_assignments.items():
+                if (employee_idx < len(employees) and workstation_idx < len(workstations) and 
+                    (employee_idx, workstation_idx, period-1) in assign):
+                    # Force this specific ARO-workstation assignment
+                    model.Add(assign[(employee_idx, workstation_idx, period-1)] == 1)
+                    employee_name = employees[employee_idx].name if employee_idx < len(employees) else f"Employee_{employee_idx}"
+                    workstation_name = workstations[workstation_idx].name if workstation_idx < len(workstations) else f"Workstation_{workstation_idx}"
+                    logger.info(f"Pre-assigned {employee_name} to {workstation_name} for period {period}")
+                else:
+                    logger.warning(f"Invalid pre-assignment: employee_idx={employee_idx}, workstation_idx={workstation_idx}, period={period}")
 
         # If team_name is provided, use rules from registry
         if team_name:
@@ -67,15 +90,27 @@ class CPModelBuilder:
                 current_period=period,  # Pass the current period being processed
                 work_history_data=work_history_data,  # Pass work history data directly
                 employee_history_repo=employee_history_repo,  # For backward compatibility
-                lookback=7  # Default lookback window of 7 days
+                lookback=7,  # Default lookback window of 7 days
+                call_ins=call_ins or [],  # List of employee names who called in
+                employee_offline_periods=offline_dict or {}  # Dict of employee name -> set of periods when offline
             )
 
             # Apply each rule to the context
             penalties = []
             for rule in rules:
-                result = rule(ctx)
-                if result:  # Some rules return penalty variables
-                    penalties.extend(result)
+                try:
+                    # Check if rule is callable before trying to call it
+                    if not callable(rule):
+                        logger.warning(f"Skipping non-callable rule: {rule} (type: {type(rule)})")
+                        continue
+
+                    result = rule(ctx)
+                    if result:  # Some rules return penalty variables
+                        penalties.extend(result)
+                except Exception as e:
+                    logger.error(f"Error applying rule {rule}: {str(e)}")
+                    # Continue with other rules instead of failing completely
+                    continue
 
             # Add penalties to objective function if any
             if penalties:
@@ -85,14 +120,22 @@ class CPModelBuilder:
                 # Identify ARO employees (employees whose home team is not this team)
                 aro_employees = [e for e, employee in enumerate(employees) if employee.team_id != team_id]
 
-                # Regular assignments have weight 1, ARO assignments have weight 2
-                objective_terms = []
-                for e in range(len(employees)):
-                    for w in range(len(workstations)):
-                        weight = 2 if e in aro_employees else 1
-                        objective_terms.append(weight * assign[(e, w, period-1)])
+                # If this is an ARO assignment context, maximize assignments
+                if team_name == "aro":
+                    model.Maximize(sum(assign.values()))
+                else:
+                    # Fallback objective for regular teams: maximize assignments with weights
+                    # Identify ARO employees (employees whose home team is not this team)
+                    aro_employees = [e for e, employee in enumerate(employees) if employee.team_id != team_id]
 
-                model.Minimize(sum(objective_terms))
+                    # Regular assignments have weight 1, ARO assignments have weight 2
+                    objective_terms = []
+                    for e in range(len(employees)):
+                        for w in range(len(workstations)):
+                            weight = 2 if e in aro_employees else 1
+                            objective_terms.append(weight * assign[(e, w, period-1)])
+
+                    model.Minimize(sum(objective_terms))
         else:
             # Fallback to existing hard-coded constraints for backward compatibility
 
@@ -226,7 +269,8 @@ class CPModelBuilder:
     def solve_one_period(self, employees: List[Employee], workstations: List[Workstation],
                         period: int, team_id: int, start_date: date, 
                         aro_data: Dict, team_name: str = None,
-                        work_history_data: Dict = None, employee_history_repo = None) -> List[WorkAssignment]:
+                        work_history_data: Dict = None, call_ins: List[str] = None,
+                        offline_dict: Dict = None) -> List[WorkAssignment]:
         """
         Build and solve a CP model for one period, returning work assignments.
 
@@ -240,8 +284,9 @@ class CPModelBuilder:
             start_date: The date of the schedule
             aro_data: Dictionary of ARO assignments by employee and period
             team_name: The name of the team (optional, for rule context)
-            work_history_data: Dictionary containing work history data for employees (preferred over repository)
-            employee_history_repo: Repository for employee work history (deprecated, use work_history_data instead)
+            work_history_data: Dictionary containing work history data for employees
+            call_ins: List of employee names who called in (unavailable)
+            offline_dict: Dictionary of employee names to periods when they are offline
 
         Returns:
             List of work assignments for the specified team and period
@@ -257,7 +302,9 @@ class CPModelBuilder:
                 start_date=start_date, 
                 team_name=team_name,
                 work_history_data=work_history_data,
-                employee_history_repo=employee_history_repo
+                employee_history_repo=None,  # Deprecated parameter, use work_history_data instead
+                call_ins=call_ins,
+                offline_dict=offline_dict
             )
 
             # Solve the model

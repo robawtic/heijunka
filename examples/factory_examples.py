@@ -9,12 +9,12 @@ from domain.factories.schedule_factory import ScheduleFactory
 from domain.factories.assignment_factory import AssignmentFactory
 from domain.factories.employee_factory import EmployeeFactory
 from domain.factories.workstation_factory import WorkstationFactory
-from domain.entities.employee import Employee
-from domain.entities.workstation import Workstation
-from domain.entities.team import Team
-from domain.entities.schedule import Schedule
-from domain.value_objects.schedule_period import SchedulePeriod
-from domain.value_objects.work_assignment import WorkAssignment
+from domain.contexts.employee_management.entities.employee import Employee
+from domain.contexts.workstation_management.entities.workstation import Workstation
+from domain.contexts.employee_management.entities.team import Team
+from domain.contexts.scheduling.entities.model import Schedule
+from domain.contexts.scheduling.value_objects.schedule_period import SchedulePeriod
+from domain.contexts.assignment.value_objects.work_assignment import WorkAssignment
 
 def demonstrate_team_factory():
     """Demonstrate using the TeamFactory."""

@@ -1,7 +1,7 @@
 import unittest
 from datetime import date
 
-from domain.entities.employee import Employee
+from domain.contexts.employee_management.entities.employee import Employee
 from domain.repositories.tests.mock_employee_repository import MockEmployeeRepository
 
 

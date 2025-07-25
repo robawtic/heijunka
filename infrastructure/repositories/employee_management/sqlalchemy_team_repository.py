@@ -3,9 +3,9 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 from sqlalchemy import func, distinct
 
-from domain.entities.team import Team
-from domain.entities.employee import Employee
-from domain.entities.workstation import Workstation
+from domain.contexts.employee_management.entities.team import Team
+from domain.contexts.employee_management.entities.employee import Employee
+from domain.contexts.workstation_management.entities.workstation import Workstation
 from domain.models import TeamMemberModel
 from domain.models.TeamModel import TeamModel
 from domain.models.EmployeeModel import EmployeeModel

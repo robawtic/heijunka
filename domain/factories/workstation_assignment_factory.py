@@ -1,6 +1,6 @@
 # domain/factories/workstation_assignment_factory.py
 from typing import Optional
-from domain.value_objects.workstation_assignment import WorkstationAssignment
+from domain.contexts.assignment.value_objects.workstation_assignment import WorkstationAssignment
 from domain.models.EmployeeWorkstationModel import EmployeeWorkstationModel
 from domain.models.WorkstationModel import WorkstationModel
 from utilities.logging_factory import get_logger

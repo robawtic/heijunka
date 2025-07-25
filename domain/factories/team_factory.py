@@ -1,9 +1,9 @@
 # domain/factories/team_factory.py
 from typing import List, Optional, Any
-from domain.entities.team import Team
-from domain.entities.employee import Employee
-from domain.entities.workstation import Workstation
-from domain.entities.team_member import TeamMember
+from domain.contexts.employee_management.entities.team import Team
+from domain.contexts.employee_management.entities.employee import Employee
+from domain.contexts.workstation_management.entities.workstation import Workstation
+from domain.contexts.employee_management.entities.team_member import TeamMember
 
 class TeamFactory:
     @staticmethod
@@ -168,7 +168,7 @@ class TeamFactory:
                     employee = EmployeeFactory.create_from_model(member_model.employee)
 
                 # Create team member
-                from domain.entities.team_member import TeamMember
+                from domain.contexts.employee_management.entities.team_member import TeamMember
                 team_member = TeamMember(
                     team_member_id=member_model.id,
                     team_id=model.id,

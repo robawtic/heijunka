@@ -1,5 +1,5 @@
 from typing import List, Optional, Dict
-from domain.entities.team_member import TeamMember
+from domain.contexts.employee_management.entities.team_member import TeamMember
 from domain.repositories.interfaces.team_member_repository import TeamMemberRepositoryInterface
 
 

@@ -19,7 +19,7 @@ class LineTypeModel(Base):
     description = Column(Text, nullable=True)
 
     # Relationships
-    workstations = relationship("WorkstationModel", back_populates="line_type")
+    # Note: workstations relationship removed as WorkstationModel no longer has line_type_id
 
     def __repr__(self):
         return f"<LineType(id={self.id}, name='{self.name}')>"
@@ -49,7 +49,7 @@ class LineTypeModel(Base):
         Returns:
             A LineType value object
         """
-        from domain.value_objects.line_type import LineType
+        from domain.contexts.workstation_management.value_objects.line_type import LineType
         return LineType(
             name=self.name,
             description=self.description

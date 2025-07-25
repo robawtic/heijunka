@@ -1,7 +1,7 @@
 # heijunka/domain/contexts/user_management/entities/refresh_token.py
 from dataclasses import dataclass, field
 from typing import Optional, List
-from datetime import datetime
+from datetime import datetime, timezone
 
 from domain.events import DomainEvent
 
@@ -9,14 +9,14 @@ from domain.events import DomainEvent
 class RefreshToken:
     """
     RefreshToken entity representing a refresh token for authentication.
-    
+
     This entity stores information about refresh tokens, including the token ID,
     user ID, expiration time, device information, and revocation status.
     """
     id: Optional[int] = None
     token_id: str = ""  # UUID for the token
     user_id: int = 0
-    expires_at: datetime = field(default_factory=datetime.utcnow)
+    expires_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     is_revoked: bool = False
     device_info: Optional[str] = None  # User agent or device identifier
     ip_address: Optional[str] = None
@@ -29,9 +29,9 @@ class RefreshToken:
         if self._domain_events is None:
             self._domain_events = []
         if self.created_at is None:
-            self.created_at = datetime.utcnow()
+            self.created_at = datetime.now(timezone.utc)
         if self.updated_at is None:
-            self.updated_at = datetime.utcnow()
+            self.updated_at = datetime.now(timezone.utc)
 
     @property
     def domain_events(self) -> List[DomainEvent]:
@@ -49,13 +49,13 @@ class RefreshToken:
     def revoke(self) -> None:
         """Revoke the refresh token."""
         self.is_revoked = True
-        self.updated_at = datetime.utcnow()
+        self.updated_at = datetime.now(timezone.utc)
         # Could register a domain event here if needed
         # self.register_domain_event(RefreshTokenRevoked(self.token_id))
 
     def is_expired(self) -> bool:
         """Check if the refresh token is expired."""
-        return datetime.utcnow() > self.expires_at
+        return datetime.now(timezone.utc) > self.expires_at
 
     def is_valid(self) -> bool:
         """Check if the refresh token is valid (not revoked and not expired)."""

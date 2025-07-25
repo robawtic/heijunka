@@ -3,7 +3,7 @@ from abc import abstractmethod
 from typing import List, Optional
 from datetime import date
 
-from domain.value_objects.workstation_assignment import WorkstationAssignment
+from domain.contexts.assignment.value_objects.workstation_assignment import WorkstationAssignment
 from domain.repositories.interfaces.base_repository import BaseRepository
 
 

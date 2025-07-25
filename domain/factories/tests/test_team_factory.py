@@ -3,10 +3,10 @@ import unittest
 from unittest.mock import MagicMock, patch
 
 from domain.factories.team_factory import TeamFactory
-from domain.entities.team import Team
-from domain.entities.employee import Employee
-from domain.entities.workstation import Workstation
-from domain.entities.team_member import TeamMember
+from domain.contexts.employee_management.entities.team import Team
+from domain.contexts.employee_management.entities.employee import Employee
+from domain.contexts.workstation_management.entities.workstation import Workstation
+from domain.contexts.employee_management.entities.team_member import TeamMember
 
 class TestTeamFactory(unittest.TestCase):
     def test_create_team_basic(self):

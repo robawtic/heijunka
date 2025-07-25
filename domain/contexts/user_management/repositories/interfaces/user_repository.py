@@ -79,43 +79,17 @@ class UserRepositoryInterface(BaseRepository[User]):
         pass
 
     @abstractmethod
-    def add_role(self, user_id: int, role_name: str) -> bool:
+    async def save(self, user: User) -> bool:
         """
-        Add a role to a user.
-
-        Args:
-            user_id: The ID of the user.
-            role_name: The name of the role to add.
-
-        Returns:
-            True if the role was added successfully, False otherwise.
+        Persist the entire User aggregate, including its Roles VO.
         """
         pass
 
+    # if you ever need to query by role, expose a finder:
     @abstractmethod
-    def remove_role(self, user_id: int, role_name: str) -> bool:
+    def find_by_role(self, role_name: str) -> List[User]:
         """
-        Remove a role from a user.
-
-        Args:
-            user_id: The ID of the user.
-            role_name: The name of the role to remove.
-
-        Returns:
-            True if the role was removed successfully, False otherwise.
-        """
-        pass
-
-    @abstractmethod
-    def get_users_by_role(self, role_name: str) -> List[User]:
-        """
-        Get all users with a specific role.
-
-        Args:
-            role_name: The name of the role to filter by.
-
-        Returns:
-            A list of users with the specified role.
+        Retrieve all users having the given role.
         """
         pass
 

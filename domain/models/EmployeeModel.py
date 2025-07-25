@@ -7,7 +7,7 @@ from sqlalchemy.orm import relationship
 from domain.models.Base import Base
 
 if TYPE_CHECKING:
-    from domain.entities.employee import Employee
+    from domain.contexts.employee_management.entities.employee import Employee
 
 class EmployeeModel(Base):
     __tablename__ = 'employees'

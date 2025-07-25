@@ -1,9 +1,9 @@
 from abc import abstractmethod
 from typing import List, Optional, Any
 
-from domain.entities.team import Team
-from domain.entities.employee import Employee
-from domain.entities.workstation import Workstation
+from domain.contexts.employee_management.entities.team import Team
+from domain.contexts.employee_management.entities.employee import Employee
+from domain.contexts.workstation_management.entities.workstation import Workstation
 from domain.repositories.interfaces.base_repository import BaseRepository
 
 

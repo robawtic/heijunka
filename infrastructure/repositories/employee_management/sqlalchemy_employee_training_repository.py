@@ -1,11 +1,11 @@
-# heijunka/domain/repositories/implementations/sqlalchemy_employee_training_repository.py
+# heijunka/domain/repositories/buses/sqlalchemy_employee_training_repository.py
 from typing import List, Optional, Type
 from datetime import date
 from sqlalchemy import and_
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 
-from domain.value_objects.employee_training import EmployeeTraining
+from domain.contexts.employee_management.value_objects.employee_training import EmployeeTraining
 from domain.models.EmployeeTrainingModel import EmployeeTrainingModel
 from domain.repositories.interfaces.employee_training_repository import EmployeeTrainingRepositoryInterface
 from domain.factories.employee_training_factory import EmployeeTrainingFactory

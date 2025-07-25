@@ -1,9 +1,9 @@
 # domain/factories/schedule_factory.py
 from typing import List, Dict, Optional, Any
 from datetime import date
-from domain.entities.schedule import Schedule
-from domain.value_objects.schedule_period import SchedulePeriod
-from domain.value_objects.work_assignment import WorkAssignment
+from domain.contexts.scheduling.entities.model import Schedule
+from domain.contexts.scheduling.value_objects.schedule_period import SchedulePeriod
+from domain.contexts.assignment.value_objects.work_assignment import WorkAssignment
 
 class ScheduleFactory:
     @staticmethod

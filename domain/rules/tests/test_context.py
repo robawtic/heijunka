@@ -4,8 +4,8 @@ from unittest.mock import MagicMock
 
 from ortools.sat.python.cp_model import CpModel
 
-from domain.entities.employee import Employee
-from domain.entities.workstation import Workstation
+from domain.contexts.employee_management.entities.employee import Employee
+from domain.contexts.workstation_management.entities.workstation import Workstation
 from domain.rules.context import RuleContext, HeadsubRuleContext, rule_metadata, adapt_rule
 
 

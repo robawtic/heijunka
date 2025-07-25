@@ -50,20 +50,33 @@ def _discover_team_rules():
     for finder, name, ispkg in pkgutil.iter_modules(pkg.__path__):
         if name.startswith("_"):
             continue
-        mod = importlib.import_module(f"domain.rules.teams.{name}")
-        attr = name.upper() + "_RULES"
-        rules = getattr(mod, attr, None)
-        if rules is not None:
-            # Adapt any prototype rules to use the Context pattern
-            adapted_rules = []
-            for rule in rules:
-                if len(inspect.signature(rule).parameters) > 1:
-                    # This is a prototype rule with multiple parameters
-                    adapted_rules.append(adapt_rule(rule))
-                else:
-                    # This is already a Context-based rule
-                    adapted_rules.append(rule)
-            team_rules[name.lower()] = adapted_rules
+        try:
+            mod = importlib.import_module(f"domain.rules.teams.{name}")
+            attr = name.upper() + "_RULES"
+            rules = getattr(mod, attr, None)
+            if rules is not None:
+                # Adapt any prototype rules to use the Context pattern
+                adapted_rules = []
+                for rule in rules:
+                    try:
+                        # Check if rule is callable before inspecting it
+                        if not callable(rule):
+                            print(f"Warning: Rule {rule} in {name} is not callable, skipping")
+                            continue
+
+                        if len(inspect.signature(rule).parameters) > 1:
+                            # This is a prototype rule with multiple parameters
+                            adapted_rules.append(adapt_rule(rule))
+                        else:
+                            # This is already a Context-based rule
+                            adapted_rules.append(rule)
+                    except Exception as e:
+                        print(f"Warning: Error processing rule {rule} in {name}: {e}")
+                        continue
+                team_rules[name.lower()] = adapted_rules
+        except Exception as e:
+            print(f"Warning: Error importing team rules for {name}: {e}")
+            continue
     return team_rules
 
 

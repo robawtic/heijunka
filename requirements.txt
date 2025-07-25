@@ -960,12 +960,7 @@ pendulum==3.1.0 \
     # via
     #   -r requirements.in
     #   fastapi-cache2
-prometheus-client==0.12.0 \
-    --hash=sha256:1b12ba48cee33b9b0b9de64a1047cbd3c5f2d0ab6ebcead7ddda613a750ec3c5 \
-    --hash=sha256:317453ebabff0a1b02df7f708efbab21e3489e7072b61cb6957230dd004a0af0
-    # via
-    #   -r requirements.in
-    #   starlette-prometheus
+
 propcache==0.3.1 \
     --hash=sha256:050b571b2e96ec942898f8eb46ea4bfbb19bd5502424747e83badc2d4a99a44e \
     --hash=sha256:05543250deac8e61084234d5fc54f8ebd254e8f2b39a16b1dce48904f45b744b \
@@ -1314,7 +1309,7 @@ starlette==0.46.2 \
     #   fastapi
     #   fastapi-csrf-protect
     #   starlette-prometheus
-starlette-prometheus==0.9.0 \
+starlette-prometheus~=0.9.0 \
     --hash=sha256:a52fb0f1df52b44a7a677a792759337ef0ce0d59ddf3e684a7d6459a93a90e99 \
     --hash=sha256:b4702e4ec67dce508d28551db0e45f12f58411afdb5d1078c92ff74331915381
     # via -r requirements.in

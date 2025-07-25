@@ -6,9 +6,9 @@ from typing import Optional, Any, Dict, List, Tuple, Union, cast
 from datetime import datetime, date
 from sqlalchemy.orm import Session
 
-from domain.repositories.implementations.sqlalchemy_employee_repository import SqlAlchemyEmployeeRepository
-from domain.repositories.implementations.sqlalchemy_team_repository import SqlAlchemyTeamRepository
-from domain.repositories.implementations.sqlalchemy_workstation_repository import SqlAlchemyWorkstationRepository
+from infrastructure.repositories.employee_management.sqlalchemy_employee_repository import SqlAlchemyEmployeeRepository
+from infrastructure.repositories.employee_management.sqlalchemy_team_repository import SqlAlchemyTeamRepository
+from infrastructure.repositories.workstation_management.sqlalchemy_workstation_repository import SqlAlchemyWorkstationRepository
 from utilities.logging_factory import get_logger, RateLimitedLogger
 
 # Create a logger for this module
@@ -58,8 +58,8 @@ def handle_aro_assignment(
                 identifier="service_creation"
             )
 
-            from domain.repositories.implementations.sqlalchemy_aro_assignment_repository import SqlAlchemyAROAssignmentRepository
-            from domain.repositories.implementations.sqlalchemy_team_aro_repository import SqlAlchemyTeamAroRepository
+            from infrastructure.repositories.assignment.sqlalchemy_aro_assignment_repository import SqlAlchemyAROAssignmentRepository
+            from infrastructure.repositories.assignment.sqlalchemy_team_aro_repository import SqlAlchemyTeamAroRepository
             aro_repository = SqlAlchemyAROAssignmentRepository(session_factory)
             team_aro_repository = SqlAlchemyTeamAroRepository(session_factory)
             from domain.services.aro_service import AROService
@@ -202,7 +202,7 @@ def handle_aro_optimize(
             identifier="service_creation"
         )
 
-        from domain.repositories.implementations.sqlalchemy_aro_assignment_repository import SqlAlchemyAROAssignmentRepository
+        from infrastructure.repositories.assignment.sqlalchemy_aro_assignment_repository import SqlAlchemyAROAssignmentRepository
         aro_repository = SqlAlchemyAROAssignmentRepository(session_factory)
         from domain.contexts.assignment.services.aro_graph_service import AROGraphService
         from domain.events.publisher import DomainEventPublisher

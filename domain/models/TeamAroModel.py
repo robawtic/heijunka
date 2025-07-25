@@ -1,7 +1,11 @@
 from enum import Enum
+from typing import TYPE_CHECKING
 from sqlalchemy import Column, Integer, Enum as SqlEnum, ForeignKey
 from sqlalchemy.orm import relationship
 from .Base import Base
+
+if TYPE_CHECKING:
+    from domain.contexts.assignment.entities.team_aro import TeamAro
 
 class AroTeamStatus(Enum):
     ACTIVE = 'active'

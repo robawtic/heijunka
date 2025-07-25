@@ -8,10 +8,10 @@ from datetime import datetime, date
 from sqlalchemy.orm import Session
 from tabulate import tabulate
 
-from domain.repositories.implementations.sqlalchemy_employee_repository import SqlAlchemyEmployeeRepository
-from domain.repositories.implementations.sqlalchemy_workstation_repository import SqlAlchemyWorkstationRepository
-from domain.repositories.implementations.sqlalchemy_team_repository import SqlAlchemyTeamRepository
-from domain.repositories.implementations.sqlalchemy_schedule_repository import SqlAlchemyScheduleRepository
+from infrastructure.repositories.employee_management.sqlalchemy_employee_repository import SqlAlchemyEmployeeRepository
+from infrastructure.repositories.workstation_management.sqlalchemy_workstation_repository import SqlAlchemyWorkstationRepository
+from infrastructure.repositories.employee_management.sqlalchemy_team_repository import SqlAlchemyTeamRepository
+from infrastructure.repositories.scheduling.sqlalchemy_schedule_repository import SqlAlchemyScheduleRepository
 from domain.services.schedule_service import ScheduleService
 from utilities.logging_factory import get_logger, RateLimitedLogger
 
@@ -31,7 +31,7 @@ def handle_regression_test(args: Any, session_factory: Any) -> bool:
     """
     try:
         from domain.services.regression_test_service import RegressionTestService
-        from domain.value_objects.regression_test_scenario import RegressionTestScenario
+        from domain.contexts.shared.value_objects.regression_test_scenario import RegressionTestScenario
 
         logger.info(
             f"Handling regression test command for team '{args.team}'", 

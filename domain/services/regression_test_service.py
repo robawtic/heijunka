@@ -5,7 +5,7 @@ import os
 import logging
 from datetime import date
 
-from domain.value_objects.regression_test_scenario import RegressionTestScenario
+from domain.contexts.shared.value_objects.regression_test_scenario import RegressionTestScenario
 from domain.services.scenario_simulator import ScenarioSimulator
 from domain.repositories.interfaces.employee_repository import EmployeeRepositoryInterface
 from domain.repositories.interfaces.workstation_repository import WorkstationRepositoryInterface

@@ -1,7 +1,7 @@
 # heijunka/domain/contexts/user_management/entities/user.py
 from dataclasses import dataclass, field
-from typing import List, Optional, Set
-from datetime import datetime
+from typing import List, Optional, Set, Sequence
+from datetime import datetime, timezone
 import bcrypt
 
 from domain.events import DomainEvent
@@ -41,9 +41,9 @@ class User:
         if self._domain_events is None:
             self._domain_events = []
         if self.created_at is None:
-            self.created_at = datetime.utcnow()
+            self.created_at = datetime.now(timezone.utc)
         if self.updated_at is None:
-            self.updated_at = datetime.utcnow()
+            self.updated_at = datetime.now(timezone.utc)
 
     @property
     def roles(self) -> List[Role]:
@@ -76,7 +76,7 @@ class User:
         password_bytes = plain_password.encode('utf-8')
         salt = bcrypt.gensalt()
         self._password_hash = bcrypt.hashpw(password_bytes, salt).decode('utf-8')
-        self.updated_at = datetime.utcnow()
+        self.updated_at = datetime.now(timezone.utc)
 
     def verify_password(self, plain_password: str) -> bool:
         """
@@ -107,41 +107,35 @@ class User:
         """
         return any(role.name == role_name for role in self._roles)
 
-    def add_role(self, role: Role) -> None:
+    def change_roles(self, new_role_names: Sequence[str]) -> None:
         """
-        Add a role to the user if they don't already have it.
-
-        Args:
-            role: The role to add
+        Replace this user’s roles VO with a fresh set built from the given names.
         """
-        if not any(r.name == role.name for r in self._roles):
-            self._roles.append(role)
-            self.updated_at = datetime.utcnow()
-            # Could register a domain event here if needed
-            # self.register_domain_event(RoleAdded(self.id, role.name))
-
-    def remove_role(self, role_name: str) -> None:
-        """
-        Remove a role from the user if they have it.
-
-        Args:
-            role_name: The name of the role to remove
-        """
-        self._roles = [role for role in self._roles if role.name != role_name]
-        self.updated_at = datetime.utcnow()
-        # Could register a domain event here if needed
-        # self.register_domain_event(RoleRemoved(self.id, role_name))
+        # 1) Build or reuse Role instances
+        existing = {r.name: r for r in self._roles}
+        new_roles = []
+        for name in new_role_names:
+            if name in existing:
+                new_roles.append(existing[name])
+            else:
+                new_roles.append(Role(name=name))
+        # 2) Atomically swap in the new list
+        self._roles = new_roles
+        # 3) Update timestamp
+        self.updated_at = datetime.now(timezone.utc)
+        # 4) (Optional) Register a domain event to signal the change
+        # self.register_domain_event(RolesChanged(self.id, new_role_names))
 
     def update_last_login(self) -> None:
         """Update the last login timestamp to the current time."""
-        self.last_login_at = datetime.utcnow()
-        self.updated_at = datetime.utcnow()
+        self.last_login_at = datetime.now(timezone.utc)
+        self.updated_at = datetime.now(timezone.utc)
 
     def deactivate(self) -> None:
         """Deactivate the user account."""
         if self.is_active:
             self.is_active = False
-            self.updated_at = datetime.utcnow()
+            self.updated_at = datetime.now(timezone.utc)
             # Could register a domain event here if needed
             # self.register_domain_event(UserDeactivated(self.id))
 
@@ -149,7 +143,7 @@ class User:
         """Activate the user account."""
         if not self.is_active:
             self.is_active = True
-            self.updated_at = datetime.utcnow()
+            self.updated_at = datetime.now(timezone.utc)
             # Could register a domain event here if needed
             # self.register_domain_event(UserActivated(self.id))
 
@@ -164,7 +158,7 @@ class User:
             raise ValueError("Email cannot be empty")
 
         self.email = new_email
-        self.updated_at = datetime.utcnow()
+        self.updated_at = datetime.now(timezone.utc)
         # Could register a domain event here if needed
         # self.register_domain_event(EmailUpdated(self.id, new_email))
 

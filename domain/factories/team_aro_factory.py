@@ -1,5 +1,5 @@
 from typing import Optional
-from domain.entities.team_aro import TeamAro
+from domain.contexts.assignment.entities.team_aro import TeamAro
 from domain.models.TeamAroModel import AroTeamStatus
 
 class TeamAroFactory:

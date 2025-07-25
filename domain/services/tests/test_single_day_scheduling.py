@@ -2,9 +2,9 @@ import unittest
 from datetime import date
 from unittest.mock import MagicMock
 
-from domain.entities.employee import Employee
-from domain.entities.workstation import Workstation
-from domain.entities.team import Team
+from domain.contexts.employee_management.entities.employee import Employee
+from domain.contexts.workstation_management.entities.workstation import Workstation
+from domain.contexts.employee_management.entities.team import Team
 from domain.services.schedule_service import ScheduleService
 
 

@@ -64,7 +64,10 @@ def validate_environment():
     print("Environment configuration validated successfully.")
 
 if __name__ == '__main__':
-    configure_logging()
+    # Ensure LOG_LEVEL is set correctly from .env file
+    load_dotenv()
+    log_level = os.environ.get('LOG_LEVEL', 'INFO')
+    configure_logging(log_level)
     logger.info("Starting Heijunka application", event_type="application", identifier="startup")
     try:
         validate_environment()

@@ -2,8 +2,8 @@ import unittest
 from datetime import date
 from unittest.mock import MagicMock
 
-from domain.entities.employee import Employee
-from domain.entities.team import Team
+from domain.contexts.employee_management.entities.employee import Employee
+from domain.contexts.employee_management.entities.team import Team
 from domain.services.aro_service import AROService
 from domain.contexts.assignment.aro_assignment import AROAssignment
 

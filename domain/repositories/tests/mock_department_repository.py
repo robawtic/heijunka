@@ -1,5 +1,5 @@
 from typing import Dict, List, Optional
-from domain.entities.department import Department
+from domain.contexts.employee_management.entities.department import Department
 from domain.repositories.interfaces.department_repository import DepartmentRepositoryInterface
 
 

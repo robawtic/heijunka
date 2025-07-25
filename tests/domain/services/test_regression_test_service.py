@@ -4,11 +4,11 @@ from unittest.mock import MagicMock, patch
 from datetime import date
 
 from domain.services.regression_test_service import RegressionTestService, RegressionTestResult
-from domain.value_objects.regression_test_scenario import RegressionTestScenario
-from domain.value_objects.work_assignment import WorkAssignment
-from domain.entities.employee import Employee
-from domain.entities.workstation import Workstation
-from domain.value_objects.work_period import WorkPeriod
+from domain.contexts.shared.value_objects.regression_test_scenario import RegressionTestScenario
+from domain.contexts.assignment.value_objects.work_assignment import WorkAssignment
+from domain.contexts.employee_management.entities.employee import Employee
+from domain.contexts.workstation_management.entities.workstation import Workstation
+from domain.contexts.scheduling.value_objects.work_period import WorkPeriod
 
 class TestRegressionTestService(unittest.TestCase):
     """Test cases for the RegressionTestService."""

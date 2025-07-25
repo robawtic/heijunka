@@ -8,9 +8,9 @@ from domain.rules.soft import (
     add_lookback_same_period_penalties
 )
 from domain.rules.context import RuleContext
-from domain.entities.employee import Employee
-from domain.entities.workstation import Workstation
-from domain.value_objects.work_history_entry import WorkHistoryEntry
+from domain.contexts.employee_management.entities.employee import Employee
+from domain.contexts.workstation_management.entities.workstation import Workstation
+from domain.contexts.employee_management.value_objects.work_history_entry import WorkHistoryEntry
 from domain.repositories.interfaces.employee_work_history_repository import EmployeeWorkHistoryRepositoryInterface
 from ortools.sat.python.cp_model import CpModel
 
@@ -145,8 +145,8 @@ class TestHistoryPenalties(unittest.TestCase):
     def test_assignment_recording(self):
         """Test that new assignments are correctly recorded in the repository."""
         from domain.entities.schedule.model import Schedule
-        from domain.value_objects.schedule_period import SchedulePeriod
-        from domain.value_objects.work_assignment import WorkAssignment
+        from domain.contexts.scheduling.value_objects.schedule_period import SchedulePeriod
+        from domain.contexts.assignment.value_objects.work_assignment import WorkAssignment
         from domain.services.cp_model_builder import CPModelBuilder
 
         # Create a schedule

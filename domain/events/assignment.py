@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import Optional
 from .base import DomainEvent
-from domain.value_objects.schedule_period import SchedulePeriod
+from domain.contexts.scheduling.value_objects.schedule_period import SchedulePeriod
 
 @dataclass
 class AssignmentCreated(DomainEvent):

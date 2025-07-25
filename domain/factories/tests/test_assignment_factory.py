@@ -4,10 +4,10 @@ from unittest.mock import MagicMock, patch
 from datetime import date
 
 from domain.factories.assignment_factory import AssignmentFactory
-from domain.entities.employee import Employee
-from domain.entities.workstation import Workstation
-from domain.value_objects.schedule_period import SchedulePeriod
-from domain.value_objects.work_assignment import WorkAssignment
+from domain.contexts.employee_management.entities.employee import Employee
+from domain.contexts.workstation_management.entities.workstation import Workstation
+from domain.contexts.scheduling.value_objects.schedule_period import SchedulePeriod
+from domain.contexts.assignment.value_objects.work_assignment import WorkAssignment
 
 class TestAssignmentFactory(unittest.TestCase):
     def setUp(self):

@@ -1,6 +1,6 @@
 # heijunka/domain/repositories/tests/mock_line_type_repository.py
 from typing import Dict, List, Optional
-from domain.value_objects.line_type import LineType
+from domain.contexts.workstation_management.value_objects.line_type import LineType
 from domain.repositories.interfaces.line_type_repository import LineTypeRepositoryInterface
 
 

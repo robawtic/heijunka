@@ -5,9 +5,9 @@ from typing import List, Dict, Optional, Any, Union
 from datetime import date
 from tabulate import tabulate
 
-from domain.entities.employee import Employee
-from domain.entities.workstation import Workstation
-from domain.value_objects.work_assignment import WorkAssignment
+from domain.contexts.employee_management.entities.employee import Employee
+from domain.contexts.workstation_management.entities.workstation import Workstation
+from domain.contexts.assignment.value_objects.work_assignment import WorkAssignment
 from utilities.logging_factory import get_logger
 
 # Create a logger for this module

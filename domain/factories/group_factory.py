@@ -1,7 +1,7 @@
 # domain/factories/group_factory.py
 from typing import Optional, Any
 
-from domain.entities.group import Group
+from domain.contexts.employee_management.entities.group import Group
 from domain.models.GroupModel import GroupModel
 
 

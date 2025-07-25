@@ -7,8 +7,8 @@ from datetime import date
 import os
 import logging
 
-from domain.value_objects.scenario import Scenario
-from domain.value_objects.work_assignment import WorkAssignment
+from domain.contexts.shared.value_objects.scenario import Scenario
+from domain.contexts.assignment.value_objects.work_assignment import WorkAssignment
 
 logger = logging.getLogger(__name__)
 

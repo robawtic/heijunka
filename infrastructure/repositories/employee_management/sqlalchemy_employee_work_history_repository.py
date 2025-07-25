@@ -1,11 +1,11 @@
-# heijunka/domain/repositories/implementations/sqlalchemy_employee_work_history_repository.py
+# heijunka/domain/repositories/buses/sqlalchemy_employee_work_history_repository.py
 from typing import List, Optional, Tuple, Set, Dict, Union
 from datetime import date, datetime
 from sqlalchemy import and_, or_, func
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 
-from domain.value_objects.work_history_entry import WorkHistoryEntry
+from domain.contexts.employee_management.value_objects.work_history_entry import WorkHistoryEntry
 from domain.models.EmployeeWorkHistoryModel import EmployeeWorkHistoryModel, WorkHistoryStatus
 from domain.repositories.interfaces.employee_work_history_repository import EmployeeWorkHistoryRepositoryInterface
 from domain.factories.work_history_entry_factory import WorkHistoryEntryFactory

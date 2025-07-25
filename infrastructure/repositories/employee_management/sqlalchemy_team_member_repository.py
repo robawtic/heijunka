@@ -3,7 +3,7 @@ from typing import Optional, List, Generator
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
-from domain.entities.team_member import TeamMember
+from domain.contexts.employee_management.entities.team_member import TeamMember
 from domain.models.TeamMemberModel import TeamMemberModel
 from domain.models.RoleModel import RoleModel
 from domain.repositories.interfaces.team_member_repository import TeamMemberRepositoryInterface

@@ -8,7 +8,44 @@ from domain.models.Base import Base
 
 # Import seeding modules
 from infrastructure.seeding.seed_data.powertrain_seed import seed_powertrain_data
+from domain.models.WorkstationAttributeDefinition import WorkstationAttributeDefinition
 # (…other seeds as they’re implemented…)
+
+def seed_workstation_attribute_definitions(session: Session):
+    """
+    Seeds the database with workstation attribute definitions.
+    These replace the old boolean flags and line types.
+    """
+    print("Seeding workstation attribute definitions...")
+
+    # Define the attribute definitions as specified in the issue
+    attribute_definitions = [
+        ('mainline', 'Workstation is part of the mainline.'),
+        ('subline', 'Workstation is part of the subline.'),
+        ('loading', 'A lot of moving around'),
+        ('heavy', 'Heavy lifting required'),
+        ('skill_level_1', 'Baseline skill, no extra training'),
+        ('skill_level_2', 'Intermediate skill, some training needed'),
+        ('skill_level_3', 'Advanced skill, extensive training needed'),
+    ]
+
+    for name, description in attribute_definitions:
+        # Check if the attribute definition already exists
+        existing_attr = session.query(WorkstationAttributeDefinition).filter_by(name=name).first()
+        if not existing_attr:
+            attr_def = WorkstationAttributeDefinition(name=name, description=description)
+            session.add(attr_def)
+            print(f"  Created workstation attribute definition: {name}")
+        else:
+            # Update description if it's different
+            if existing_attr.description != description:
+                existing_attr.description = description
+                print(f"  Updated workstation attribute definition: {name}")
+            else:
+                print(f"  Workstation attribute definition already exists: {name}")
+
+    session.commit()
+    print("Workstation attribute definitions seeding complete.")
 
 def reset_database():
     print("Dropping all tables…")
@@ -76,6 +113,9 @@ def main():
 
     session = SessionFactory()
     try:
+        # Seed workstation attribute definitions first (needed by all departments)
+        seed_workstation_attribute_definitions(session)
+
         if args.department in ["all", "powertrain"]:
             print("Seeding Powertrain department data…")
             seed_powertrain_data(session)

@@ -2,9 +2,9 @@ import unittest
 from datetime import date
 from unittest.mock import MagicMock, patch
 
-from domain.entities.employee import Employee
-from domain.entities.workstation import Workstation
-from domain.value_objects.work_history_entry import WorkHistoryEntry
+from domain.contexts.employee_management.entities.employee import Employee
+from domain.contexts.workstation_management.entities.workstation import Workstation
+from domain.contexts.employee_management.value_objects.work_history_entry import WorkHistoryEntry
 from domain.contexts.employee_management.services.employee_service import EmployeeService
 from domain.events.publisher import DomainEventPublisher
 from domain.events.employee import WorkHistoryEntryAdded

@@ -3,9 +3,8 @@ from sqlalchemy.exc import SQLAlchemyError, NoResultFound
 from sqlalchemy.orm import Session, selectinload
 from sqlalchemy import func, distinct
 
-from domain.entities.workstation import Workstation
+from domain.contexts.workstation_management.entities.workstation import Workstation
 from domain.models.WorkstationModel import WorkstationModel
-from domain.models.LineTypeModel import LineTypeModel
 from domain.repositories.interfaces.workstation_repository import WorkstationRepositoryInterface
 from infrastructure.repositories.sqlalchemy.base_sqlalchemy_repository import BaseSqlAlchemyRepository
 from infrastructure.exceptions import RepositoryError
@@ -226,7 +225,7 @@ class SqlAlchemyWorkstationRepository(BaseSqlAlchemyRepository[Workstation, Work
                 # Apply eager loading if requested
                 if eager:
                     query = query.options(
-                        selectinload(WorkstationModel.line_type),
+                        selectinload(WorkstationModel.attributes),
                         selectinload(WorkstationModel.employees),
                         selectinload(WorkstationModel.team),
                         selectinload(WorkstationModel.employee_skills)
@@ -432,57 +431,6 @@ class SqlAlchemyWorkstationRepository(BaseSqlAlchemyRepository[Workstation, Work
 
     # Helper Methods
 
-    def _fetch_line_type(self, name: str) -> LineTypeModel:
-        """
-        Fetch a LineTypeModel by name.
-
-        Args:
-            name: The name of the line type to fetch.
-
-        Returns:
-            The LineTypeModel if found.
-
-        Raises:
-            RepositoryError: If the line type is not found.
-        """
-        try:
-            self.logger.debug(
-                f"Fetching LineTypeModel by name: {name}",
-                extra={
-                    "event_type": "line_type_lookup",
-                    "line_type_name": name
-                }
-            )
-
-            with self.session_scope() as session:
-                line_type_model = session.query(LineTypeModel).filter(
-                    LineTypeModel.name == name
-                ).first()
-
-                if not line_type_model:
-                    error_msg = f"LineType with name '{name}' not found"
-                    self.logger.error(
-                        error_msg,
-                        extra={
-                            "event_type": "line_type_lookup_error",
-                            "line_type_name": name,
-                            "reason": "not_found"
-                        }
-                    )
-                    raise RepositoryError(error_msg)
-
-                return line_type_model
-        except SQLAlchemyError as e:
-            error_msg = sanitize_exception(e)
-            self.logger.error(
-                f"Database error fetching LineType: {error_msg}",
-                extra={
-                    "event_type": "line_type_lookup_error",
-                    "line_type_name": name,
-                    "error_type": type(e).__name__
-                }
-            )
-            raise RepositoryError(f"Failed to fetch line type: {error_msg}")
 
     # Conversion Methods
 
@@ -560,19 +508,16 @@ class SqlAlchemyWorkstationRepository(BaseSqlAlchemyRepository[Workstation, Work
                 }
             )
 
-            # Fetch the LineTypeModel by name
-            line_type_model = self._fetch_line_type(entity.line_type)
-
-            # Create a new model
+            # Create a new model (without line_type and boolean flags)
             model = WorkstationModel(
                 id=entity_id,
                 name=entity.name,
-                line_type=line_type_model,
-                is_loading_job=entity.is_loading_job,
-                is_heavy_job=entity.is_heavy_job,
-                is_key_skill_job=entity.is_key_skill_job,
                 team_id=entity.team_id
             )
+
+            # TODO: Add attribute creation logic here if needed
+            # For now, we'll just create the basic model without attributes
+            # The attributes should be managed separately through the attribute system
 
             self.logger.debug(
                 "Successfully converted workstation domain entity to model",
@@ -584,9 +529,6 @@ class SqlAlchemyWorkstationRepository(BaseSqlAlchemyRepository[Workstation, Work
             )
 
             return model
-        except RepositoryError:
-            # Re-raise RepositoryError from _fetch_line_type
-            raise
         except Exception as e:
             error_msg = sanitize_exception(e)
             self.logger.error(
@@ -633,42 +575,6 @@ class SqlAlchemyWorkstationRepository(BaseSqlAlchemyRepository[Workstation, Work
                     }
                 )
 
-            if model.is_loading_job != entity.is_loading_job:
-                self.logger.info(
-                    "Changing workstation loading job status",
-                    extra={
-                        "event_type": "workstation_field_change",
-                        "entity_id": model.id,
-                        "field": "is_loading_job",
-                        "old_value": model.is_loading_job,
-                        "new_value": entity.is_loading_job
-                    }
-                )
-
-            if model.is_heavy_job != entity.is_heavy_job:
-                self.logger.info(
-                    "Changing workstation heavy job status",
-                    extra={
-                        "event_type": "workstation_field_change",
-                        "entity_id": model.id,
-                        "field": "is_heavy_job",
-                        "old_value": model.is_heavy_job,
-                        "new_value": entity.is_heavy_job
-                    }
-                )
-
-            if model.is_key_skill_job != entity.is_key_skill_job:
-                self.logger.info(
-                    "Changing workstation key skill job status",
-                    extra={
-                        "event_type": "workstation_field_change",
-                        "entity_id": model.id,
-                        "field": "is_key_skill_job",
-                        "old_value": model.is_key_skill_job,
-                        "new_value": entity.is_key_skill_job
-                    }
-                )
-
             if model.team_id != entity.team_id:
                 self.logger.info(
                     "Changing workstation team",
@@ -681,33 +587,12 @@ class SqlAlchemyWorkstationRepository(BaseSqlAlchemyRepository[Workstation, Work
                     }
                 )
 
-            # Check and update line type if needed
-            if isinstance(entity.line_type, str):
-                current_line_type_name = model.line_type.name if model.line_type else None
-                if current_line_type_name != entity.line_type:
-                    self.logger.info(
-                        "Changing workstation line type",
-                        extra={
-                            "event_type": "workstation_field_change",
-                            "entity_id": model.id,
-                            "field": "line_type",
-                            "old_value": current_line_type_name,
-                            "new_value": entity.line_type
-                        }
-                    )
-
-                    # Use the centralized helper to fetch line type
-                    line_type_model = self._fetch_line_type(entity.line_type)
-                    model.line_type = line_type_model
-            else:
-                model.line_type = entity.line_type
-
-            # Update the model
+            # Update the model (only basic fields now)
             model.name = entity.name
-            model.is_loading_job = entity.is_loading_job
-            model.is_heavy_job = entity.is_heavy_job
-            model.is_key_skill_job = entity.is_key_skill_job
             model.team_id = entity.team_id
+
+            # TODO: Add attribute update logic here if needed
+            # The attributes should be managed separately through the attribute system
 
             # Update timestamp if available
             self._stamp_updated(model)

@@ -3,7 +3,7 @@ from contextlib import contextmanager
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 
-from domain.entities.team_aro import TeamAro
+from domain.contexts.assignment.entities.team_aro import TeamAro
 from domain.models.TeamAroModel import TeamAroModel, AroTeamStatus
 from domain.repositories.interfaces.team_aro_repository import TeamAroRepositoryInterface
 from infrastructure.repositories.sqlalchemy.base_sqlalchemy_repository import BaseSqlAlchemyRepository
@@ -27,41 +27,6 @@ class SqlAlchemyTeamAroRepository(BaseSqlAlchemyRepository[TeamAro, TeamAroModel
         self.logger = get_logger("heijunka.repositories.team_aro")
         self.rate_limited_logger = get_logger("heijunka.repositories.team_aro", rate_limit=True)
 
-    @contextmanager
-    def session_scope(self) -> Generator[Session, None, None]:
-        """
-        Provide a transactional scope around a series of operations.
-
-        Yields:
-            The SQLAlchemy session.
-        """
-        try:
-            yield self._session
-            self._session.commit()
-        except SQLAlchemyError as e:
-            self._session.rollback()
-            error_msg = sanitize_exception(e)
-            self.logger.error(
-                f"Database operation failed: {error_msg}",
-                extra={
-                    "event_type": "database_error",
-                    "error_type": type(e).__name__,
-                    "repository": "team_aro"
-                }
-            )
-            raise RepositoryError(f"Database error: {error_msg}")
-        except Exception as e:
-            self._session.rollback()
-            error_msg = sanitize_exception(e)
-            self.logger.error(
-                f"Unexpected error in team ARO repository: {error_msg}",
-                extra={
-                    "event_type": "unexpected_error",
-                    "error_type": type(e).__name__,
-                    "repository": "team_aro"
-                }
-            )
-            raise RepositoryError(f"Repository error: {error_msg}")
 
     def get(self, team_aro_id: int) -> Optional[TeamAro]:
         """
@@ -95,22 +60,23 @@ class SqlAlchemyTeamAroRepository(BaseSqlAlchemyRepository[TeamAro, TeamAroModel
                 }
             )
 
-            models = self._session.query(TeamAroModel).filter(
-                TeamAroModel.employee_id == employee_id
-            ).all()
+            with self.session_scope() as session:
+                models = session.query(TeamAroModel).filter(
+                    TeamAroModel.employee_id == employee_id
+                ).all()
 
-            relationship_count = len(models)
-            self.logger.info(
-                f"Found {relationship_count} TeamAro relationships for employee ID: {employee_id}",
-                extra={
-                    "event_type": "team_aro_lookup_success",
-                    "lookup_type": "employee_id",
-                    "employee_id": employee_id,
-                    "relationship_count": relationship_count
-                }
-            )
+                relationship_count = len(models)
+                self.logger.info(
+                    f"Found {relationship_count} TeamAro relationships for employee ID: {employee_id}",
+                    extra={
+                        "event_type": "team_aro_lookup_success",
+                        "lookup_type": "employee_id",
+                        "employee_id": employee_id,
+                        "relationship_count": relationship_count
+                    }
+                )
 
-            return [self._to_domain(model) for model in models]
+                return [self._to_domain(model) for model in models]
         except SQLAlchemyError as e:
             error_msg = sanitize_exception(e)
             self.logger.error(
@@ -144,22 +110,23 @@ class SqlAlchemyTeamAroRepository(BaseSqlAlchemyRepository[TeamAro, TeamAroModel
                 }
             )
 
-            models = self._session.query(TeamAroModel).filter(
-                TeamAroModel.team_id == team_id
-            ).all()
+            with self.session_scope() as session:
+                models = session.query(TeamAroModel).filter(
+                    TeamAroModel.team_id == team_id
+                ).all()
 
-            relationship_count = len(models)
-            self.logger.info(
-                f"Found {relationship_count} TeamAro relationships for team ID: {team_id}",
-                extra={
-                    "event_type": "team_aro_lookup_success",
-                    "lookup_type": "team_id",
-                    "team_id": team_id,
-                    "relationship_count": relationship_count
-                }
-            )
+                relationship_count = len(models)
+                self.logger.info(
+                    f"Found {relationship_count} TeamAro relationships for team ID: {team_id}",
+                    extra={
+                        "event_type": "team_aro_lookup_success",
+                        "lookup_type": "team_id",
+                        "team_id": team_id,
+                        "relationship_count": relationship_count
+                    }
+                )
 
-            return [self._to_domain(model) for model in models]
+                return [self._to_domain(model) for model in models]
         except SQLAlchemyError as e:
             error_msg = sanitize_exception(e)
             self.logger.error(
@@ -209,22 +176,23 @@ class SqlAlchemyTeamAroRepository(BaseSqlAlchemyRepository[TeamAro, TeamAroModel
                 )
                 raise RepositoryError(error_msg)
 
-            models = self._session.query(TeamAroModel).filter(
-                TeamAroModel.status == status_enum
-            ).all()
+            with self.session_scope() as session:
+                models = session.query(TeamAroModel).filter(
+                    TeamAroModel.status == status_enum
+                ).all()
 
-            relationship_count = len(models)
-            self.logger.info(
-                f"Found {relationship_count} TeamAro relationships with status: {status}",
-                extra={
-                    "event_type": "team_aro_lookup_success",
-                    "lookup_type": "status",
-                    "status": status,
-                    "relationship_count": relationship_count
-                }
-            )
+                relationship_count = len(models)
+                self.logger.info(
+                    f"Found {relationship_count} TeamAro relationships with status: {status}",
+                    extra={
+                        "event_type": "team_aro_lookup_success",
+                        "lookup_type": "status",
+                        "status": status,
+                        "relationship_count": relationship_count
+                    }
+                )
 
-            return [self._to_domain(model) for model in models]
+                return [self._to_domain(model) for model in models]
         except SQLAlchemyError as e:
             error_msg = sanitize_exception(e)
             self.logger.error(

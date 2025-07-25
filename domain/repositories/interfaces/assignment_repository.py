@@ -1,7 +1,7 @@
 from abc import abstractmethod
 from typing import List
 
-from domain.value_objects.work_assignment import WorkAssignment
+from domain.contexts.assignment.value_objects.work_assignment import WorkAssignment
 from domain.repositories.interfaces.base_repository import BaseRepository
 
 

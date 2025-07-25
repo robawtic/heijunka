@@ -1,30 +1,11 @@
-# domain/repositories/implementations/__init__.py
-from infrastructure.repositories.sqlalchemy.base_sqlalchemy_repository import BaseSqlAlchemyRepository
-from infrastructure.repositories.employee_management.sqlalchemy_employee_repository import SqlAlchemyEmployeeRepository
-from infrastructure.repositories.employee_management.sqlalchemy_group_repository import SqlAlchemyGroupRepository
-from infrastructure.repositories.employee_management.sqlalchemy_department_repository import SqlAlchemyDepartmentRepository
-from infrastructure.repositories.employee_management.sqlalchemy_team_repository import SqlAlchemyTeamRepository
-from infrastructure.repositories.employee_management.sqlalchemy_team_member_repository import SqlAlchemyTeamMemberRepository
-from infrastructure.repositories.workstation_management.sqlalchemy_workstation_repository import SqlAlchemyWorkstationRepository
-from infrastructure.repositories.workstation_management.sqlalchemy_line_type_repository import SqlAlchemyLineTypeRepository
-from infrastructure.repositories.employee_management.sqlalchemy_employee_work_history_repository import SqlAlchemyEmployeeWorkHistoryRepository
-from infrastructure.repositories.employee_management.sqlalchemy_employee_training_repository import SqlAlchemyEmployeeTrainingRepository
-from infrastructure.repositories.employee_management.sqlalchemy_employee_workstation_repository import SqlAlchemyEmployeeWorkstationRepository
-from infrastructure.repositories.assignment.sqlalchemy_assignment_repository import SqlAlchemyAssignmentRepository
-from infrastructure.repositories.scheduling.sqlalchemy_schedule_repository import SqlAlchemyScheduleRepository
-
-__all__ = [
-    'BaseSqlAlchemyRepository',
-    'SqlAlchemyEmployeeRepository',
-    'SqlAlchemyGroupRepository',
-    'SqlAlchemyDepartmentRepository',
-    'SqlAlchemyTeamRepository',
-    'SqlAlchemyTeamMemberRepository',
-    'SqlAlchemyWorkstationRepository',
-    'SqlAlchemyLineTypeRepository',
-    'SqlAlchemyEmployeeWorkHistoryRepository',
-    'SqlAlchemyEmployeeTrainingRepository',
-    'SqlAlchemyEmployeeWorkstationRepository',
-    'SqlAlchemyAssignmentRepository',
-    'SqlAlchemyScheduleRepository'
-]
+# domain/repositories/buses/__init__.py
+# This directory is now empty as repository buses have been moved to the infrastructure layer
+# Repository buses are now organized by bounded context in:
+# - infrastructure.repositories.user_management (4 repositories)
+# - infrastructure.repositories.employee_management (8 repositories)
+# - infrastructure.repositories.workstation_management (2 repositories)
+# - infrastructure.repositories.scheduling (1 repository)
+# - infrastructure.repositories.assignment (3 repositories)
+# - infrastructure.repositories.shared (1 repository)
+#
+# Use dependency injection to access repository buses

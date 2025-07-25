@@ -3,7 +3,7 @@ from abc import abstractmethod
 from typing import List, Optional
 from datetime import date
 
-from domain.contexts.scheduling.entities.schedule.model import Schedule
+from domain.contexts.scheduling.entities.model import Schedule
 from domain.repositories.interfaces.base_repository import BaseRepository
 
 

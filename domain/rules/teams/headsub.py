@@ -18,7 +18,7 @@ def forbid_adjacent_special_loading(ctx: HeadsubRuleContext):
 
     # Find loading stations and special stations
     special_stations = {"H170", "BW010"}
-    loading_indices = [j for j, ws in enumerate(workstations) if ws.is_loading()]
+    loading_indices = [j for j, ws in enumerate(workstations) if ws.is_loading]
     special_indices = [j for j, ws in enumerate(workstations) if ws.name in special_stations]
 
     for i in range(len(employees)):

@@ -2,7 +2,7 @@
 from typing import List, Optional, Dict
 from datetime import date
 
-from domain.value_objects.employee_training import EmployeeTraining
+from domain.contexts.employee_management.value_objects.employee_training import EmployeeTraining
 from domain.repositories.interfaces.employee_training_repository import EmployeeTrainingRepositoryInterface
 
 

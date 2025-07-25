@@ -1,9 +1,9 @@
 from typing import List, Optional
 from datetime import date
 
-from domain.entities.employee import Employee
-from domain.entities.workstation import Workstation
-from domain.value_objects.work_history_entry import WorkHistoryEntry
+from domain.contexts.employee_management.entities.employee import Employee
+from domain.contexts.workstation_management.entities.workstation import Workstation
+from domain.contexts.employee_management.value_objects.work_history_entry import WorkHistoryEntry
 from domain.repositories.interfaces.employee_repository import EmployeeRepositoryInterface
 from domain.repositories.interfaces.employee_work_history_repository import EmployeeWorkHistoryRepositoryInterface
 from domain.repositories.interfaces.workstation_repository import WorkstationRepositoryInterface

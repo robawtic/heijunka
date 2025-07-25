@@ -1,6 +1,6 @@
 from typing import Optional, List
 
-from domain.entities.workstation import Workstation
+from domain.contexts.workstation_management.entities.workstation import Workstation
 from domain.repositories.interfaces.workstation_repository import WorkstationRepositoryInterface
 
 

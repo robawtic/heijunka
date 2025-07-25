@@ -1,190 +1,125 @@
 # domain/factories/workstation_factory.py
+
 from typing import Optional, List, Any
-from domain.entities.workstation import Workstation
+from domain.contexts.workstation_management.entities.workstation import Workstation
 
 class WorkstationFactory:
     @staticmethod
     def create_workstation(
-        id: Optional[int] = None,
-        name: str = "",
-        line_type: Optional[str] = "",
-        is_loading_job: bool = False,
-        is_heavy_job: bool = False,
-        is_key_skill_job: bool = False,
-        team_id: Optional[int] = None
+        *,
+        id: Optional[int]    = None,
+        name: str            = "",
+        line_type: str       = "",
+        attributes: List[str]= None,
+        team_id: Optional[int]= None
     ) -> Workstation:
         """
-        Create a new Workstation entity with validation.
+        Create a new Workstation aggregate.
 
         Args:
-            id: Optional workstation ID (None for new workstations)
-            name: Workstation name
-            line_type: Type of line (e.g., "Mainline", "Sub-Assembly")
-            is_loading_job: Whether this is a loading job
-            is_heavy_job: Whether this is a heavy job
-            is_key_skill_job: Whether this requires a key skill
-            team_id: Optional team ID the workstation belongs to
+            id: Optional existing ID (None for new).
+            name: Workstation name.
+            line_type: One of 'mainline' or 'subline'.
+            attributes: List of tags like ['loading','heavy','skill_level_2'].
+            team_id: Optional team ID.
 
         Returns:
-            A new Workstation entity
-
-        Raises:
-            ValueError: If validation fails (e.g., empty name or line_type)
+            A new Workstation entity.
         """
-        # Validate inputs before creating the workstation
-        if name and not isinstance(name, str):
-            raise ValueError("Name must be a string")
-
-        if line_type and not isinstance(line_type, str):
-            raise ValueError("Line type must be a string")
-
+        attrs = list(attributes) if attributes else []
+        # Validate core fields
+        if not isinstance(name, str) or not name:
+            raise ValueError("Name must be a non-empty string")
+        if not isinstance(line_type, str) or not line_type:
+            raise ValueError("Line type must be a non-empty string")
         if team_id is not None and (not isinstance(team_id, int) or team_id <= 0):
-            raise ValueError("Team ID must be a positive integer or None")
+            raise ValueError("team_id must be a positive integer or None")
 
-        # Create the workstation
-        workstation = Workstation(
+        return Workstation(
             id=id,
             name=name,
             line_type=line_type,
-            is_loading_job=is_loading_job,
-            is_heavy_job=is_heavy_job,
-            is_key_skill_job=is_key_skill_job,
-            team_id=team_id
+            team_id=team_id,
+            _attributes=attrs
         )
-
-        # Validate the workstation
-        workstation.validate()
-
-        return workstation
 
     @staticmethod
     def create_loading_workstation(
-        id: Optional[int] = None,
-        name: str = "",
-        line_type: Optional[str] = "",
-        is_heavy_job: bool = False,
-        is_key_skill_job: bool = False,
-        team_id: Optional[int] = None
+        *,
+        id: Optional[int]     = None,
+        name: str             = "",
+        line_type: str        = "",
+        team_id: Optional[int]= None
     ) -> Workstation:
-        """
-        Create a workstation that is a loading job.
-
-        Args:
-            id: Optional workstation ID
-            name: Workstation name
-            line_type: Type of line
-            is_heavy_job: Whether this is a heavy job
-            is_key_skill_job: Whether this requires a key skill
-            team_id: Optional team ID
-
-        Returns:
-            A new Workstation entity configured as a loading job
-
-        Raises:
-            ValueError: If validation fails
-        """
+        """Convenience: a loading job station."""
         return WorkstationFactory.create_workstation(
             id=id,
             name=name,
             line_type=line_type,
-            is_loading_job=True,
-            is_heavy_job=is_heavy_job,
-            is_key_skill_job=is_key_skill_job,
+            attributes=['loading'],
             team_id=team_id
         )
 
     @staticmethod
     def create_heavy_workstation(
-        id: Optional[int] = None,
-        name: str = "",
-        line_type: Optional[str] = "",
-        is_loading_job: bool = True,  # Heavy jobs are typically loading jobs
-        is_key_skill_job: bool = False,
-        team_id: Optional[int] = None
+        *,
+        id: Optional[int]     = None,
+        name: str             = "",
+        line_type: str        = "",
+        team_id: Optional[int]= None
     ) -> Workstation:
-        """
-        Create a workstation that is a heavy job.
-
-        Args:
-            id: Optional workstation ID
-            name: Workstation name
-            line_type: Type of line
-            is_loading_job: Whether this is a loading job (default: True)
-            is_key_skill_job: Whether this requires a key skill
-            team_id: Optional team ID
-
-        Returns:
-            A new Workstation entity configured as a heavy job
-
-        Raises:
-            ValueError: If validation fails
-        """
+        """Convenience: a heavy (and loading) job station."""
         return WorkstationFactory.create_workstation(
             id=id,
             name=name,
             line_type=line_type,
-            is_loading_job=is_loading_job,
-            is_heavy_job=True,
-            is_key_skill_job=is_key_skill_job,
+            attributes=['heavy', 'loading'],
             team_id=team_id
         )
 
     @staticmethod
     def create_key_skill_workstation(
-        id: Optional[int] = None,
-        name: str = "",
-        line_type: Optional[str] = "",
-        is_loading_job: bool = False,
-        is_heavy_job: bool = False,
-        team_id: Optional[int] = None
+        *,
+        id: Optional[int]     = None,
+        name: str             = "",
+        line_type: str        = "",
+        level: int            = 3,
+        team_id: Optional[int]= None
     ) -> Workstation:
         """
-        Create a workstation that requires a key skill.
-
-        Args:
-            id: Optional workstation ID
-            name: Workstation name
-            line_type: Type of line
-            is_loading_job: Whether this is a loading job
-            is_heavy_job: Whether this is a heavy job
-            team_id: Optional team ID
-
-        Returns:
-            A new Workstation entity configured as requiring a key skill
-
-        Raises:
-            ValueError: If validation fails
+        Convenience: a key-skill station.
+        Defaults to skill_level_3, adjust `level` as needed.
         """
+        skill_tag = f"skill_level_{level}"
         return WorkstationFactory.create_workstation(
             id=id,
             name=name,
             line_type=line_type,
-            is_loading_job=is_loading_job,
-            is_heavy_job=is_heavy_job,
-            is_key_skill_job=True,
+            attributes=[skill_tag],
             team_id=team_id
         )
 
     @staticmethod
     def create_from_model(model: Any) -> Workstation:
         """
-        Create a Workstation entity from a database model.
-
-        Args:
-            model: The database model to convert
-
-        Returns:
-            A new Workstation entity populated with data from the model
-
-        Raises:
-            ValueError: If validation fails
+        Reconstitute a Workstation entity from a SQLAlchemy model.
+        Assumes your WorkstationModel.attributes is a list of attribute‐definitions.
         """
+        # Extract raw attribute names
+        attrs = [attr.name for attr in getattr(model, 'attributes', [])]
+
+        # Derive line_type from attributes (fallback to blank)
+        if 'mainline' in attrs:
+            lt = 'mainline'
+        elif 'subline' in attrs:
+            lt = 'subline'
+        else:
+            lt = ''
+
         return WorkstationFactory.create_workstation(
             id=model.id,
             name=model.name,
-            line_type=model.line_type.name if model.line_type else None,
-            is_loading_job=model.is_loading_job,
-            is_heavy_job=model.is_heavy_job,
-            is_key_skill_job=model.is_key_skill_job,
+            line_type=lt,
+            attributes=attrs,
             team_id=model.team_id
         )

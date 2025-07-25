@@ -8,10 +8,10 @@ from datetime import datetime
 from sqlalchemy.orm import Session
 from tabulate import tabulate
 
-from domain.repositories.implementations.sqlalchemy_employee_repository import SqlAlchemyEmployeeRepository
-from domain.repositories.implementations.sqlalchemy_workstation_repository import SqlAlchemyWorkstationRepository
-from domain.repositories.implementations.sqlalchemy_team_repository import SqlAlchemyTeamRepository
-from domain.repositories.implementations.sqlalchemy_schedule_repository import SqlAlchemyScheduleRepository
+from infrastructure.repositories.employee_management.sqlalchemy_employee_repository import SqlAlchemyEmployeeRepository
+from infrastructure.repositories.workstation_management.sqlalchemy_workstation_repository import SqlAlchemyWorkstationRepository
+from infrastructure.repositories.employee_management.sqlalchemy_team_repository import SqlAlchemyTeamRepository
+from infrastructure.repositories.scheduling.sqlalchemy_schedule_repository import SqlAlchemyScheduleRepository
 from domain.services.schedule_service import ScheduleService
 from utilities.logging_factory import get_logger
 
@@ -31,7 +31,7 @@ def handle_simulation(args: Any, session_factory: Any) -> bool:
     """
     try:
         import json
-        from domain.value_objects.scenario import Scenario
+        from domain.contexts.shared.value_objects.scenario import Scenario
         from domain.services.scenario_simulator import ScenarioSimulator
         from domain.services.scenario_comparator import ScenarioComparator
 
@@ -47,7 +47,7 @@ def handle_simulation(args: Any, session_factory: Any) -> bool:
             event_type="simulation", 
             identifier="setup"
         )
-        
+
         employee_repository = SqlAlchemyEmployeeRepository(session_factory)
         workstation_repository = SqlAlchemyWorkstationRepository(session_factory)
         team_repository = SqlAlchemyTeamRepository(session_factory)
@@ -60,7 +60,7 @@ def handle_simulation(args: Any, session_factory: Any) -> bool:
             event_type="simulation", 
             identifier="team_lookup"
         )
-        
+
         team = team_repository.get_by_name(args.team)
         if not team:
             error_msg = f"Error: Team '{args.team}' not found"
@@ -78,7 +78,7 @@ def handle_simulation(args: Any, session_factory: Any) -> bool:
             event_type="simulation", 
             identifier="date_parsing"
         )
-        
+
         try:
             start_date = datetime.strptime(args.start_date, "%Y-%m-%d").date()
         except ValueError:
@@ -97,7 +97,7 @@ def handle_simulation(args: Any, session_factory: Any) -> bool:
             event_type="simulation", 
             identifier="load_scenarios"
         )
-        
+
         try:
             with open(args.scenarios, 'r') as f:
                 scenarios_data = json.load(f)
@@ -161,7 +161,7 @@ def handle_simulation(args: Any, session_factory: Any) -> bool:
                 event_type="simulation", 
                 identifier="advanced_analytics"
             )
-            
+
             from domain.analytics.scenario_analytics import ScenarioAnalytics
             analytics = ScenarioAnalytics(results, session_factory=session_factory)
             analytics.generate_advanced_analytics(args.output_dir)
@@ -178,7 +178,7 @@ def handle_simulation(args: Any, session_factory: Any) -> bool:
                 event_type="simulation", 
                 identifier="basic_comparison"
             )
-            
+
             comparator = ScenarioComparator(results)
 
             # Generate comparison report
@@ -200,12 +200,12 @@ def handle_simulation(args: Any, session_factory: Any) -> bool:
             event_type="simulation", 
             identifier="summary_table"
         )
-        
+
         print("\nScenario Comparison Summary:")
         summary_cols = ['Scenario', 'Total Assignments']
         if 'Min Employee Assignments' in comparison_df.columns:
             summary_cols.extend(['Min Employee Assignments', 'Max Employee Assignments', 'Avg Employee Assignments'])
-        
+
         print(tabulate(
             comparison_df[summary_cols].values.tolist(),
             headers=summary_cols,

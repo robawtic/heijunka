@@ -1,5 +1,5 @@
 from typing import Optional, List, Generator
-from datetime import datetime
+from datetime import datetime, timezone
 from contextlib import contextmanager
 from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session
@@ -145,7 +145,7 @@ class SqlAlchemyRefreshTokenRepository(BaseSqlAlchemyRepository[RefreshToken, Re
                 }
             )
 
-            now = datetime.utcnow()
+            now = datetime.now(timezone.utc)
             models = self.session.query(RefreshTokenModel).filter(
                 and_(
                     RefreshTokenModel.user_id == user_id,
@@ -230,7 +230,7 @@ class SqlAlchemyRefreshTokenRepository(BaseSqlAlchemyRepository[RefreshToken, Re
                     return True
 
                 model.is_revoked = True
-                model.updated_at = datetime.utcnow()
+                model.updated_at = datetime.now(timezone.utc)
 
                 # Prepare audit data with optional client information
                 audit_data = {"token_id": token_id, "user_id": model.user_id}

@@ -4,7 +4,7 @@ from contextlib import contextmanager
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy.exc import SQLAlchemyError
 
-from domain.entities.schedule import Schedule
+from domain.contexts.scheduling.entities.model import Schedule
 from domain.models.ScheduleModel import ScheduleModel
 from domain.models.EmployeeWorkHistoryModel import EmployeeWorkHistoryModel
 from domain.repositories.interfaces.schedule_repository_interface import ScheduleRepositoryInterface

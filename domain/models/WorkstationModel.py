@@ -1,10 +1,8 @@
-from sqlalchemy import Column, Integer, String, Boolean, Enum, ForeignKey, UniqueConstraint
+from sqlalchemy import Column, Integer, String, ForeignKey, UniqueConstraint
+from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import relationship
-
-from domain.models.EmployeeWorkstationModel import EmployeeWorkstationModel
 from .Base import Base
-from .LineType import LineType  # Import the LineType enum
-from domain.models.EmployeeWorkHistoryModel import EmployeeWorkHistoryModel  # Import the EmployeeWorkHistory model
+
 
 class WorkstationModel(Base):
     __tablename__ = 'workstations'
@@ -15,16 +13,32 @@ class WorkstationModel(Base):
 
     id = Column(Integer, primary_key=True)
     name = Column(String, nullable=False)
-    line_type_id = Column(Integer, ForeignKey('line_types.id'), nullable=False)
-    is_loading_job = Column(Boolean, nullable=False, default=False)
-    is_heavy_job = Column(Boolean, nullable=False, default=False)
-    is_active = Column(Boolean, nullable=False, default=True)
-    is_key_skill_job = Column(Boolean, nullable=False, default=False)
     team_id = Column(Integer, ForeignKey('teams.id'), nullable=False)
 
     # Relationships
-    line_type = relationship('LineTypeModel', back_populates='workstations')
     employees = relationship('EmployeeWorkstationModel', back_populates='workstation')
     work_history = relationship('EmployeeWorkHistoryModel', back_populates='station')
     team = relationship('TeamModel', back_populates='workstations')
     employee_skills = relationship('EmployeeStationSkillModel', back_populates='station')
+
+    attribute_links = relationship(
+        'WorkstationAttributeModel',
+        back_populates='workstation',
+        cascade='all, delete-orphan',
+    )
+    attributes = relationship(
+        'WorkstationAttributeDefinition',
+        secondary='workstation_attributes',
+        back_populates='workstations',
+        viewonly=True,
+    )
+
+    @hybrid_property
+    def is_loading(self) -> bool:
+        """Check if this workstation is a loading job based on its attributes."""
+        return any(attr.name == 'loading' for attr in self.attributes)
+
+    @hybrid_property
+    def is_heavy(self) -> bool:
+        """Check if this workstation is a heavy job based on its attributes."""
+        return any(attr.name == 'heavy' for attr in self.attributes)

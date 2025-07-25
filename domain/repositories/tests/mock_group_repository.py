@@ -1,6 +1,6 @@
 from typing import Optional, List
 
-from domain.entities.group import Group
+from domain.contexts.employee_management.entities.group import Group
 from domain.repositories.interfaces.group_repository import GroupRepositoryInterface
 
 

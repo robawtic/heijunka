@@ -1,7 +1,7 @@
 import unittest
 from datetime import date
 
-from domain.entities.schedule import Schedule
+from domain.contexts.scheduling.entities.model import Schedule
 from domain.repositories.tests.mock_schedule_repository import MockScheduleRepository
 
 

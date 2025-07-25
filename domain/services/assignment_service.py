@@ -1,7 +1,7 @@
 from datetime import date
-from domain.entities.employee import Employee
-from domain.entities.workstation import Workstation
-from domain.value_objects.work_history_entry import WorkHistoryEntry
+from domain.contexts.employee_management.entities.employee import Employee
+from domain.contexts.workstation_management.entities.workstation import Workstation
+from domain.contexts.employee_management.value_objects.work_history_entry import WorkHistoryEntry
 
 class AssignmentService:
     def __init__(self, employee_repository, rule_registry):

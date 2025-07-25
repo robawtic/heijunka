@@ -2,8 +2,8 @@
 from typing import List, Dict, Any, Optional
 from datetime import date
 
-from domain.value_objects.scenario import Scenario
-from domain.value_objects.work_assignment import WorkAssignment
+from domain.contexts.shared.value_objects.scenario import Scenario
+from domain.contexts.assignment.value_objects.work_assignment import WorkAssignment
 from domain.services.schedule_service import ScheduleService
 from domain.repositories.interfaces.employee_repository import EmployeeRepositoryInterface
 from domain.repositories.interfaces.workstation_repository import WorkstationRepositoryInterface

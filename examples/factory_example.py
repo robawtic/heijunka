@@ -6,7 +6,7 @@ from datetime import date
 
 from domain.factories.employee_factory import EmployeeFactory
 from domain.factories.workstation_factory import WorkstationFactory
-from domain.value_objects.employee_availability import EmployeeAvailability, AvailabilityStatus
+from domain.contexts.employee_management.value_objects.employee_availability import EmployeeAvailability, AvailabilityStatus
 from domain.contexts.employee_management.services.employee_service import EmployeeService
 from domain.repositories.implementations.sqlalchemy_employee_repository import SqlAlchemyEmployeeRepository
 from domain.repositories.implementations.sqlalchemy_workstation_repository import SqlAlchemyWorkstationRepository

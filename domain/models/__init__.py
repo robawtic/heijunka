@@ -8,6 +8,8 @@ from domain.models.DepartmentModel import DepartmentModel
 from domain.models.EmployeeModel import EmployeeModel
 from domain.models.TeamMemberModel import TeamMemberModel
 from domain.models.WorkstationModel import WorkstationModel
+from domain.models.WorkstationAttributeDefinition import WorkstationAttributeDefinition
+from domain.models.WorkstationAttributeModel import WorkstationAttributeModel
 from domain.models.team_member_roles import team_member_roles
 from domain.models.EmployeeTrainingModel import EmployeeTrainingModel
 from domain.models.EmployeeWorkHistoryModel import EmployeeWorkHistoryModel
@@ -30,6 +32,8 @@ __all__ = [
     'EmployeeModel',
     'TeamMemberModel',
     'WorkstationModel',
+    'WorkstationAttributeDefinition',
+    'WorkstationAttributeModel',
     'team_member_roles',
     'EmployeeTrainingModel',
     'EmployeeWorkHistoryModel',

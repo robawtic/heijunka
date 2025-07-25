@@ -35,24 +35,24 @@ async def api_generate_schedule(
 ):
     """
     Generate a schedule using the ScheduleService.generate_schedule_flow method.
-    
+
     This is a simplified example that shows how an API handler could use the same
     ScheduleService.generate_schedule_flow method that the CLI handler uses.
-    
+
     Args:
         request: The schedule generation request
         db: Database session
         current_user: The authenticated user
-        
+
     Returns:
         A dictionary containing the generated schedule and performance metrics
     """
     # Get repositories and services
     repositories = get_repositories(db)
     schedule_service = get_schedule_service()
-    
+
     # Call the schedule service to handle all orchestration
-    result = schedule_service.generate_schedule_flow(
+    result = schedule_service.generate_schedule_flow_legacy(
         args=request,
         session=db,
         employee_repository=repositories["employee_repository"],
@@ -65,10 +65,10 @@ async def api_generate_schedule(
         aro_graph_service=repositories["aro_graph_service"],
         schedule_repository=repositories["schedule_repository"]
     )
-    
+
     if not result["success"]:
         raise HTTPException(status_code=400, detail=result["error"])
-    
+
     # Convert assignments to response format
     assignments = []
     for assignment in result["assignments"]:
@@ -82,7 +82,7 @@ async def api_generate_schedule(
                 "period": assignment.period.period
             }
         })
-    
+
     # Return a response with the generated schedule and performance metrics
     return {
         "success": True,

@@ -1,5 +1,5 @@
 from typing import Optional, List
-from domain.value_objects.work_assignment import WorkAssignment
+from domain.contexts.assignment.value_objects.work_assignment import WorkAssignment
 from domain.repositories.interfaces.assignment_repository import AssignmentRepositoryInterface
 
 

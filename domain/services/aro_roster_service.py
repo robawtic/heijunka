@@ -3,7 +3,7 @@ from typing import List, Dict, Set, Optional, Any
 from datetime import date
 import logging
 
-from domain.entities.employee import Employee
+from domain.contexts.employee_management.entities.employee import Employee
 
 # Logger for this module
 logger = logging.getLogger(__name__)

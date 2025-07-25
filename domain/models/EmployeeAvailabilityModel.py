@@ -2,7 +2,7 @@
 from sqlalchemy import Column, Integer, Date, String, ForeignKey, Enum, Boolean, text
 from sqlalchemy.orm import relationship
 from .Base import Base
-from domain.value_objects.employee_availability import EmployeeAvailability, AvailabilityStatus
+from domain.contexts.employee_management.value_objects.employee_availability import EmployeeAvailability, AvailabilityStatus
 
 
 class EmployeeAvailabilityModel(Base):

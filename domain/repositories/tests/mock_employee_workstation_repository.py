@@ -2,7 +2,7 @@
 from typing import List, Optional, Dict
 from datetime import date
 
-from domain.value_objects.workstation_assignment import WorkstationAssignment
+from domain.contexts.assignment.value_objects.workstation_assignment import WorkstationAssignment
 from domain.repositories.interfaces.employee_workstation_repository import EmployeeWorkstationRepositoryInterface
 
 

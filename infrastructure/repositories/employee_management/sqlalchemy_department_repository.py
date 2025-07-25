@@ -1,10 +1,10 @@
-# domain/repositories/implementations/refactored_sqlalchemy_department_repository.py
+# domain/repositories/buses/refactored_sqlalchemy_department_repository.py
 from typing import Optional, List
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 
-from domain.entities.department import Department
+from domain.contexts.employee_management.entities.department import Department
 from domain.models.DepartmentModel import DepartmentModel
 from domain.repositories.interfaces.department_repository import DepartmentRepositoryInterface
 from domain.factories.department_factory import DepartmentFactory

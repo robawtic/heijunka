@@ -2,7 +2,7 @@ import os
 import json
 from typing import List, Optional, Dict, Any
 from datetime import datetime, date
-from domain.entities.seed_data import (
+from domain.contexts.shared.entities.seed_data import (
     WorkstationSeedData, EmployeeSeedData, TeamSeedData, 
     GroupSeedData, DepartmentSeedData
 )

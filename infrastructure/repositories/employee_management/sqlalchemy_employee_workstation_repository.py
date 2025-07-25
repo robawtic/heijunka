@@ -1,11 +1,11 @@
-# heijunka/domain/repositories/implementations/sqlalchemy_employee_workstation_repository.py
+# heijunka/domain/repositories/buses/sqlalchemy_employee_workstation_repository.py
 from typing import List, Optional
 from datetime import date
 from sqlalchemy import and_
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 
-from domain.value_objects.workstation_assignment import WorkstationAssignment
+from domain.contexts.assignment.value_objects.workstation_assignment import WorkstationAssignment
 from domain.models.EmployeeWorkstationModel import EmployeeWorkstationModel
 from domain.models.WorkstationModel import WorkstationModel
 from domain.repositories.interfaces.employee_workstation_repository import EmployeeWorkstationRepositoryInterface

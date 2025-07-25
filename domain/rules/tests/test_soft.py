@@ -4,14 +4,15 @@ from unittest.mock import MagicMock, patch
 
 from ortools.sat.python.cp_model import CpModel
 
-from domain.entities.employee import Employee
-from domain.entities.workstation import Workstation
-from domain.value_objects.work_history_entry import WorkHistoryEntry
+from domain.contexts.employee_management.entities.employee import Employee
+from domain.contexts.workstation_management.entities.workstation import Workstation
+from domain.contexts.employee_management.value_objects.work_history_entry import WorkHistoryEntry
 from domain.rules.context import RuleContext
 from domain.rules.soft import (
-    add_rotation_penalties,
-    add_repeat_station_penalties,
-    add_workload_deviation
+    add_same_day_repeat_penalties,
+    add_lookback_any_period_penalties,
+    add_lookback_same_period_penalties,
+    add_aro_reassignment_penalties
 )
 
 
@@ -57,8 +58,8 @@ class TestSoftRules(unittest.TestCase):
 
         # Work history will be added in specific tests as needed
 
-    def test_add_rotation_penalties(self):
-        """Test that add_rotation_penalties rule is correctly implemented."""
+    def test_add_lookback_any_period_penalties(self):
+        """Test that add_lookback_any_period_penalties rule is correctly implemented."""
         # Add work history entries
         yesterday = self.start_date - timedelta(days=1)
         self.employee1.add_work_history_entry(
@@ -81,34 +82,34 @@ class TestSoftRules(unittest.TestCase):
         self.ctx.session.query.return_value = mock_query
 
         # Apply the rule
-        penalties = add_rotation_penalties(self.ctx)
+        penalties = add_lookback_any_period_penalties(self.ctx)
 
         # Verify that penalties were created
         self.assertTrue(penalties)
 
-    def test_add_rotation_penalties_no_history(self):
-        """Test add_rotation_penalties with no work history."""
+    def test_add_lookback_any_period_penalties_no_history(self):
+        """Test add_lookback_any_period_penalties with no work history."""
         # Apply the rule with empty work history
-        penalties = add_rotation_penalties(self.ctx)
+        penalties = add_lookback_any_period_penalties(self.ctx)
 
         # Verify that no penalties were created (empty list)
         self.assertEqual(penalties, [])
 
-    def test_add_rotation_penalties_no_start_date(self):
-        """Test add_rotation_penalties with no start date."""
+    def test_add_lookback_any_period_penalties_no_start_date(self):
+        """Test add_lookback_any_period_penalties with no start date."""
         # Set start_date to None
         self.ctx.start_date = None
 
         # Apply the rule
-        penalties = add_rotation_penalties(self.ctx)
+        penalties = add_lookback_any_period_penalties(self.ctx)
 
         # Verify that no penalties were created (empty list)
         self.assertEqual(penalties, [])
 
-    def test_add_repeat_station_penalties(self):
-        """Test that add_repeat_station_penalties rule is correctly implemented."""
+    def test_add_same_day_repeat_penalties(self):
+        """Test that add_same_day_repeat_penalties rule is correctly implemented."""
         # Apply the rule
-        penalties = add_repeat_station_penalties(self.ctx)
+        penalties = add_same_day_repeat_penalties(self.ctx)
 
         # Verify that penalties were created
         self.assertTrue(penalties)
@@ -118,18 +119,13 @@ class TestSoftRules(unittest.TestCase):
         expected_count = len(self.employees) * len(self.workstations) * (self.periods * (self.periods - 1) // 2)
         self.assertEqual(len(penalties), expected_count)
 
-    def test_add_workload_deviation(self):
-        """Test that add_workload_deviation rule is correctly implemented."""
+    def test_add_aro_reassignment_penalties(self):
+        """Test that add_aro_reassignment_penalties rule is correctly implemented."""
         # Apply the rule
-        deviations = add_workload_deviation(self.ctx)
+        penalties = add_aro_reassignment_penalties(self.ctx)
 
-        # Verify that deviation variables were created
-        self.assertTrue(deviations)
-
-        # Calculate expected number of deviations
-        # For each employee, we create one deviation variable
-        expected_count = len(self.employees)
-        self.assertEqual(len(deviations), expected_count)
+        # Verify that penalties were created
+        self.assertTrue(penalties)
 
 
 if __name__ == '__main__':

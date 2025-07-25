@@ -2,11 +2,11 @@ import unittest
 from unittest.mock import MagicMock, patch
 from datetime import date, timedelta
 
-from domain.entities.schedule.model import Schedule
-from domain.entities.employee import Employee
-from domain.entities.workstation import Workstation
+from domain.contexts.scheduling.entities.model import Schedule
+from domain.contexts.employee_management.entities.employee import Employee
+from domain.contexts.workstation_management.entities.workstation import Workstation
 from domain.repositories.interfaces import TeamRepositoryInterface
-from domain.value_objects.work_history_entry import WorkHistoryEntry
+from domain.contexts.employee_management.value_objects.work_history_entry import WorkHistoryEntry
 from domain.services.cp_model_builder import CPModelBuilder
 from domain.repositories.interfaces.employee_work_history_repository import EmployeeWorkHistoryRepositoryInterface
 

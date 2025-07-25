@@ -4,9 +4,9 @@ from unittest.mock import MagicMock, patch
 from datetime import date, timedelta
 
 from domain.factories.schedule_factory import ScheduleFactory
-from domain.entities.schedule import Schedule
-from domain.value_objects.schedule_period import SchedulePeriod
-from domain.value_objects.work_assignment import WorkAssignment
+from domain.contexts.scheduling.entities.model import Schedule
+from domain.contexts.scheduling.value_objects.schedule_period import SchedulePeriod
+from domain.contexts.assignment.value_objects.work_assignment import WorkAssignment
 
 class TestScheduleFactory(unittest.TestCase):
     def test_create_schedule_basic(self):

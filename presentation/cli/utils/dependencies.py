@@ -5,11 +5,11 @@ from typing import Tuple, Any, Optional, cast
 from sqlalchemy.orm import Session
 
 from domain.models.db import Session as ScopedSession
-from domain.repositories.implementations.sqlalchemy_employee_repository import SqlAlchemyEmployeeRepository
+from infrastructure.repositories.employee_management.sqlalchemy_employee_repository import SqlAlchemyEmployeeRepository
 from infrastructure.repositories.workstation_management.sqlalchemy_workstation_repository import SqlAlchemyWorkstationRepository
-from domain.repositories.implementations.sqlalchemy_team_repository import SqlAlchemyTeamRepository
+from infrastructure.repositories.employee_management.sqlalchemy_team_repository import SqlAlchemyTeamRepository
 from infrastructure.repositories.assignment.sqlalchemy_assignment_repository import SqlAlchemyAssignmentRepository
-from domain.repositories.implementations.sqlalchemy_employee_work_history_repository import SqlAlchemyEmployeeWorkHistoryRepository
+from infrastructure.repositories.employee_management.sqlalchemy_employee_work_history_repository import SqlAlchemyEmployeeWorkHistoryRepository
 from infrastructure.repositories.scheduling.sqlalchemy_schedule_repository import SqlAlchemyScheduleRepository
 from domain.services.schedule_service import ScheduleService
 from utilities.logging_factory import get_logger, RateLimitedLogger
@@ -53,24 +53,34 @@ def setup_dependencies() -> Tuple[
     employee_repository = SqlAlchemyEmployeeRepository(session_factory)
     workstation_repository = SqlAlchemyWorkstationRepository(session_factory)
     team_repository = SqlAlchemyTeamRepository(session_factory)
-    schedule_service = ScheduleService()
     assignment_repository = SqlAlchemyAssignmentRepository(session_factory)
     work_history_repository = SqlAlchemyEmployeeWorkHistoryRepository(session_factory)
     schedule_repository = SqlAlchemyScheduleRepository(session_factory)
 
     # Import here to avoid circular imports
     from infrastructure.repositories.assignment.sqlalchemy_aro_assignment_repository import SqlAlchemyAROAssignmentRepository
-    from domain.repositories.implementations.sqlalchemy_team_aro_repository import SqlAlchemyTeamAroRepository
+    from infrastructure.repositories.assignment.sqlalchemy_team_aro_repository import SqlAlchemyTeamAroRepository
     aro_repository = SqlAlchemyAROAssignmentRepository(session_factory)
     team_aro_repository = SqlAlchemyTeamAroRepository(session_factory)
 
     # Create and register the schedule recalculation handler
     from domain.services.aro_service import AROService
+    from domain.services.aro_roster_service import ARORosterService
+    from domain.services.aro_orchestration_service import AROOrchestrationService
     from domain.services.schedule_recalculation_handler import ScheduleRecalculationHandler
     from domain.contexts.assignment.services.aro_graph_service import AROGraphService
     from domain.services.cache_invalidation_handler import CacheInvalidationHandler
 
     aro_service = AROService(aro_repository, employee_repository, team_repository, team_aro_repository)
+    aro_roster_service = ARORosterService(aro_repository, team_repository)
+    aro_orchestration_service = AROOrchestrationService(aro_service, aro_roster_service)
+    
+    # Create ScheduleService with ARO orchestration support
+    schedule_service = ScheduleService(
+        aro_roster_service=aro_roster_service,
+        aro_orchestration_service=aro_orchestration_service
+    )
+    
     schedule_recalculation_handler = ScheduleRecalculationHandler(
         team_repository, 
         employee_repository, 

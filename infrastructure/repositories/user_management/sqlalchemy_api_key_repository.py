@@ -1,5 +1,5 @@
 from typing import Optional, List, Generator
-from datetime import datetime
+from datetime import datetime, timezone
 from contextlib import contextmanager
 from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session
@@ -198,7 +198,7 @@ class SqlAlchemyApiKeyRepository(BaseSqlAlchemyRepository[ApiKey, ApiKeyModel], 
                 }
             )
 
-            now = datetime.utcnow()
+            now = datetime.now(timezone.utc)
             models = self._session.query(ApiKeyModel).filter(
                 and_(
                     ApiKeyModel.user_id == user_id,
@@ -286,7 +286,7 @@ class SqlAlchemyApiKeyRepository(BaseSqlAlchemyRepository[ApiKey, ApiKeyModel], 
                     return True
 
                 model.is_active = False
-                model.updated_at = datetime.utcnow()
+                model.updated_at = datetime.now(timezone.utc)
 
                 # Prepare audit data with optional client information
                 audit_data = {"key_id": key_id, "user_id": model.user_id}

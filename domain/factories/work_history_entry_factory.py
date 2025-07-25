@@ -1,7 +1,7 @@
 # domain/factories/work_history_entry_factory.py
 from typing import Optional, Union
 from datetime import date
-from domain.value_objects.work_history_entry import WorkHistoryEntry
+from domain.contexts.employee_management.value_objects.work_history_entry import WorkHistoryEntry
 from domain.models.EmployeeWorkHistoryModel import EmployeeWorkHistoryModel, WorkHistoryStatus
 from utilities.logging_factory import get_logger
 

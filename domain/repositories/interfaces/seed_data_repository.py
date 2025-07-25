@@ -1,5 +1,5 @@
 from typing import List, Optional, Dict, Any
-from domain.entities.seed_data import (
+from domain.contexts.shared.entities.seed_data import (
     WorkstationSeedData, EmployeeSeedData, TeamSeedData, 
     GroupSeedData, DepartmentSeedData
 )

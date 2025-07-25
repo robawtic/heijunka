@@ -2,7 +2,7 @@
 from typing import List, Optional, Tuple, Dict
 from datetime import date
 
-from domain.value_objects.work_history_entry import WorkHistoryEntry
+from domain.contexts.employee_management.value_objects.work_history_entry import WorkHistoryEntry
 from domain.repositories.interfaces.employee_work_history_repository import EmployeeWorkHistoryRepositoryInterface
 
 

@@ -1,7 +1,7 @@
 from typing import Optional, List
 from datetime import date
 
-from domain.entities.schedule import Schedule
+from domain.contexts.scheduling.entities.model import Schedule
 from domain.repositories.interfaces.schedule_repository_interface import ScheduleRepositoryInterface
 
 

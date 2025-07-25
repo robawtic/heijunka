@@ -150,7 +150,7 @@ class RateLimitedLogger:
                 summary_extra.update({
                     'rate_limited': True,
                     'event_type': event_type,
-                    'message': f"Rate limiting similar logs for {event_type}"
+                    'rate_limit_message': f"Rate limiting similar logs for {event_type}"
                 })
                 log_func = getattr(self.logger, level)
                 log_func(

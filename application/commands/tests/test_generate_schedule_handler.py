@@ -1,9 +1,9 @@
 import unittest
 from datetime import date
 
-from domain.entities.employee import Employee
-from domain.entities.workstation import Workstation
-from domain.entities.team import Team
+from domain.contexts.employee_management.entities.employee import Employee
+from domain.contexts.workstation_management.entities.workstation import Workstation
+from domain.contexts.employee_management.entities.team import Team
 from domain.repositories.tests.mock_employee_repository import MockEmployeeRepository
 from domain.repositories.tests.mock_workstation_repository import MockWorkstationRepository
 from domain.repositories.tests.mock_team_repository import MockTeamRepository

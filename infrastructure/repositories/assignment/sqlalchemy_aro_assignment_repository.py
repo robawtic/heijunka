@@ -48,7 +48,7 @@ class SqlAlchemyAROAssignmentRepository(BaseSqlAlchemyRepository[AROAssignment, 
                 extra={
                     "event_type": "aro_assignments_lookup",
                     "lookup_type": "date",
-                    "assignment_date": assignment_date.isoformat()
+                    "assignment_date": assignment_date.isoformat() if hasattr(assignment_date, 'isoformat') else str(assignment_date)
                 }
             )
 
@@ -66,7 +66,7 @@ class SqlAlchemyAROAssignmentRepository(BaseSqlAlchemyRepository[AROAssignment, 
                 extra={
                     "event_type": "aro_assignments_lookup_success",
                     "lookup_type": "date",
-                    "assignment_date": assignment_date.isoformat(),
+                    "assignment_date": assignment_date.isoformat() if hasattr(assignment_date, 'isoformat') else str(assignment_date),
                     "assignment_count": assignment_count
                 }
             )
@@ -104,7 +104,7 @@ class SqlAlchemyAROAssignmentRepository(BaseSqlAlchemyRepository[AROAssignment, 
             }
 
             if assignment_date:
-                log_context["assignment_date"] = assignment_date.isoformat()
+                log_context["assignment_date"] = assignment_date.isoformat() if hasattr(assignment_date, 'isoformat') else str(assignment_date)
                 self.logger.info(
                     f"Retrieving ARO assignments for employee ID: {employee_id} on date: {assignment_date}",
                     extra=log_context
@@ -138,7 +138,7 @@ class SqlAlchemyAROAssignmentRepository(BaseSqlAlchemyRepository[AROAssignment, 
             }
 
             if assignment_date:
-                success_context["assignment_date"] = assignment_date.isoformat()
+                success_context["assignment_date"] = assignment_date.isoformat() if hasattr(assignment_date, 'isoformat') else str(assignment_date)
                 self.logger.info(
                     f"Found {assignment_count} ARO assignments for employee ID: {employee_id} on date: {assignment_date}",
                     extra=success_context
@@ -160,7 +160,7 @@ class SqlAlchemyAROAssignmentRepository(BaseSqlAlchemyRepository[AROAssignment, 
             }
 
             if assignment_date:
-                error_context["assignment_date"] = assignment_date.isoformat()
+                error_context["assignment_date"] = assignment_date.isoformat() if hasattr(assignment_date, 'isoformat') else str(assignment_date)
 
             self.logger.error(
                 f"Error retrieving ARO assignments by employee ID: {error_msg}",
@@ -186,7 +186,7 @@ class SqlAlchemyAROAssignmentRepository(BaseSqlAlchemyRepository[AROAssignment, 
                     "event_type": "aro_assignments_lookup",
                     "lookup_type": "from_team_id",
                     "team_id": team_id,
-                    "assignment_date": assignment_date.isoformat()
+                    "assignment_date": assignment_date.isoformat() if hasattr(assignment_date, 'isoformat') else str(assignment_date)
                 }
             )
 
@@ -208,7 +208,7 @@ class SqlAlchemyAROAssignmentRepository(BaseSqlAlchemyRepository[AROAssignment, 
                     "event_type": "aro_assignments_lookup_success",
                     "lookup_type": "from_team_id",
                     "team_id": team_id,
-                    "assignment_date": assignment_date.isoformat(),
+                    "assignment_date": assignment_date.isoformat() if hasattr(assignment_date, 'isoformat') else str(assignment_date),
                     "assignment_count": assignment_count
                 }
             )

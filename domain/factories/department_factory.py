@@ -1,8 +1,8 @@
 # domain/factories/department_factory.py
 from typing import List, Optional, Any
 
-from domain.entities.department import Department
-from domain.entities.group import Group
+from domain.contexts.employee_management.entities.department import Department
+from domain.contexts.employee_management.entities.group import Group
 from domain.models.DepartmentModel import DepartmentModel
 from domain.models.GroupModel import GroupModel
 

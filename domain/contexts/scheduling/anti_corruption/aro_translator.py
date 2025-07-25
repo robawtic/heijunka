@@ -2,7 +2,7 @@ from typing import List, Optional
 from datetime import date
 
 from domain.contexts.assignment.aro_assignment import AROAssignment
-from domain.entities.employee import Employee
+from domain.contexts.employee_management.entities.employee import Employee
 
 class AROTranslator:
     """

@@ -23,8 +23,8 @@ from infrastructure.api.pagination import PaginationParams, Page
 from infrastructure.audit.audit_logger import get_audit_logger, AuditLogger
 from presentation.api.models import AssignmentCreate, AssignmentUpdate, AssignmentResponse, ErrorResponse
 from typing import List as TypeList
-from domain.value_objects.schedule_period import SchedulePeriod
-from domain.value_objects.work_assignment import WorkAssignment
+from domain.contexts.scheduling.value_objects.schedule_period import SchedulePeriod
+from domain.contexts.assignment.value_objects.work_assignment import WorkAssignment
 
 router = APIRouter()
 

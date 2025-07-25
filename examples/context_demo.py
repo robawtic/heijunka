@@ -10,8 +10,8 @@ to use the context.
 from datetime import date, timedelta
 from ortools.sat.python import cp_model
 
-from domain.entities.employee import Employee
-from domain.entities.workstation import Workstation
+from domain.contexts.employee_management.entities.employee import Employee
+from domain.contexts.workstation_management.entities.workstation import Workstation
 from rules.context import RuleContext, HeadsubRuleContext, rule_metadata, adapt_rule
 from rules.registry import get_rules_for_team, create_context_for_team
 

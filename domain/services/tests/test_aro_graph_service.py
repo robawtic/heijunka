@@ -4,9 +4,9 @@ from unittest.mock import MagicMock, patch, call
 import time
 from sqlalchemy.exc import OperationalError
 
-from domain.entities.employee import Employee
-from domain.entities.team import Team
-from domain.entities.workstation import Workstation
+from domain.contexts.employee_management.entities.employee import Employee
+from domain.contexts.employee_management.entities.team import Team
+from domain.contexts.workstation_management.entities.workstation import Workstation
 from domain.contexts.assignment.services.aro_graph_service import AROGraphService
 from domain.services.aro_service import AROService
 from domain.contexts.assignment.aro_assignment import AROAssignment

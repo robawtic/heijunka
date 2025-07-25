@@ -1,7 +1,7 @@
 # heijunka/domain/repositories/interfaces/line_type_repository.py
 from abc import abstractmethod
 from typing import List, Optional
-from domain.value_objects.line_type import LineType
+from domain.contexts.workstation_management.value_objects.line_type import LineType
 from domain.repositories.interfaces.base_repository import BaseRepository
 
 

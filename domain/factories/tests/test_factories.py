@@ -4,11 +4,11 @@ from datetime import date
 
 from domain.factories.employee_factory import EmployeeFactory
 from domain.factories.workstation_factory import WorkstationFactory
-from domain.entities.employee import Employee
-from domain.entities.workstation import Workstation
-from domain.value_objects.employee_availability import EmployeeAvailability, AvailabilityStatus
-from domain.entities.team_member import TeamMember
-from domain.value_objects.workstation_assignment import WorkstationAssignment
+from domain.contexts.employee_management.entities.employee import Employee
+from domain.contexts.workstation_management.entities.workstation import Workstation
+from domain.contexts.employee_management.value_objects.employee_availability import EmployeeAvailability, AvailabilityStatus
+from domain.contexts.employee_management.entities.team_member import TeamMember
+from domain.contexts.assignment.value_objects.workstation_assignment import WorkstationAssignment
 
 
 class TestFactories(unittest.TestCase):

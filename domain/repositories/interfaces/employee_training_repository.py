@@ -3,7 +3,7 @@ from abc import abstractmethod
 from typing import List, Optional
 from datetime import date
 
-from domain.value_objects.employee_training import EmployeeTraining
+from domain.contexts.employee_management.value_objects.employee_training import EmployeeTraining
 from domain.repositories.interfaces.base_repository import BaseRepository
 
 

@@ -8,9 +8,6 @@ from domain.repositories.interfaces.employee_repository import EmployeeRepositor
 from domain.repositories.interfaces.workstation_repository import WorkstationRepositoryInterface
 from domain.repositories.interfaces.team_repository import TeamRepositoryInterface
 from domain.repositories.interfaces.aro_assignment_repository import AROAssignmentRepositoryInterface
-from domain.entities.employee import Employee
-from domain.entities.workstation import Workstation
-from domain.entities.team import Team
 from utilities.logging_factory import get_logger
 
 # Create a logger for this module
@@ -75,22 +72,18 @@ class ScheduleDataService:
             identifier="start"
         )
 
-        # Batch fetch all employees and workstations
         all_employees = self.employee_repository.get_by_team_ids(team_ids)
         all_workstations = self.workstation_repository.get_by_team_ids(team_ids)
 
-        # Create lookup dictionaries for employees and workstations
         employees_by_team = {}
         workstations_by_team = {}
         employees_by_id = {}
 
         for employee in all_employees:
-            # Add to employees_by_team
             if employee.team_id not in employees_by_team:
                 employees_by_team[employee.team_id] = []
-            employees_by_team[employee.team_id].append(employee)
 
-            # Add to employees_by_id
+            employees_by_team[employee.team_id].append(employee)
             employees_by_id[employee.id] = employee
 
         for workstation in all_workstations:
@@ -98,29 +91,22 @@ class ScheduleDataService:
                 workstations_by_team[workstation.team_id] = []
             workstations_by_team[workstation.team_id].append(workstation)
 
-        # Prefetch teams, groups, and departments
         logger.info(
             "Prefetching teams, groups, and departments",
             event_type="bulk_data_fetch",
             identifier="teams_groups"
         )
-
-        # Get all teams
         teams = [self.team_repository.get(team_id) for team_id in team_ids]
-        teams = [team for team in teams if team]  # Filter out None values
-
-        # Create lookup dictionaries for teams
+        teams = [team for team in teams if team]
         teams_by_id = {team.id: team for team in teams}
         teams_by_name = {team.name: team for team in teams}
 
-        # Prefetch groups for all teams
         groups_by_team = {}
         for team_id in team_ids:
             group = self.team_repository.get_group(team_id)
             if group:
                 groups_by_team[team_id] = group
 
-        # Prefetch departments for all groups
         departments_by_group = {}
         teams_by_department = {}
         for group in groups_by_team.values():
@@ -129,7 +115,6 @@ class ScheduleDataService:
                 if department:
                     departments_by_group[group.id] = department
 
-                    # Create teams_by_department lookup
                     if department.id not in teams_by_department:
                         teams_by_department[department.id] = []
                     for team in teams:
@@ -138,7 +123,6 @@ class ScheduleDataService:
                                                   'department_id') and team_group.department_id == department.id:
                             teams_by_department[department.id].append(team)
 
-        # Prefetch ARO assignments for the date
         logger.info(
             f"Prefetching ARO assignments for date {start_date}",
             event_type="bulk_data_fetch",
@@ -286,7 +270,8 @@ class ScheduleDataService:
             'employees_by_team': employees_by_team,
             'workstations_by_team': workstations_by_team,
             'periods_per_day': periods,
-            'work_history_data': work_history_data
+            'work_history_data': work_history_data,
+            'employee_history_repo': self.work_history_repository
         }
 
         return prefetched_data
@@ -342,10 +327,8 @@ class ScheduleDataService:
                     for leader_id in team_leaders:
                         available_by_team_and_period[team_id][period].discard(leader_id)
 
-        # Remove any call-ins from every roster & period
         if call_ins:
             for call_in in call_ins:
-                # Find employee ID by name
                 emp_id = None
                 for emp_id, emp in employees_by_id.items():
                     if emp.name == call_in:
@@ -359,30 +342,22 @@ class ScheduleDataService:
                 else:
                     logger.warning(f"Call-in employee '{call_in}' not found in any team")
 
-        # Process ARO assignments that are already in the system
         for team_id in team_ids:
-            # Process full-day ARO assignments
             if team_id in aro_assignments_by_team:
                 aro_data = aro_assignments_by_team[team_id]
 
-                # Remove employees leaving as AROs from all periods
                 for emp_id in aro_data.get('out', []):
                     for period in range(1, periods + 1):
                         available_by_team_and_period[team_id][period].discard(emp_id)
 
-                # Add employees joining as AROs to all periods
                 for emp_id in aro_data.get('in', []):
                     for period in range(1, periods + 1):
                         available_by_team_and_period[team_id][period].add(emp_id)
 
-            # Process period-specific ARO assignments
             if team_id in aro_assignments_by_team_period:
                 for period, period_data in aro_assignments_by_team_period[team_id].items():
-                    # Remove employees leaving as AROs for this period
                     for emp_id in period_data.get('out', []):
                         available_by_team_and_period[team_id][period].discard(emp_id)
-
-                    # Add employees joining as AROs for this period
                     for emp_id in period_data.get('in', []):
                         available_by_team_and_period[team_id][period].add(emp_id)
 
@@ -412,19 +387,13 @@ class ScheduleDataService:
         employees_by_id = prefetched_data['employees_by_id']
         workstations_by_team = prefetched_data['workstations_by_team']
 
-        # Get workstations for this team
         workstations = workstations_by_team.get(team_id, [])
 
-        # Get employees for this team
         if period is not None and available_by_team_and_period is not None:
-            # Get available employees for this period
             available_ids = available_by_team_and_period.get(team_id, {}).get(period, set())
             employees = [employees_by_id[emp_id] for emp_id in available_ids if emp_id in employees_by_id]
         else:
-            # Get all employees for this team
             employees = prefetched_data['employees_by_team'].get(team_id, [])
-
-        # Create team-specific data dictionary
         team_data = {
             'employees': employees,
             'workstations': workstations,

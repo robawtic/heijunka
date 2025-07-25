@@ -162,31 +162,31 @@ Based on a thorough analysis of the current codebase state, this report identifi
 2. **Move repositories**:
    ```bash
    # Employee Management
-   move domain/repositories/implementations/sqlalchemy_employee_training_repository.py infrastructure/repositories/employee_management/
-   move domain/repositories/implementations/sqlalchemy_employee_workstation_repository.py infrastructure/repositories/employee_management/
-   move domain/repositories/implementations/sqlalchemy_employee_work_history_repository.py infrastructure/repositories/employee_management/
-   move domain/repositories/implementations/sqlalchemy_department_repository.py infrastructure/repositories/employee_management/
-   move domain/repositories/implementations/sqlalchemy_group_repository.py infrastructure/repositories/employee_management/
-   move domain/repositories/implementations/sqlalchemy_team_repository.py infrastructure/repositories/employee_management/
+   move domain/repositories/buses/sqlalchemy_employee_training_repository.py infrastructure/repositories/employee_management/
+   move domain/repositories/buses/sqlalchemy_employee_workstation_repository.py infrastructure/repositories/employee_management/
+   move domain/repositories/buses/sqlalchemy_employee_work_history_repository.py infrastructure/repositories/employee_management/
+   move domain/repositories/buses/sqlalchemy_department_repository.py infrastructure/repositories/employee_management/
+   move domain/repositories/buses/sqlalchemy_group_repository.py infrastructure/repositories/employee_management/
+   move domain/repositories/buses/sqlalchemy_team_repository.py infrastructure/repositories/employee_management/
    
    # Assignment Context
-   move domain/repositories/implementations/sqlalchemy_team_aro_repository.py infrastructure/repositories/assignment/
+   move domain/repositories/buses/sqlalchemy_team_aro_repository.py infrastructure/repositories/assignment/
    
    # Workstation Management
-   move domain/repositories/implementations/sqlalchemy_line_type_repository.py infrastructure/repositories/workstation_management/
+   move domain/repositories/buses/sqlalchemy_line_type_repository.py infrastructure/repositories/workstation_management/
    
    # User Management
-   move domain/repositories/implementations/sqlalchemy_role_repository.py infrastructure/repositories/user_management/
+   move domain/repositories/buses/sqlalchemy_role_repository.py infrastructure/repositories/user_management/
    
    # Shared
-   move domain/repositories/implementations/file_seed_data_repository.py infrastructure/repositories/shared/
+   move domain/repositories/buses/file_seed_data_repository.py infrastructure/repositories/shared/
    ```
 
 3. **Remove duplicates**:
    ```bash
-   del domain/repositories/implementations/sqlalchemy_employee_repository.py
-   del domain/repositories/implementations/sqlalchemy_user_repository.py
-   del domain/repositories/implementations/sqlalchemy_refresh_token_repository.py
+   del domain/repositories/buses/sqlalchemy_employee_repository.py
+   del domain/repositories/buses/sqlalchemy_user_repository.py
+   del domain/repositories/buses/sqlalchemy_refresh_token_repository.py
    ```
 
 4. **Update import paths** in:

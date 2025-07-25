@@ -5,7 +5,7 @@ from datetime import date
 from domain.contexts.employee_management.value_objects.employee_availability import EmployeeAvailability, AvailabilityStatus
 from domain.contexts.employee_management.entities.team_member import TeamMember
 from domain.contexts.employee_management.value_objects.work_history_entry import WorkHistoryEntry
-from domain.contexts.employee_management.value_objects.workstation_assignment import WorkstationAssignment
+from domain.contexts.assignment.value_objects.workstation_assignment import WorkstationAssignment
 from domain.events import (
     DomainEvent, QualificationAdded, QualificationRemoved, 
     RoleAssigned, TeamRoleAssigned, WorkHistoryEntryAdded
@@ -99,9 +99,9 @@ class Employee:
         Check if employee can handle specific workstation type based on their qualifications
         and the workstation's requirements (heavy job, key skill, etc.)
         """
-        if workstation.is_heavy() and not self.has_role("heavy_lifting_certified"):
+        if workstation.is_heavy and not self.has_role("heavy_lifting_certified"):
             return False
-        if workstation.requires_key_skill() and not self.has_role("key_skill_certified"):
+        if workstation.requires_key_skill and not self.has_role("key_skill_certified"):
             return False
         return True
 

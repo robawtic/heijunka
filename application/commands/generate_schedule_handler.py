@@ -1,11 +1,11 @@
 from typing import List, Dict
 
 from domain.services.schedule_service import ScheduleService
-from domain.value_objects.work_assignment import WorkAssignment
-from domain.repositories.interfaces.employee_repository import EmployeeRepositoryInterface
-from domain.repositories.interfaces.workstation_repository import WorkstationRepositoryInterface
+from domain.contexts.assignment.value_objects.work_assignment import WorkAssignment
+from domain.contexts.employee_management.repositories.interfaces.employee_repository import EmployeeRepositoryInterface
+from domain.contexts.workstation_management.repositories.interfaces.workstation_repository import WorkstationRepositoryInterface
 from domain.repositories.interfaces.team_repository import TeamRepositoryInterface
-from domain.repositories.interfaces.assignment_repository import AssignmentRepositoryInterface
+from domain.contexts.assignment.repositories.interfaces.assignment_repository import AssignmentRepositoryInterface
 from application.commands.generate_schedule_command import GenerateScheduleCommand
 
 
@@ -34,7 +34,6 @@ class GenerateScheduleHandler:
 
     def handle(self, command: GenerateScheduleCommand) -> List[WorkAssignment]:
         """Generate and SAVE assignments for a single team (original behavior)."""
-        # Get employees and workstations for the team
         employees = self.employee_repository.get_by_team_id(command.team_id)
         workstations = self.workstation_repository.get_by_team_id(command.team_id)
 
@@ -43,10 +42,8 @@ class GenerateScheduleHandler:
         if not team:
             raise ValueError(f"Team with ID {command.team_id} not found")
 
-        # Get work history data if needed
         work_history_data = None
         if self.work_history_repository:
-            # Fetch work history data for the employees
             work_history_data = self._fetch_work_history_data(employees, command.start_date)
 
         # Generate schedule
@@ -62,15 +59,12 @@ class GenerateScheduleHandler:
             force_complete=command.force_complete
         )
 
-        # Save schedule if repository is available
         if self.schedule_repository and schedule_metadata:
             self._save_schedule(schedule_metadata)
 
-        # Save work history entries if needed
         if self.work_history_repository and assignments:
             self._save_work_history(assignments, command.start_date)
 
-        # Save assignments
         if assignments:
             self.assignment_repository.save_all(assignments)
 
@@ -145,7 +139,7 @@ class GenerateScheduleHandler:
             return
 
         # Create work history entries
-        from domain.value_objects.work_history_entry import WorkHistoryEntry
+        from domain.contexts.employee_management.value_objects.work_history_entry import WorkHistoryEntry
 
         entries = []
         for assignment in assignments:

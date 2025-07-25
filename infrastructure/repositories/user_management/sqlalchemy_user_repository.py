@@ -1,6 +1,7 @@
+from abc import ABC
 from contextlib import contextmanager
 from typing import Optional, List, Dict, Generator, Any, Type
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import and_
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
@@ -15,14 +16,20 @@ from utilities.secure_logging import redact_log_message, sanitize_exception, log
 from infrastructure.logging.logging_factory import get_logger
 
 
-class SqlAlchemyUserRepository(BaseSqlAlchemyRepository[User, UserModel], UserRepositoryInterface):
+class SqlAlchemyUserRepository(BaseSqlAlchemyRepository[User, UserModel], UserRepositoryInterface, ABC):
     """
     SQLAlchemy implementation of the user repository interface.
     """
 
     def __init__(self, session: Session):
-        """Initialize with SQLAlchemy session."""
+        """
+        Initialize the repository with a SQLAlchemy session.
+
+        Args:
+            session: The SQLAlchemy session to use for database operations.
+        """
         super().__init__(session, UserModel, User)
+        self.session = session
         self.logger = get_logger("heijunka.repositories.user")
         self.rate_limited_logger = get_logger("heijunka.repositories.user", rate_limit=True)
 
@@ -35,10 +42,10 @@ class SqlAlchemyUserRepository(BaseSqlAlchemyRepository[User, UserModel], UserRe
             The SQLAlchemy session.
         """
         try:
-            yield self._session
-            self._session.commit()
+            yield self.session
+            self.session.commit()
         except SQLAlchemyError as e:
-            self._session.rollback()
+            self.session.rollback()
             error_msg = sanitize_exception(e)
             self.logger.error(
                 f"Database operation failed: {error_msg}",
@@ -50,7 +57,7 @@ class SqlAlchemyUserRepository(BaseSqlAlchemyRepository[User, UserModel], UserRe
             )
             raise RepositoryError(f"Database error: {error_msg}")
         except Exception as e:
-            self._session.rollback()
+            self.session.rollback()
             error_msg = sanitize_exception(e)
             self.logger.error(
                 f"Unexpected error in user repository: {error_msg}",
@@ -86,9 +93,13 @@ class SqlAlchemyUserRepository(BaseSqlAlchemyRepository[User, UserModel], UserRe
                     "redacted_fields": result.redacted_fields
                 }
             )
-
-            model = self._session.query(UserModel).filter(UserModel.username == username).first()
-            if model is None:
+            user_model = (
+                self.session
+                .query(UserModel)
+                .filter(UserModel.username == username)
+                .first()
+            )
+            if user_model is None:
                 self.logger.info(
                     "No user found with the provided username",
                     extra={
@@ -99,14 +110,14 @@ class SqlAlchemyUserRepository(BaseSqlAlchemyRepository[User, UserModel], UserRe
                 return None
 
             self.logger.info(
-                f"Found user with ID: {model.id}",
+                f"Found user with ID: {user_model.id}",
                 extra={
                     "event_type": "user_lookup_success",
                     "lookup_type": "username",
-                    "user_id": model.id
+                    "user_id": user_model.id
                 }
             )
-            return self._to_domain(model)
+            return self._to_domain(user_model)
         except SQLAlchemyError as e:
             error_msg = sanitize_exception(e)
             self.logger.error(
@@ -144,7 +155,7 @@ class SqlAlchemyUserRepository(BaseSqlAlchemyRepository[User, UserModel], UserRe
                 }
             )
 
-            model = self._session.query(UserModel).filter(UserModel.email == email).first()
+            model = self.session.query(UserModel).filter(UserModel.email == email).first()
             if model is None:
                 self.logger.info(
                     "No user found with the provided email",
@@ -202,7 +213,7 @@ class SqlAlchemyUserRepository(BaseSqlAlchemyRepository[User, UserModel], UserRe
                 }
             )
 
-            exists = self._session.query(UserModel).filter(UserModel.username == username).first() is not None
+            exists = self.session.query(UserModel).filter(UserModel.username == username).first() is not None
 
             self.rate_limited_logger.info(
                 f"Username exists: {exists}",
@@ -251,7 +262,7 @@ class SqlAlchemyUserRepository(BaseSqlAlchemyRepository[User, UserModel], UserRe
                 }
             )
 
-            exists = self._session.query(UserModel).filter(UserModel.email == email).first() is not None
+            exists = self.session.query(UserModel).filter(UserModel.email == email).first() is not None
 
             self.rate_limited_logger.info(
                 f"Email exists: {exists}",
@@ -309,8 +320,8 @@ class SqlAlchemyUserRepository(BaseSqlAlchemyRepository[User, UserModel], UserRe
                     return False
 
                 # Update the last login timestamp
-                model.last_login_at = datetime.utcnow()
-                model.updated_at = datetime.utcnow()
+                model.last_login_at = datetime.now(timezone.utc)
+                model.updated_at = datetime.now(timezone.utc)
 
                 # Prepare audit data with optional client information
                 audit_data = {"user_id": user_id}
@@ -418,7 +429,7 @@ class SqlAlchemyUserRepository(BaseSqlAlchemyRepository[User, UserModel], UserRe
 
                 # Add the role to the user
                 user.roles.append(role)
-                user.updated_at = datetime.utcnow()
+                user.updated_at = datetime.now(timezone.utc)
 
                 # Prepare audit data with optional client information
                 audit_data = {"user_id": user_id, "role_name": role_name}
@@ -527,7 +538,7 @@ class SqlAlchemyUserRepository(BaseSqlAlchemyRepository[User, UserModel], UserRe
 
                 # Remove the role from the user
                 user.roles.remove(role)
-                user.updated_at = datetime.utcnow()
+                user.updated_at = datetime.now(timezone.utc)
 
                 # Prepare audit data with optional client information
                 audit_data = {"user_id": user_id, "role_name": role_name}
@@ -589,7 +600,7 @@ class SqlAlchemyUserRepository(BaseSqlAlchemyRepository[User, UserModel], UserRe
             )
 
             # Get the role
-            role = self._session.query(RoleModel).filter(RoleModel.name == role_name).first()
+            role = self.session.query(RoleModel).filter(RoleModel.name == role_name).first()
             if role is None:
                 self.logger.warning(
                     f"Role not found with name: {role_name}",
@@ -674,7 +685,7 @@ class SqlAlchemyUserRepository(BaseSqlAlchemyRepository[User, UserModel], UserRe
                     return True
 
                 model.is_active = True
-                model.updated_at = datetime.utcnow()
+                model.updated_at = datetime.now(timezone.utc)
 
                 # Prepare audit data with optional client information
                 audit_data = {"user_id": user_id}
@@ -761,7 +772,7 @@ class SqlAlchemyUserRepository(BaseSqlAlchemyRepository[User, UserModel], UserRe
                     return True
 
                 model.is_active = False
-                model.updated_at = datetime.utcnow()
+                model.updated_at = datetime.now(timezone.utc)
 
                 # Prepare audit data with optional client information
                 audit_data = {"user_id": user_id}
@@ -1002,7 +1013,7 @@ class SqlAlchemyUserRepository(BaseSqlAlchemyRepository[User, UserModel], UserRe
             model.verification_token_expires_at = entity.verification_token_expires_at
             model.password_reset_token = entity.password_reset_token
             model.password_reset_token_expires_at = entity.password_reset_token_expires_at
-            model.updated_at = datetime.utcnow()
+            model.updated_at = datetime.now(timezone.utc)
 
             self.logger.debug(
                 "Successfully updated user model",

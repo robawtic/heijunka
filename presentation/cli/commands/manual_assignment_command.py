@@ -8,9 +8,9 @@ from sqlalchemy.orm import Session
 
 from application.commands.create_manual_assignment_command import CreateManualAssignmentCommand
 from application.commands.create_manual_assignment_handler import CreateManualAssignmentHandler
-from domain.repositories.implementations.sqlalchemy_employee_repository import SqlAlchemyEmployeeRepository
-from domain.repositories.implementations.sqlalchemy_workstation_repository import SqlAlchemyWorkstationRepository
-from domain.repositories.implementations.sqlalchemy_assignment_repository import SqlAlchemyAssignmentRepository
+from infrastructure.repositories.employee_management.sqlalchemy_employee_repository import SqlAlchemyEmployeeRepository
+from infrastructure.repositories.workstation_management.sqlalchemy_workstation_repository import SqlAlchemyWorkstationRepository
+from infrastructure.repositories.assignment.sqlalchemy_assignment_repository import SqlAlchemyAssignmentRepository
 from utilities.logging_factory import get_logger, RateLimitedLogger
 
 # Create a logger for this module
@@ -32,7 +32,7 @@ def handle_manual_assignment(args: Any, session_factory: Any) -> bool:
         event_type="manual_assignment", 
         identifier="start"
     )
-    
+
     try:
         # Setup repositories
         logger.debug(
@@ -40,7 +40,7 @@ def handle_manual_assignment(args: Any, session_factory: Any) -> bool:
             event_type="manual_assignment", 
             identifier="setup"
         )
-        
+
         employee_repository = SqlAlchemyEmployeeRepository(session_factory)
         workstation_repository = SqlAlchemyWorkstationRepository(session_factory)
         assignment_repository = SqlAlchemyAssignmentRepository(session_factory)
@@ -51,7 +51,7 @@ def handle_manual_assignment(args: Any, session_factory: Any) -> bool:
             event_type="manual_assignment", 
             identifier="employee_lookup"
         )
-        
+
         employee = employee_repository.get_by_name(args.employee)
         if not employee:
             error_msg = f"Error: Employee '{args.employee}' not found"
@@ -69,7 +69,7 @@ def handle_manual_assignment(args: Any, session_factory: Any) -> bool:
             event_type="manual_assignment", 
             identifier="workstation_lookup"
         )
-        
+
         workstation = workstation_repository.get_by_name(args.workstation)
         if not workstation:
             error_msg = f"Error: Workstation '{args.workstation}' not found"
@@ -87,7 +87,7 @@ def handle_manual_assignment(args: Any, session_factory: Any) -> bool:
             event_type="manual_assignment", 
             identifier="date_parsing"
         )
-        
+
         try:
             assignment_date = datetime.strptime(args.date, "%Y-%m-%d").date()
         except ValueError:
@@ -106,7 +106,7 @@ def handle_manual_assignment(args: Any, session_factory: Any) -> bool:
             event_type="manual_assignment", 
             identifier="period_validation"
         )
-        
+
         if args.period < 1 or args.period > 4:
             error_msg = f"Error: Period must be between 1 and 4"
             logger.error(
@@ -123,7 +123,7 @@ def handle_manual_assignment(args: Any, session_factory: Any) -> bool:
             event_type="manual_assignment", 
             identifier="handler_creation"
         )
-        
+
         handler = CreateManualAssignmentHandler(assignment_repository)
 
         # Create command
@@ -132,7 +132,7 @@ def handle_manual_assignment(args: Any, session_factory: Any) -> bool:
             event_type="manual_assignment", 
             identifier="command_creation"
         )
-        
+
         command = CreateManualAssignmentCommand(
             employee_id=employee.id,
             workstation_id=workstation.id,
@@ -147,7 +147,7 @@ def handle_manual_assignment(args: Any, session_factory: Any) -> bool:
             event_type="manual_assignment", 
             identifier="command_execution"
         )
-        
+
         success = handler.handle(command)
 
         if success:

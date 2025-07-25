@@ -1,13 +1,11 @@
-# domain/repositories/implementations/sqlalchemy_assignment_repository.py
-from typing import List, Optional, Dict, Any, Tuple
+# domain/repositories/buses/sqlalchemy_assignment_repository.py
+from typing import List, Optional, Tuple
 from datetime import date
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy import and_
 
-from domain.value_objects.work_assignment import WorkAssignment
-from domain.value_objects.schedule_period import SchedulePeriod
-from domain.value_objects.work_assignment_validator import WorkAssignmentValidator
+from domain.contexts.assignment.value_objects.work_assignment import WorkAssignment
+from domain.contexts.assignment.value_objects.work_assignment_validator import WorkAssignmentValidator
 from domain.models.EmployeeWorkHistoryModel import EmployeeWorkHistoryModel, WorkHistoryStatus
 from domain.repositories.interfaces.assignment_repository import AssignmentRepositoryInterface
 from domain.factories.work_assignment_factory import WorkAssignmentFactory
@@ -266,58 +264,20 @@ class SqlAlchemyAssignmentRepository(BaseSqlAlchemyRepository[WorkAssignment, Em
 
         try:
             with self.session_scope() as session:
-                # If version is provided, use it for optimistic concurrency control
-                if version is not None:
-                    # Check if the entity exists with the specified ID and version
-                    model = session.query(EmployeeWorkHistoryModel).filter(
-                        EmployeeWorkHistoryModel.id == assignment_id,
-                        EmployeeWorkHistoryModel.version == version
-                    ).first()
+                # No version provided, just get the entity by ID
+                model = session.get(EmployeeWorkHistoryModel, assignment_id)
 
-                    if not model:
-                        # Check if the entity exists with a different version
-                        exists = session.query(EmployeeWorkHistoryModel).filter(
-                            EmployeeWorkHistoryModel.id == assignment_id
-                        ).first() is not None
-
-                        if exists:
-                            error_msg = f"Concurrent modification detected for work assignment with ID {assignment_id}"
-                            self.logger.warning(
-                                error_msg,
-                                extra={
-                                    "event_type": "assignment_update_failed",
-                                    "assignment_id": assignment_id,
-                                    "reason": "concurrent_modification",
-                                    "version": version
-                                }
-                            )
-                            raise RepositoryError(error_msg)
-                        else:
-                            error_msg = f"Work assignment with ID {assignment_id} not found"
-                            self.logger.warning(
-                                error_msg,
-                                extra={
-                                    "event_type": "assignment_update_failed",
-                                    "assignment_id": assignment_id,
-                                    "reason": "not_found"
-                                }
-                            )
-                            raise RepositoryError(error_msg)
-                else:
-                    # No version provided, just get the entity by ID
-                    model = session.get(EmployeeWorkHistoryModel, assignment_id)
-
-                    if not model:
-                        error_msg = f"Work assignment with ID {assignment_id} not found"
-                        self.logger.warning(
-                            error_msg,
-                            extra={
-                                "event_type": "assignment_update_failed",
-                                "assignment_id": assignment_id,
-                                "reason": "not_found"
-                            }
-                        )
-                        raise RepositoryError(error_msg)
+                if not model:
+                    error_msg = f"Work assignment with ID {assignment_id} not found"
+                    self.logger.warning(
+                        error_msg,
+                        extra={
+                            "event_type": "assignment_update_failed",
+                            "assignment_id": assignment_id,
+                            "reason": "not_found"
+                        }
+                    )
+                    raise RepositoryError(error_msg)
 
                 self.rate_limited_logger.debug(
                     f"Updating EmployeeWorkHistoryModel [id={model.id}] from domain WorkAssignment",
@@ -841,8 +801,8 @@ class SqlAlchemyAssignmentRepository(BaseSqlAlchemyRepository[WorkAssignment, Em
 
         This method first validates all assignments, then deletes any existing entries 
         for the dates in the assignments to avoid duplicate schedules. It processes 
-        assignments in batches to avoid long-running transactions, but uses a single 
-        session for all batches to ensure entity relationships are maintained.
+        assignments in batches to avoid long-running transactions, using the session_scope
+        context manager to ensure proper commit/rollback handling for all batches.
 
         Args:
             assignments: The list of work assignments to save.
@@ -880,19 +840,22 @@ class SqlAlchemyAssignmentRepository(BaseSqlAlchemyRepository[WorkAssignment, Em
                 }
             )
 
-            # Log details of the first 5 invalid assignments
+            # Enhanced logging for invalid assignments
             for i, (assignment, error_msg) in enumerate(invalid_assignments[:5]):
-                self.logger.warning(
-                    f"Invalid assignment {i+1}: {error_msg}",
+                self.logger.error(
+                    f"Assignment validation failed: {error_msg}",
                     extra={
-                        "event_type": "invalid_assignment_details",
-                        "employee_id": getattr(assignment.employee, 'id', None),
-                        "employee_name": getattr(assignment.employee, 'name', None) if hasattr(assignment.employee, 'name') else None,
-                        "workstation_id": getattr(assignment.workstation, 'id', None),
-                        "workstation_name": getattr(assignment.workstation, 'name', None) if hasattr(assignment.workstation, 'name') else None,
-                        "date": self._format_date(getattr(assignment.period, 'date', None)),
-                        "period": getattr(assignment.period, 'period', None),
-                        "error": error_msg
+                        "event_type": "assignment_validation_failure_detail",
+                        "employee_id": getattr(assignment.employee, 'id', None) if assignment.employee else None,
+                        "employee_name": getattr(assignment.employee, 'name', None) if hasattr(assignment, 'employee') and hasattr(assignment.employee, 'name') else None,
+                        "workstation_id": getattr(assignment.workstation, 'id', None) if assignment.workstation else None,
+                        "workstation_name": getattr(assignment.workstation, 'name', None) if hasattr(assignment, 'workstation') and hasattr(assignment.workstation, 'name') else None,
+                        "date": str(getattr(assignment.period, 'date', None)) if assignment.period else None,
+                        "period": getattr(assignment.period, 'period', None) if assignment.period else None,
+                        "validation_error": error_msg,
+                        "employee_exists": assignment.employee is not None,
+                        "workstation_exists": assignment.workstation is not None,
+                        "period_exists": assignment.period is not None
                     }
                 )
 
@@ -957,113 +920,128 @@ class SqlAlchemyAssignmentRepository(BaseSqlAlchemyRepository[WorkAssignment, Em
             error_summary = "; ".join([f"{self._format_date(date)}: {error}" for date, error in failed_dates])
             raise RepositoryError(f"Failed to delete existing entries for some dates: {error_summary}")
 
-        # Create a single session for all batches
-        session = self._session_factory()
+        # Use session_scope context manager to ensure proper commit/rollback handling
         success_count = 0
         failed_assignments = []
 
         try:
-            # Process assignments in batches but within the same session
-            for i in range(0, len(assignments), batch_size):
-                batch = assignments[i:i+batch_size]
+            with self.session_scope() as session:
+                # Process assignments in batches within the same session
+                for i in range(0, len(assignments), batch_size):
+                    batch = assignments[i:i+batch_size]
 
-                self.logger.info(
-                    f"Processing batch {i//batch_size + 1} of {(len(assignments) + batch_size - 1) // batch_size} (size: {len(batch)})",
-                    extra={
-                        "event_type": "assignments_batch_processing",
-                        "batch_number": i//batch_size + 1,
-                        "total_batches": (len(assignments) + batch_size - 1) // batch_size,
-                        "batch_size": len(batch)
-                    }
-                )
+                    self.logger.info(
+                        f"Processing batch {i//batch_size + 1} of {(len(assignments) + batch_size - 1) // batch_size} (size: {len(batch)})",
+                        extra={
+                            "event_type": "assignments_batch_processing",
+                            "batch_number": i//batch_size + 1,
+                            "total_batches": (len(assignments) + batch_size - 1) // batch_size,
+                            "batch_size": len(batch)
+                        }
+                    )
 
-                batch_success_count = 0
-                batch_failed_count = 0
+                    batch_success_count = 0
+                    batch_failed_count = 0
 
-                for idx, assignment in enumerate(batch):
+                    for idx, assignment in enumerate(batch):
+                        try:
+                            # Convert to model
+                            self.rate_limited_logger.debug(
+                                "Converting WorkAssignment to EmployeeWorkHistoryModel",
+                                "domain_to_model_conversion",
+                                str(assignment.employee.id),
+                                extra={
+                                    "employee_id": assignment.employee.id,
+                                    "workstation_id": assignment.workstation.id
+                                }
+                            )
+
+                            model = self._to_model(assignment)
+                            session.add(model)
+                            batch_success_count += 1
+                        except Exception as e:
+                            error_msg = sanitize_exception(e)
+                            self.logger.error(
+                                f"Error saving assignment: {error_msg}",
+                                extra={
+                                    "event_type": "assignment_save_error",
+                                    "employee_id": assignment.employee.id,
+                                    "workstation_id": assignment.workstation.id,
+                                    "date": self._format_date(assignment.period.date),
+                                    "period": assignment.period.period,
+                                    "error_type": type(e).__name__
+                                }
+                            )
+                            failed_assignments.append(assignment)
+                            batch_failed_count += 1
+
+                    # Flush after each batch to ensure all assignments in this batch are processed
+                    # The session_scope context manager will handle the final commit
                     try:
-                        # Convert to model
-                        self.rate_limited_logger.debug(
-                            "Converting WorkAssignment to EmployeeWorkHistoryModel",
-                            "domain_to_model_conversion",
-                            str(assignment.employee.id),
+                        session.flush()
+                        self.logger.info(
+                            f"Batch {i//batch_size + 1}: Successfully flushed {batch_success_count} assignments",
                             extra={
-                                "employee_id": assignment.employee.id,
-                                "workstation_id": assignment.workstation.id
+                                "event_type": "assignments_batch_flush_success",
+                                "batch_number": i//batch_size + 1,
+                                "flushed_count": batch_success_count
                             }
                         )
-
-                        # Ensure the assignment has the correct status (GENERATED)
-                        assignment = assignment.with_status(WorkHistoryStatus.GENERATED)
-
-
-                        model = self._to_model(assignment)
-                        session.add(model)
-                        batch_success_count += 1
                     except Exception as e:
                         error_msg = sanitize_exception(e)
                         self.logger.error(
-                            f"Error saving assignment: {error_msg}",
+                            f"Error flushing batch {i//batch_size + 1}: {error_msg}",
                             extra={
-                                "event_type": "assignment_save_error",
-                                "employee_id": assignment.employee.id,
-                                "workstation_id": assignment.workstation.id,
-                                "date": self._format_date(assignment.period.date),
-                                "period": assignment.period.period,
+                                "event_type": "batch_flush_error",
+                                "batch_number": i//batch_size + 1,
                                 "error_type": type(e).__name__
                             }
                         )
-                        failed_assignments.append(assignment)
-                        batch_failed_count += 1
+                        # Re-raise the exception to trigger rollback via session_scope
+                        raise
 
-                # Flush after each batch to ensure all assignments in this batch are saved
-                # but don't commit yet to maintain the session
-                try:
-                    session.flush()
-                except Exception as e:
-                    error_msg = sanitize_exception(e)
-                    self.logger.error(
-                        f"Error flushing batch {i//batch_size + 1}: {error_msg}",
+                    self.logger.info(
+                        f"Batch {i//batch_size + 1}: Processed {batch_success_count} assignments, {batch_failed_count} failed",
                         extra={
-                            "event_type": "batch_flush_error",
+                            "event_type": "assignments_batch_result",
                             "batch_number": i//batch_size + 1,
-                            "error_type": type(e).__name__
+                            "success_count": batch_success_count,
+                            "failed_count": batch_failed_count
                         }
                     )
-                    # Continue processing other batches even if this one failed
-                    # The session will be rolled back at the end if any batch fails
 
+                    success_count += batch_success_count
+
+                # Check if there were any failed assignments before allowing commit
+                if failed_assignments:
+                    error_msg = f"Cannot commit due to {len(failed_assignments)} failed assignments"
+                    self.logger.warning(
+                        error_msg,
+                        extra={
+                            "event_type": "assignments_commit_prevented",
+                            "failed_count": len(failed_assignments)
+                        }
+                    )
+                    raise RepositoryError(error_msg)
+
+                # If we reach here, all batches were processed successfully
+                # The session_scope context manager will automatically commit
                 self.logger.info(
-                    f"Batch {i//batch_size + 1}: Processed {batch_success_count} assignments, {batch_failed_count} failed",
+                    f"All {success_count} assignments processed successfully, ready for commit",
                     extra={
-                        "event_type": "assignments_batch_result",
-                        "batch_number": i//batch_size + 1,
-                        "success_count": batch_success_count,
-                        "failed_count": batch_failed_count
-                    }
-                )
-
-                success_count += batch_success_count
-
-            # Commit the session after all batches are processed
-            if len(failed_assignments) == 0:
-                session.commit()
-                self.logger.info(
-                    "Successfully committed all assignments to the database",
-                    extra={
-                        "event_type": "assignments_commit_success",
+                        "event_type": "assignments_ready_for_commit",
                         "total_count": success_count
                     }
                 )
-            else:
-                session.rollback()
-                self.logger.warning(
-                    f"Rolling back due to {len(failed_assignments)} failed assignments",
-                    extra={
-                        "event_type": "assignments_rollback",
-                        "failed_count": len(failed_assignments)
-                    }
-                )
+
+            # If we reach here, the session_scope has successfully committed
+            self.logger.info(
+                "Successfully committed all assignments to the database",
+                extra={
+                    "event_type": "assignments_commit_success",
+                    "total_count": success_count
+                }
+            )
 
             self.logger.info(
                 f"Total: Successfully processed {success_count} assignments, {len(failed_assignments)} failed",
@@ -1076,33 +1054,21 @@ class SqlAlchemyAssignmentRepository(BaseSqlAlchemyRepository[WorkAssignment, Em
 
             # Return true only if there were no failed assignments and no invalid assignments
             return len(failed_assignments) == 0 and len(invalid_assignments) == 0
-        except SQLAlchemyError as e:
-            # Rollback the session if there's an error
-            session.rollback()
-            error_msg = sanitize_exception(e)
-            self.logger.error(
-                f"Database error saving assignments: {error_msg}",
-                extra={
-                    "event_type": "assignments_save_error",
-                    "error_type": type(e).__name__
-                }
-            )
-            raise RepositoryError(f"Database error saving assignments: {error_msg}")
+
+        except RepositoryError:
+            # Re-raise RepositoryError as-is (these are already properly logged)
+            raise
         except Exception as e:
-            # Rollback the session if there's an error
-            session.rollback()
+            # Handle any unexpected errors not caught by session_scope
             error_msg = sanitize_exception(e)
             self.logger.error(
-                f"Error saving assignments: {error_msg}",
+                f"Unexpected error in save_all: {error_msg}",
                 extra={
-                    "event_type": "assignments_save_error",
+                    "event_type": "assignments_save_unexpected_error",
                     "error_type": type(e).__name__
                 }
             )
-            raise RepositoryError(f"Error saving assignments: {error_msg}")
-        finally:
-            # Always close the session
-            session.close()
+            raise RepositoryError(f"Unexpected error saving assignments: {error_msg}")
 
     def delete_existing_entries_for_date(self, date_obj: date) -> int:
         """

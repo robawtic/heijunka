@@ -3,7 +3,7 @@ from sqlalchemy.orm import relationship
 from datetime import datetime
 
 from .Base import Base
-from domain.entities.team import Team
+from domain.contexts.employee_management.entities.team import Team
 
 
 class TeamModel(Base):
@@ -25,9 +25,9 @@ class TeamModel(Base):
 
     def to_domain(self) -> Team:
         """Convert TeamModel to Team domain entity"""
-        from domain.entities.employee import Employee
-        from domain.entities.workstation import Workstation
-        from domain.entities.team_member import TeamMember
+        from domain.contexts.employee_management.entities.employee import Employee
+        from domain.contexts.workstation_management.entities.workstation import Workstation
+        from domain.contexts.employee_management.entities.team_member import TeamMember
 
         # Create team members
         team_members = []
@@ -43,17 +43,39 @@ class TeamModel(Base):
             team_members.append(team_member)
 
         # Create workstations
-        workstations = [
-            Workstation(
+        workstations = []
+        for ws in self.workstations:
+            # Extract attributes from the new attribute system
+            attribute_names = [attr.name for attr in ws.attributes] if ws.attributes else []
+
+            # Map attributes back to the expected format
+            line_type = "Mainline"  # default
+            if "mainline" in attribute_names:
+                line_type = "Mainline"
+            elif "subline" in attribute_names:
+                line_type = "Sub-Assembly"
+
+            is_loading_job = "loading" in attribute_names
+            is_heavy_job = "heavy" in attribute_names
+            is_key_skill_job = "skill_level_3" in attribute_names  # Assuming skill_level_3 = key skill
+
+            # Create workstation with the new attribute system
+            attributes = []
+            if is_loading_job:
+                attributes.append("loading")
+            if is_heavy_job:
+                attributes.append("heavy")
+            if is_key_skill_job:
+                attributes.append("skill_level_3")  # Assuming key skill = advanced skill
+
+            workstation = Workstation(
                 id=ws.id,
                 name=ws.name,
-                line_type=str(ws.line_type),
-                is_loading_job=ws.is_loading_job,
-                is_heavy_job=ws.is_heavy_job,
-                is_key_skill_job=ws.is_key_skill_job,
-                team_id=ws.team_id
-            ) for ws in self.workstations
-        ]
+                line_type=line_type,
+                team_id=ws.team_id,
+                _attributes=attributes
+            )
+            workstations.append(workstation)
 
         return Team(
             id=self.id,

@@ -1,7 +1,7 @@
 # heijunka/domain/contexts/user_management/entities/api_key.py
 from dataclasses import dataclass, field
 from typing import Optional, List
-from datetime import datetime
+from datetime import datetime, timezone
 import uuid
 import secrets
 import ipaddress
@@ -36,9 +36,9 @@ class ApiKey:
         if self._domain_events is None:
             self._domain_events = []
         if self.created_at is None:
-            self.created_at = datetime.utcnow()
+            self.created_at = datetime.now(timezone.utc)
         if self.updated_at is None:
-            self.updated_at = datetime.utcnow()
+            self.updated_at = datetime.now(timezone.utc)
         if not self.key_id:
             self.key_id = str(uuid.uuid4())
         if not self.key_value:
@@ -65,18 +65,18 @@ class ApiKey:
     def deactivate(self) -> None:
         """Deactivate the API key."""
         self.is_active = False
-        self.updated_at = datetime.utcnow()
+        self.updated_at = datetime.now(timezone.utc)
 
     def activate(self) -> None:
         """Activate the API key."""
         self.is_active = True
-        self.updated_at = datetime.utcnow()
+        self.updated_at = datetime.now(timezone.utc)
 
     def is_expired(self) -> bool:
         """Check if the API key is expired."""
         if self.expires_at is None:
             return False
-        return datetime.utcnow() > self.expires_at
+        return datetime.now(timezone.utc) > self.expires_at
 
     def is_valid(self) -> bool:
         """Check if the API key is valid (active and not expired)."""

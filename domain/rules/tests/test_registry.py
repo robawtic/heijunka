@@ -3,8 +3,8 @@ from unittest.mock import patch, MagicMock
 
 from ortools.sat.python.cp_model import CpModel
 
-from domain.entities.employee import Employee
-from domain.entities.workstation import Workstation
+from domain.contexts.employee_management.entities.employee import Employee
+from domain.contexts.workstation_management.entities.workstation import Workstation
 from domain.rules.context import RuleContext, HeadsubRuleContext
 from domain.rules.registry import (
     COMMON_HARD_RULES,

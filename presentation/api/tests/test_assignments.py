@@ -4,9 +4,9 @@ from unittest.mock import patch, MagicMock
 from datetime import date
 
 from presentation.api.app import app
-from domain.value_objects.work_history_entry import WorkHistoryEntry
-from domain.entities.employee import Employee
-from domain.entities.workstation import Workstation
+from domain.contexts.employee_management.value_objects.work_history_entry import WorkHistoryEntry
+from domain.contexts.employee_management.entities.employee import Employee
+from domain.contexts.workstation_management.entities.workstation import Workstation
 
 # Create a test client
 client = TestClient(app)
